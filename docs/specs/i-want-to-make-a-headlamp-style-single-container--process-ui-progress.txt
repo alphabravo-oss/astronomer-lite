@@ -1,0 +1,58 @@
+Astronomer-Lite — Implementation Progress
+Spec: docs/specs/i-want-to-make-a-headlamp-style-single-container--process-ui.md
+Created: 2026-05-08
+
+PHASE 1 — Walking Skeleton
+[PENDING] US-1: Repo skeleton + dev workflow
+[PENDING] US-2: Lift design system
+[PENDING] US-3: Kubeconfig loading + cluster list
+[PENDING] US-4: Add / remove kubeconfig via UI
+[PENDING] US-5: Cluster dashboard + Pods page
+Phase 1 verification:
+  [PENDING] make build produces a runnable binary
+  [PENDING] docker build produces an image under 200MB
+  [PENDING] go vet ./... && go test ./... passes
+  [PENDING] npm run lint && tsc --noEmit passes
+  [PENDING] e2e (k3d) cluster list / dashboard / pods page
+
+PHASE 2 — Live Data + Read Pages
+[PENDING] US-6: WebSocket plumbing for watches
+[PENDING] US-7: All workload list pages
+[PENDING] US-8: Storage / Networking / Security / Cluster read pages
+[PENDING] US-9: Generic resource browser
+[PENDING] US-10: Pod logs (live tail)
+[PENDING] US-11: Cluster events stream
+Phase 2 verification:
+  [PENDING] e2e (k3d) create/delete Deployment reflects in UI < 1s
+  [PENDING] logs tail in real-time
+  [PENDING] events stream shows live events
+  [PENDING] watch reconnects on transient disconnect
+
+PHASE 3 — Write & Heavy-Interactive
+[PENDING] US-12: YAML view + edit (Monaco)
+[PENDING] US-13: Pod exec terminal
+[PENDING] US-14: Port-forward
+[PENDING] US-15: Metrics from metrics-server
+[PENDING] US-16: Secrets reveal
+Phase 3 verification:
+  [PENDING] yaml edit dry-run shows diff and applies
+  [PENDING] exec terminal runs interactive top
+  [PENDING] port-forward localhost URL works
+  [PENDING] metrics charts render with metrics-server / hide without
+  [PENDING] secrets masked by default; reveal works per-key
+
+PHASE 4 — Plugin Architecture Stub
+[PENDING] US-17: Plugin registry seam
+Phase 4 verification:
+  [PENDING] docs/plugins.md exists and documents interfaces
+  [PENDING] removing an internal plugin registration removes its nav and route
+
+DEFINITION OF DONE
+[PENDING] All user stories acceptance criteria pass
+[PENDING] go vet + go test clean
+[PENDING] npm lint + tsc --noEmit clean
+[PENDING] make build + docker build (image < 200MB)
+[PENDING] e2e suite green against k3d in CI
+[PENDING] Visual parity review vs astronomer/frontend
+[PENDING] README documents docker run quickstart and exec-plugin caveat
+[PENDING] docs/plugins.md exists

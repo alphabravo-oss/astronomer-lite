@@ -1,0 +1,141 @@
+{
+  "slug": "i-want-to-make-a-headlamp-style-single-container--process-ui",
+  "title": "Astronomer-Lite — Headlamp-style multi-cluster Kubernetes UI",
+  "created": "2026-05-08",
+  "owner": "mj@alphabravo.io",
+  "status": "ready_for_implementation",
+  "summary": "Single-container Kubernetes UI that reads kubeconfigs and manages multiple remote clusters. Visually matches astronomer-go's design system (lifted from ../astronomer/frontend), but architecturally simpler — no agents, no tunnel, no central DB, no multi-user auth. Local-first MVP; server mode is a separate later spec.",
+  "architecture": {
+    "deployment_scope": "local_first_server_mode_later",
+    "frontend": "vite_react_spa_reusing_design_tokens",
+    "backend": "go_client_go_embed_fs",
+    "distribution": "container_image_only",
+    "layout_strategy": "lift_astronomer_frontend_layout_verbatim",
+    "live_data": "websocket_per_stream",
+    "api_style": "thin_rest_proxy_to_apiserver",
+    "multi_cluster_ux": "single_active_cluster_top_bar_switcher",
+    "namespace_ux": "multi_select_top_bar_persists_per_cluster",
+    "secrets_ux": "masked_default_reveal_per_key",
+    "theme": "dark_default_light_toggle",
+    "repo_layout": "monorepo_server_web",
+    "dev_workflow": "vite_dev_plus_go_run",
+    "testing": "go_unit_plus_e2e_k3d",
+    "default_port": 8080
+  },
+  "in_scope": [
+    "auto_load_kubeconfig",
+    "ui_add_remove_managed_kubeconfigs",
+    "context_per_cluster_entry",
+    "cluster_reachability_probe_30s",
+    "cluster_dashboard",
+    "workloads_full_set",
+    "storage_pages",
+    "networking_pages",
+    "security_pages_read_only",
+    "cluster_pages_namespaces_nodes_events_crds",
+    "generic_resource_browser_via_discovery",
+    "pod_logs_live_tail",
+    "pod_exec_terminal",
+    "port_forward",
+    "yaml_view_edit_monaco_with_dry_run",
+    "metrics_from_metrics_server",
+    "secrets_masked_reveal_per_key",
+    "multi_select_namespace_filter",
+    "dark_light_theme",
+    "kubeconfig_exec_plugin_support",
+    "plugin_registry_seam_internal_only"
+  ],
+  "out_of_scope": [
+    "multi_user_login_oidc_app_rbac",
+    "agent_tunnel_reverse_proxy",
+    "argocd_integration",
+    "persistent_app_database",
+    "external_plugin_loader",
+    "bundled_cloud_exec_plugins",
+    "raw_binary_distribution",
+    "helm_chart",
+    "homebrew_scoop_apt",
+    "auto_open_browser",
+    "telemetry_phone_home"
+  ],
+  "user_stories": [
+    {"id": "US-1", "phase": 1, "title": "Repo skeleton + dev workflow"},
+    {"id": "US-2", "phase": 1, "title": "Lift design system"},
+    {"id": "US-3", "phase": 1, "title": "Kubeconfig loading + cluster list"},
+    {"id": "US-4", "phase": 1, "title": "Add / remove kubeconfig via UI"},
+    {"id": "US-5", "phase": 1, "title": "Cluster dashboard + Pods page"},
+    {"id": "US-6", "phase": 2, "title": "WebSocket plumbing for watches"},
+    {"id": "US-7", "phase": 2, "title": "All workload list pages"},
+    {"id": "US-8", "phase": 2, "title": "Storage / Networking / Security / Cluster read pages"},
+    {"id": "US-9", "phase": 2, "title": "Generic resource browser"},
+    {"id": "US-10", "phase": 2, "title": "Pod logs (live tail)"},
+    {"id": "US-11", "phase": 2, "title": "Cluster events stream"},
+    {"id": "US-12", "phase": 3, "title": "YAML view + edit (Monaco)"},
+    {"id": "US-13", "phase": 3, "title": "Pod exec terminal"},
+    {"id": "US-14", "phase": 3, "title": "Port-forward"},
+    {"id": "US-15", "phase": 3, "title": "Metrics from metrics-server"},
+    {"id": "US-16", "phase": 3, "title": "Secrets reveal"},
+    {"id": "US-17", "phase": 4, "title": "Plugin registry seam"}
+  ],
+  "phases": [
+    {
+      "number": 1,
+      "name": "Walking Skeleton",
+      "stories": ["US-1", "US-2", "US-3", "US-4", "US-5"],
+      "verification": [
+        "make build produces a runnable binary",
+        "docker build produces an image under 200MB",
+        "go vet ./... && go test ./... passes",
+        "npm run lint && tsc --noEmit passes",
+        "e2e (k3d) cluster list, dashboard, pods page work"
+      ]
+    },
+    {
+      "number": 2,
+      "name": "Live Data + Read Pages",
+      "stories": ["US-6", "US-7", "US-8", "US-9", "US-10", "US-11"],
+      "verification": [
+        "e2e (k3d) create/delete deployment reflects in UI within 1s",
+        "logs tail in real-time",
+        "events stream shows live events",
+        "watch reconnects on transient disconnect"
+      ]
+    },
+    {
+      "number": 3,
+      "name": "Write & Heavy-Interactive",
+      "stories": ["US-12", "US-13", "US-14", "US-15", "US-16"],
+      "verification": [
+        "yaml edit dry-run shows diff and applies",
+        "exec terminal runs interactive top",
+        "port-forward localhost url works",
+        "metrics charts render with metrics-server, hide gracefully without",
+        "secrets masked by default reveal per-key works"
+      ]
+    },
+    {
+      "number": 4,
+      "name": "Plugin Architecture Stub",
+      "stories": ["US-17"],
+      "verification": [
+        "docs/plugins.md exists and documents interfaces",
+        "removing an internal plugin registration removes its nav entry and route"
+      ]
+    }
+  ],
+  "non_functional_requirements": [
+    {"id": "NFR-1", "text": "cold start under 2s on developer laptop"},
+    {"id": "NFR-2", "text": "container image under 200MB"},
+    {"id": "NFR-3", "text": "first paint of cluster list under 500ms after /api/clusters resolves"},
+    {"id": "NFR-4", "text": "watch reconnect transparent to user"},
+    {"id": "NFR-5", "text": "no app state survives container restart except files under ~/.config/astronomer-lite"},
+    {"id": "NFR-6", "text": "secrets values never logged"},
+    {"id": "NFR-7", "text": "User-Agent set to astronomer-lite/<version> on all k8s API calls"}
+  ],
+  "references": {
+    "design_source": "../astronomer/frontend",
+    "patterns_source": "../astronomer-go",
+    "external_inspiration": "https://headlamp.dev"
+  },
+  "spec_path": "docs/specs/i-want-to-make-a-headlamp-style-single-container--process-ui.md"
+}

@@ -1,0 +1,22 @@
+# Build output
+web/dist/
+web/node_modules/
+server/bin/
+server/dist/
+
+# Editors
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.local
+
+# Lisa interview state (kept locally, not in repo)
+.claude/lisa-*.md
+.claude/lisa-draft.md
