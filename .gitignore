@@ -1,8 +1,12 @@
 # Build output
 web/dist/
 web/node_modules/
+web/playwright-report/
+web/test-results/
 server/bin/
+server/astronomer-lite
 server/dist/
+.kube/
 
 # Editors
 .vscode/
@@ -20,3 +24,5 @@ Thumbs.db
 # Lisa interview state (kept locally, not in repo)
 .claude/lisa-*.md
 .claude/lisa-draft.md
+
+headlamp/

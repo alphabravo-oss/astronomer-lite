@@ -1,4 +1,4 @@
-# Astronomer-Lite — Specification
+# Astronomer-lite — Specification
 
 **Slug:** `i-want-to-make-a-headlamp-style-single-container--process-ui`
 **Created:** 2026-05-08
@@ -9,11 +9,11 @@
 
 ## 1. Overview
 
-Astronomer-Lite is a Headlamp-style, single-container Kubernetes UI. A user adds kubeconfigs and manages multiple remote clusters from one small-footprint app. Visually it matches astronomer-go (reusing the design language defined in `../astronomer/frontend`), but architecturally it is dramatically simpler — no agents, no reverse tunnels, no central database, no multi-process coordination, no multi-tenant auth model. Cluster access is direct from the running app to each cluster's API server, using kubeconfig credentials the user has already.
+Astronomer-lite is a Headlamp-style, single-container Kubernetes UI. A user adds kubeconfigs and manages multiple remote clusters from one small-footprint app. Visually it matches astronomer-go (reusing the design language defined in `../astronomer/frontend`), but architecturally it is dramatically simpler — no agents, no reverse tunnels, no central database, no multi-process coordination, no multi-tenant auth model. Cluster access is direct from the running app to each cluster's API server, using kubeconfig credentials the user has already.
 
 ## 2. Problem Statement
 
-`astronomer-go`'s full architecture (server + agent + tunnel + worker + Postgres + RBAC + ArgoCD integration) is overkill when a user just wants to point a UI at a few clusters they already have kubeconfigs for. Headlamp solves this minimally but doesn't match the team's UI design language. Astronomer-Lite bridges the gap: Headlamp's deployment simplicity plus astronomer's visual identity.
+`astronomer-go`'s full architecture (server + agent + tunnel + worker + Postgres + RBAC + ArgoCD integration) is overkill when a user just wants to point a UI at a few clusters they already have kubeconfigs for. Headlamp solves this minimally but doesn't match the team's UI design language. Astronomer-lite bridges the gap: Headlamp's deployment simplicity plus astronomer's visual identity.
 
 ## 3. Architecture (locked in)
 
@@ -100,7 +100,7 @@ Astronomer-Lite is a Headlamp-style, single-container Kubernetes UI. A user adds
 - [ ] `astronomer-lite/` contains `server/` (Go module) and `web/` (Vite + React + TS + Tailwind).
 - [ ] `make dev` (or `npm run dev` + `go run`) starts vite on :5173 and Go on :8080; vite proxies `/api/*` → :8080.
 - [ ] `make build` produces a single Go binary that serves the embedded SPA at `/`.
-- [ ] `Dockerfile` produces a `<200MB` image; `docker run -p 8080:8080 -v ~/.kube:/root/.kube astronomer-lite` shows the SPA at http://localhost:8080.
+- [ ] `Dockerfile` produces a `<200MB` image; `docker run -p 8080:8080 -v ~/.kube:/home/astronomer/.kube:ro -v astronomer-lite-config:/home/astronomer/.config/astronomer-lite astronomer-lite` shows the SPA at http://localhost:8080.
 - [ ] `go vet ./...` and `npm run lint` and `tsc --noEmit` all pass.
 
 #### US-2: Lift design system
@@ -339,7 +339,7 @@ WS /api/clusters/{id}/ws/exec?ns=&pod=&container=&command=
 
 ### 8.1 First run flow
 
-1. User runs `docker run -p 8080:8080 -v ~/.kube:/root/.kube astronomer-lite`.
+1. User runs `docker run -p 8080:8080 -v ~/.kube:/home/astronomer/.kube:ro -v astronomer-lite-config:/home/astronomer/.config/astronomer-lite astronomer-lite`.
 2. Browser → http://localhost:8080.
 3. Cluster list populated from `~/.kube/config`. Reachable clusters green; unreachable red.
 4. User clicks a cluster → dashboard. Top-bar shows cluster + namespace filter.
@@ -421,5 +421,5 @@ WS /api/clusters/{id}/ws/exec?ns=&pod=&container=&command=
 
 - Treat `astronomer/frontend` as a **read-only reference**. Lift code by copying, not by importing — the Vite app should have no runtime dependency on Next.js, next-themes, next-auth, or `next/*`. Replace `next-themes` with a minimal local theme hook; replace `next/link` with `react-router`'s `Link`; replace `next/image` with native `<img>` (or just remove if not needed).
 - Treat `astronomer-go` as a **patterns reference**: copy its slog setup, graceful-shutdown loop, and chi route style. Do **not** import from it; this is a separate module.
-- The container image should run as a non-root user, write only under `/tmp` and `/root/.config/astronomer-lite/` (volume-mountable).
+- The container image should run as a non-root user, write only under `/tmp` and `/home/astronomer/.config/astronomer-lite/` (volume-mountable).
 - Use `golangci-lint` matching `astronomer-go`'s config.

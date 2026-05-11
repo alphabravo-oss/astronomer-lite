@@ -1,4 +1,4 @@
-# astronomer-lite
+# Astronomer-lite
 
 A Headlamp-style, single-container Kubernetes UI. Add kubeconfigs, manage multiple remote clusters, and get the full astronomer look in a small-footprint app.
 
@@ -7,7 +7,7 @@ A Headlamp-style, single-container Kubernetes UI. Add kubeconfigs, manage multip
 
 ## What it is
 
-`astronomer-lite` is the lightweight cousin of [`astronomer-go`](../astronomer-go). Same visual language as the full astronomer, but architecturally minimal:
+`astronomer-lite` is the lightweight cousin of [`astronomer`](../astronomer). Same visual language as the full astronomer, but architecturally minimal:
 
 - **No agents.** No reverse tunnels. No central database. No multi-process coordination.
 - **Direct kubeconfig-based access** to every cluster, just like Headlamp.
@@ -21,7 +21,7 @@ A Headlamp-style, single-container Kubernetes UI. Add kubeconfigs, manage multip
 
 | Layer | Choice |
 |---|---|
-| Frontend | Vite + React SPA, reusing Tailwind config + shadcn/Radix components from [`astronomer/frontend`](https://github.com/AlphaBravoCompany/astronomer) |
+| Frontend | Vite + React SPA, reusing Tailwind tokens and layout patterns from [`../astronomer/frontend`](../astronomer/frontend) |
 | Backend | Go + `client-go`, embeds Vite build via `embed.FS` |
 | API style | Thin REST proxy `/api/clusters/{id}/k8s/*` → forwards to that cluster's API server (using its `rest.Config`) |
 | Live data | One WebSocket per stream (watch / logs / exec) |
@@ -30,16 +30,28 @@ A Headlamp-style, single-container Kubernetes UI. Add kubeconfigs, manage multip
 
 ## Quickstart
 
-> Not yet released. The commands below are the target UX.
-
 ```bash
 docker run \
   -p 8080:8080 \
-  -v ~/.kube:/root/.kube:ro \
-  ghcr.io/alphabravo-oss/astronomer-lite:latest
+  -v ~/.kube:/home/astronomer/.kube:ro \
+  -v astronomer-lite-config:/home/astronomer/.config/astronomer-lite \
+  astronomer-lite:dev
 ```
 
-Open http://localhost:8080. Every context in your `~/.kube/config` shows up as a cluster. Add more via the UI (file upload or paste YAML).
+Open http://localhost:8080. Every context in your `~/.kube/config` shows up as a cluster. Add more via the UI with file upload or pasted YAML; app-managed kubeconfigs are stored under `/home/astronomer/.config/astronomer-lite/clusters.d` in the mounted volume.
+
+Build the local image first if needed:
+
+```bash
+make image
+make image-size
+```
+
+If your kubeconfig uses an exec plugin such as `gke-gcloud-auth-plugin`, `aws-iam-authenticator`, or a cloud CLI helper, that executable must be available on `PATH` inside the container. This image does not bundle cloud-provider auth plugins. When the binary is missing, the affected cluster remains visible and shows a clear error such as ``Exec plugin `gke-gcloud-auth-plugin` not found on PATH``.
+
+The runtime image runs as the unprivileged `astronomer` user and only needs write access to its config volume.
+
+Port-forward sessions bind to `127.0.0.1` and expire after 60 minutes by default. Set `ASTRONOMER_LITE_PORT_FORWARD_TTL`, for example `ASTRONOMER_LITE_PORT_FORWARD_TTL=15m`, to change that max lifetime.
 
 ## Features (MVP)
 
@@ -60,8 +72,9 @@ Open http://localhost:8080. Every context in your `~/.kube/config` shows up as a
 - Live log tail
 - `kubectl exec` terminal (xterm.js)
 - Port-forward UI (server-managed lifecycle)
-- YAML view + edit (Monaco) with server-side dry-run preview
-- Metrics charts from `metrics.k8s.io` (when metrics-server is installed)
+- YAML view + edit (Monaco) with server-side dry-run preview and split/unified diff
+- Pasted single- or multi-document YAML apply through the API Resources page, dry-run gated before apply
+- Recharts CPU/memory charts and Pod/Node detail metric cards from `metrics.k8s.io`, refreshed every 15s when metrics-server is installed
 
 **UX**
 - Single active cluster + top-bar context switcher
@@ -95,11 +108,9 @@ astronomer-lite/
 
 ## Development
 
-> Not yet implemented. The commands below are the target dev workflow.
-
 ```bash
 # In two terminals
-cd web && npm install && npm run dev    # Vite on :5173 (HMR), proxies /api → :8080
+cd web && npm install && npm run dev       # Vite on :5173 (HMR), proxies /api → :8080
 cd server && go run ./cmd/astronomer-lite  # Go API on :8080
 ```
 
@@ -110,7 +121,46 @@ For a production build:
 ```bash
 make build    # builds web/dist, embeds into Go binary
 make image    # builds the container image
+make image-size
 ```
+
+For local verification without k3d:
+
+```bash
+make verify-local
+```
+
+Set `VERSION` when building release artifacts to stamp the Kubernetes API `User-Agent` as `astronomer-lite/<version>`:
+
+```bash
+VERSION=0.1.0 make build image
+```
+
+Browser e2e tests live in `web/e2e` and are designed to run against a real k3d cluster in GitHub Actions. To run them manually, start `server/bin/astronomer-lite` with `KUBECONFIG` pointing at a reachable cluster, then run:
+
+```bash
+cd web
+E2E_BASE_URL=http://127.0.0.1:8080 npm run e2e
+```
+
+On a Linux node with Docker, k3d, kubectl, Node, and Go installed, run the same real-cluster shape used by CI:
+
+```bash
+make k3d-e2e
+```
+
+That command creates a k3d cluster, adds a fake unreachable kubeconfig context for status coverage, starts `astronomer-lite` on port 18080, runs Playwright, then cleans up. Set `KEEP_K3D_CLUSTER=1` to keep the cluster for debugging.
+
+Useful k3d runner environment variables:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `K3D_CLUSTER_NAME` | `astronomer-lite` | Cluster name to create or reuse. |
+| `REUSE_K3D_CLUSTER` | `0` | Set to `1` to reuse an existing cluster with the same name. |
+| `KEEP_K3D_CLUSTER` | `0` | Set to `1` to leave the test cluster running after the suite. |
+| `ASTRONOMER_LITE_E2E_PORT` | `18080` | Port used by the test server. |
+| `KUBECONFIG_PATH` | `.kube/config` | Kubeconfig file generated for the test run. |
+| `KEEP_E2E_CONFIG_DIR` | `0` | Set to `1` to keep the temporary app config directory for debugging. |
 
 ## Implementation phases
 
@@ -119,7 +169,7 @@ make image    # builds the container image
 3. **Write & interactive** — YAML edit, exec terminal, port-forward, metrics, secrets reveal.
 4. **Plugin seam** — Internal pages registered through the plugin registry; documented in `docs/plugins.md`.
 
-See [`docs/specs/...progress.txt`](docs/specs/i-want-to-make-a-headlamp-style-single-container--process-ui-progress.txt) for live progress.
+See [`docs/specs/...progress.txt`](docs/specs/i-want-to-make-a-headlamp-style-single-container--process-ui-progress.txt) for live progress and [`docs/verification.md`](docs/verification.md) for the current completion checklist.
 
 ## License
 

@@ -1,0 +1,49 @@
+name: e2e
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  k3d:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install kubectl
+        run: |
+          curl -fsSLo kubectl "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+          chmod +x kubectl
+          sudo mv kubectl /usr/local/bin/kubectl
+
+      - name: Install k3d
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+
+      - name: Install dependencies
+        run: |
+          cd web
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run Playwright k3d e2e
+        run: |
+          SKIP_NPM_CI=1 \
+            SKIP_PLAYWRIGHT_INSTALL=1 \
+            ASTRONOMER_LITE_CONFIG_DIR="$RUNNER_TEMP/astronomer-lite" \
+            SERVER_LOG="$RUNNER_TEMP/astronomer-lite.log" \
+            ./scripts/run-k3d-e2e.sh
