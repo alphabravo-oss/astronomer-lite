@@ -65,6 +65,10 @@ const backendTrafficPolicyCRDName = "xbackendtrafficpolicies.gateway.networking.
 const helmReleaseName = `al-e2e-helm-${Date.now()}`;
 const helmChartDir = `/tmp/al-e2e-tiny-chart-${Date.now()}`;
 const workloadRollbackDeploymentName = `al-e2e-rollback-${Date.now()}`;
+const workloadRollbackUiName = `al-e2e-rollback-ui-${Date.now()}`;
+const helmReleaseUiName = `al-e2e-helm-ui-${Date.now()}`;
+const helmReleaseUninstallName = `al-e2e-helm-uninst-${Date.now()}`;
+const helmChartUiDir = `/tmp/al-e2e-tiny-chart-ui-${Date.now()}`;
 let cleanupContext = "";
 let cleanupClusterId = "";
 let cleanupPortForwardIds: string[] = [];
@@ -115,11 +119,14 @@ test.afterEach(async ({ request }) => {
       kubectl(cleanupContext, ["delete", "crd", backendTrafficPolicyCRDName, "--ignore-not-found=true"], true);
     }
     kubectl(cleanupContext, ["delete", "deployment", workloadRollbackDeploymentName, "--ignore-not-found=true"], true);
+    kubectl(cleanupContext, ["delete", "deployment", workloadRollbackUiName, "--ignore-not-found=true"], true);
     if (cleanupHelmRelease) {
-      try {
-        execFileSync("helm", ["--kube-context", cleanupContext, "uninstall", helmReleaseName, "--namespace", "default"], { stdio: "ignore" });
-      } catch {
-        // Already cleaned up or never installed.
+      for (const releaseName of [helmReleaseName, helmReleaseUiName, helmReleaseUninstallName]) {
+        try {
+          execFileSync("helm", ["--kube-context", cleanupContext, "uninstall", releaseName, "--namespace", "default"], { stdio: "ignore" });
+        } catch {
+          // Already cleaned up or never installed.
+        }
       }
     }
   }
@@ -866,6 +873,87 @@ YAML`]);
   await expect(page.getByRole("heading", { name: "Helm Releases" })).toBeVisible();
   await expect(page.getByText(helmReleaseName).first()).toBeVisible({ timeout: 15_000 });
 });
+
+test("rolls back a Deployment from the workload drawer UI", async ({ page, request }) => {
+  const cluster = await reachableCluster(request);
+  cleanupContext = cluster.context;
+  kubectl(cluster.context, ["create", "deployment", workloadRollbackUiName, "--image=nginx:1.27-alpine"]);
+  kubectl(cluster.context, ["rollout", "status", `deployment/${workloadRollbackUiName}`, "--timeout=120s"]);
+  kubectl(cluster.context, ["set", "image", `deployment/${workloadRollbackUiName}`, "nginx=nginx:1.26-alpine"]);
+  kubectl(cluster.context, ["rollout", "status", `deployment/${workloadRollbackUiName}`, "--timeout=120s"]);
+
+  await page.goto(`/clusters/${cluster.id}/deployments`);
+  await expect(page.getByRole("heading", { name: "Deployments" })).toBeVisible();
+  await expect(page.getByText(workloadRollbackUiName)).toBeVisible({ timeout: 30_000 });
+  await page.getByText(workloadRollbackUiName).click();
+  await expect(page.getByRole("heading", { name: "Revision History" })).toBeVisible();
+
+  const revision1Row = page.getByRole("row").filter({ has: page.getByRole("cell", { name: "1", exact: true }) }).first();
+  await revision1Row.getByRole("button", { name: /Roll back to revision 1/i }).click();
+  await expect(page.getByText(/Rolled back to revision 1\./)).toBeVisible({ timeout: 15_000 });
+  await expect
+    .poll(() => kubectlOutput(cluster.context, ["get", "deployment", workloadRollbackUiName, "-o", "jsonpath={.spec.template.spec.containers[0].image}"]))
+    .toBe("nginx:1.27-alpine");
+});
+
+test("rolls back a Helm release from the UI", async ({ page, request }) => {
+  const cluster = await reachableCluster(request);
+  cleanupContext = cluster.context;
+  writeTinyHelmChart(helmChartUiDir, helmReleaseUiName);
+  execFileSync("helm", ["--kube-context", cluster.context, "install", helmReleaseUiName, helmChartUiDir, "--namespace", "default"], { stdio: "inherit" });
+  cleanupHelmRelease = true;
+  execFileSync("helm", ["--kube-context", cluster.context, "upgrade", helmReleaseUiName, helmChartUiDir, "--namespace", "default", "--set", "greeting=world"], { stdio: "inherit" });
+
+  await page.goto(`/clusters/${cluster.id}/helm/releases`);
+  await expect(page.getByRole("heading", { name: "Helm Releases" })).toBeVisible();
+  await page.getByText(helmReleaseUiName).first().click();
+  await expect(page.getByRole("heading", { name: "Revision History" })).toBeVisible();
+  await page.getByRole("button", { name: "Roll back" }).first().click();
+  await expect(page.getByText(/Rolled back to revision 1\./)).toBeVisible({ timeout: 30_000 });
+  await expect
+    .poll(() => kubectlOutput(cluster.context, ["get", "cm", `${helmReleaseUiName}-greeting`, "-o", "jsonpath={.data.message}"]))
+    .toBe("hello");
+});
+
+test("uninstalls a Helm release from the UI", async ({ page, request }) => {
+  const cluster = await reachableCluster(request);
+  cleanupContext = cluster.context;
+  writeTinyHelmChart(helmChartUiDir, helmReleaseUninstallName);
+  execFileSync("helm", ["--kube-context", cluster.context, "install", helmReleaseUninstallName, helmChartUiDir, "--namespace", "default"], { stdio: "inherit" });
+  cleanupHelmRelease = true;
+
+  await page.goto(`/clusters/${cluster.id}/helm/releases`);
+  await expect(page.getByRole("heading", { name: "Helm Releases" })).toBeVisible();
+  await page.getByText(helmReleaseUninstallName).first().click();
+  // The drawer's Uninstall trigger opens the confirm dialog.
+  await page.getByRole("button", { name: "Uninstall" }).first().click();
+  // Confirm dialog input is id'd uniquely; the dialog's confirm button is the second "Uninstall" in DOM order.
+  await page.locator("#confirm-dialog-value").fill(helmReleaseUninstallName);
+  await page.getByRole("button", { name: "Uninstall" }).last().click();
+  await expect(page.getByText(helmReleaseUninstallName)).toHaveCount(0, { timeout: 30_000 });
+});
+
+function writeTinyHelmChart(dir: string, releaseName: string) {
+  execFileSync("rm", ["-rf", dir]);
+  execFileSync("mkdir", ["-p", `${dir}/templates`]);
+  execFileSync("sh", ["-c", `cat > ${dir}/Chart.yaml <<'YAML'
+apiVersion: v2
+name: tiny
+version: 0.1.0
+appVersion: "v1"
+YAML`]);
+  execFileSync("sh", ["-c", `cat > ${dir}/values.yaml <<'YAML'
+greeting: hello
+YAML`]);
+  execFileSync("sh", ["-c", `cat > ${dir}/templates/configmap.yaml <<'YAML'
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ${releaseName}-greeting
+data:
+  message: {{ .Values.greeting | quote }}
+YAML`]);
+}
 
 async function reachableCluster(request: APIRequestContext) {
   const clusters = await request.get("/api/clusters").then((response) => response.json() as Promise<Cluster[]>);
