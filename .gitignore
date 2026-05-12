@@ -28,5 +28,8 @@ Thumbs.db
 .claude/lisa-*.md
 .claude/lisa-draft.md
 
+# Claude agent worktrees + transient state
+.claude/worktrees/
+
 headlamp/
 freelens/

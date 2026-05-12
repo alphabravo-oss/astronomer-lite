@@ -1,6 +1,7 @@
 import { ExternalLink, FileText, Network, Pencil, ScrollText, Terminal, X } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useActivities, type ActivityKind } from "../../lib/activities-context";
+import { hasLogStream } from "../../lib/log-streams";
 import { cn } from "../../lib/utils";
 
 const ICONS: Record<ActivityKind, typeof ScrollText> = {
@@ -22,6 +23,7 @@ export function ActivityDock() {
         </span>
         {activities.map((activity) => {
           const Icon = ICONS[activity.kind] ?? ScrollText;
+          const live = activity.kind === "logs" && activity.logStream ? hasLogStream(activity.logStream) : false;
           return (
             <div
               key={activity.id}
@@ -30,6 +32,13 @@ export function ActivityDock() {
               )}
             >
               <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+              {live ? (
+                <span
+                  aria-label="Stream is live"
+                  title="Stream is live"
+                  className="h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.7)]"
+                />
+              ) : null}
               <Link to={activity.href} className="font-medium text-foreground hover:underline">
                 {activity.label}
               </Link>

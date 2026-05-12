@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { lazy, Suspense, useEffect } from "react";
 import { Eye, Loader2, Pencil, X } from "lucide-react";
 import { cn } from "../../lib/utils";
+import type { OpenAPIDocument } from "../../lib/openapi";
 
 const YamlEditor = lazy(() => import("./yaml-editor").then((module) => ({ default: module.YamlEditor })));
 
@@ -19,6 +20,9 @@ type YamlViewDialogProps = {
   actions?: ReactNode;
   message?: ReactNode;
   childrenAfterEditor?: ReactNode;
+  kind?: string;
+  apiVersion?: string;
+  openApiDoc?: OpenAPIDocument | null;
 };
 
 export function YamlViewDialog({
@@ -34,7 +38,10 @@ export function YamlViewDialog({
   readOnly = false,
   actions,
   message,
-  childrenAfterEditor
+  childrenAfterEditor,
+  kind,
+  apiVersion,
+  openApiDoc
 }: YamlViewDialogProps) {
   useEffect(() => {
     if (!open) return;
@@ -113,6 +120,9 @@ export function YamlViewDialog({
               readOnly={!editMode || !editable}
               height={childrenAfterEditor ? "48vh" : "100%"}
               className="min-h-0 flex-1"
+              kind={kind}
+              apiVersion={apiVersion}
+              openApiDoc={openApiDoc}
             />
           </Suspense>
           {childrenAfterEditor ? <div className="max-h-[28vh] overflow-auto border-t border-border">{childrenAfterEditor}</div> : null}

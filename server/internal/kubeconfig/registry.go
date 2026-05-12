@@ -109,6 +109,9 @@ type Registry struct {
 	displays    map[string]displayOverride
 	logger      *slog.Logger
 	httpClient  *http.Client
+
+	invalidationMu        sync.RWMutex
+	invalidationCallbacks []func(id string)
 }
 
 func NewRegistry(systemPaths []string, managedDir, displayFile string, logger *slog.Logger) *Registry {
@@ -291,6 +294,30 @@ func (r *Registry) SetLinks(id string, links []ClusterLink) (Cluster, error) {
 	return cluster, nil
 }
 
+// OnClusterInvalidated registers a callback fired when a cluster is removed
+// from the registry or its kubeconfig is reloaded. Downstream caches (TTL,
+// informer factories) hook this to drop per-cluster state.
+//
+// Callbacks are invoked synchronously while the registry lock is NOT held, so
+// they can safely call back into the registry. They must not block.
+func (r *Registry) OnClusterInvalidated(fn func(id string)) {
+	if fn == nil {
+		return
+	}
+	r.invalidationMu.Lock()
+	r.invalidationCallbacks = append(r.invalidationCallbacks, fn)
+	r.invalidationMu.Unlock()
+}
+
+func (r *Registry) fireInvalidate(id string) {
+	r.invalidationMu.RLock()
+	callbacks := append([]func(string){}, r.invalidationCallbacks...)
+	r.invalidationMu.RUnlock()
+	for _, fn := range callbacks {
+		fn(id)
+	}
+}
+
 func (r *Registry) Start(ctx context.Context) {
 	ticker := time.NewTicker(30 * time.Second)
 	go func() {
@@ -343,7 +370,7 @@ func (r *Registry) Reload() error {
 	}
 
 	r.mu.Lock()
-	defer r.mu.Unlock()
+	var invalidated []string
 	for id, existing := range r.clusters {
 		if next, ok := nextClusters[id]; ok {
 			next.Reachable = existing.Reachable
@@ -351,12 +378,18 @@ func (r *Registry) Reload() error {
 			next.Version = existing.Version
 			next.Error = existing.Error
 			nextClusters[id] = next
+		} else {
+			invalidated = append(invalidated, id)
 		}
 	}
 	r.clusters = nextClusters
 	r.restConfigs = nextREST
 	r.clients = map[string]*kubernetes.Clientset{}
 	r.dynamics = map[string]dynamic.Interface{}
+	r.mu.Unlock()
+	for _, id := range invalidated {
+		r.fireInvalidate(id)
+	}
 	return joined
 }
 
@@ -565,7 +598,17 @@ func (r *Registry) Delete(id string) error {
 	if err := os.Remove(cluster.filePath); err != nil {
 		return err
 	}
-	return r.Reload()
+	err := r.Reload()
+	// Reload fires invalidation for ids that disappeared. If the registry
+	// somehow still has the id (e.g. Reload partial failure), fire explicitly
+	// so downstream caches still drop their state.
+	r.mu.RLock()
+	_, stillPresent := r.clusters[id]
+	r.mu.RUnlock()
+	if stillPresent {
+		r.fireInvalidate(id)
+	}
+	return err
 }
 
 func (r *Registry) List() []Cluster {

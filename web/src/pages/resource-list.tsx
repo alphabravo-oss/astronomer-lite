@@ -1631,7 +1631,13 @@ function ResourceDrawer({
 	            editMode && canEdit ? (
 	              <div className="space-y-4">
 	                <Suspense fallback={<div className="shimmer min-h-96 rounded-lg bg-muted" />}>
-	                  <YamlEditor value={editedYaml} onChange={updateEditedYaml} />
+	                  <YamlEditor
+	                    value={editedYaml}
+	                    onChange={updateEditedYaml}
+	                    kind={item.kind || activeResource.label}
+	                    apiVersion={item.apiVersion || activeResource.apiVersion}
+	                    openApiDoc={openApiDoc}
+	                  />
 	                </Suspense>
 	                <ResourceDiff rows={diffRows} unchanged={!hasYamlChanges} validated={canApplyValidatedYaml} />
 	              </div>
@@ -1656,6 +1662,9 @@ function ResourceDrawer({
           onEditModeChange={setEditMode}
           allowEdit={canEdit}
           readOnly={!canEdit}
+          kind={item.kind || activeResource.label}
+          apiVersion={item.apiVersion || activeResource.apiVersion}
+          openApiDoc={openApiDoc}
           actions={
             canEdit && editMode ? (
               <>

@@ -26,6 +26,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/alphabravo/astronomer-lite/server/internal/cache"
 	"github.com/alphabravo/astronomer-lite/server/internal/config"
 	"github.com/alphabravo/astronomer-lite/server/internal/kubeconfig"
 	"github.com/alphabravo/astronomer-lite/server/internal/plugins"
@@ -68,6 +69,7 @@ type Server struct {
 	logger        *slog.Logger
 	portForwardMu sync.Mutex
 	portForwards  map[string]*portForwardSession
+	informers     *cache.InformerManager
 }
 
 var wsUpgrader = websocket.Upgrader{
@@ -89,7 +91,16 @@ func New(logger *slog.Logger) (*Server, error) {
 		logger.Warn("failed to reload kubeconfigs", "error", err)
 	}
 	registry.Start(ctx)
-	return &Server{Config: cfg, registry: registry, logger: logger, portForwards: map[string]*portForwardSession{}}, nil
+	informerMgr := cache.NewInformerManager()
+	// Drop per-cluster cached state (openapi, prom detection, informer
+	// factories) when a kubeconfig disappears or is reloaded so the next
+	// request rebuilds from scratch.
+	registry.OnClusterInvalidated(func(id string) {
+		openAPICache.Invalidate(id)
+		promCache.Invalidate(id)
+		informerMgr.Invalidate(id)
+	})
+	return &Server{Config: cfg, registry: registry, logger: logger, portForwards: map[string]*portForwardSession{}, informers: informerMgr}, nil
 }
 
 func (s *Server) Routes() http.Handler {
@@ -691,13 +702,26 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request, id string)
 }
 
 func (s *Server) handleSecretReveal(w http.ResponseWriter, r *http.Request, id string, namespace string, name string, key string) {
-	client, err := s.registry.Client(id)
-	if err != nil {
+	if namespace == "" || namespace == "_" || name == "" || key == "" {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("namespace, secret name, and key are required"))
+		return
+	}
+	authzCtx, authzCancel := context.WithTimeout(r.Context(), 10*time.Second)
+	if err := s.authorize(authzCtx, id, authorizationv1.ResourceAttributes{
+		Namespace: namespace,
+		Verb:      "get",
+		Group:     "",
+		Resource:  "secrets",
+		Name:      name,
+	}); err != nil {
+		authzCancel()
 		writeError(w, http.StatusBadGateway, err)
 		return
 	}
-	if namespace == "" || namespace == "_" || name == "" || key == "" {
-		writeError(w, http.StatusBadRequest, fmt.Errorf("namespace, secret name, and key are required"))
+	authzCancel()
+	client, err := s.registry.Client(id)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err)
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
@@ -884,6 +908,28 @@ func (s *Server) handleNodeDrain(w http.ResponseWriter, r *http.Request, id stri
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
+	authzCtx, authzCancel := context.WithTimeout(r.Context(), 10*time.Second)
+	if err := s.authorize(authzCtx, id, authorizationv1.ResourceAttributes{
+		Verb:     "patch",
+		Group:    "",
+		Resource: "nodes",
+		Name:     name,
+	}); err != nil {
+		authzCancel()
+		writeError(w, http.StatusBadGateway, err)
+		return
+	}
+	if err := s.authorize(authzCtx, id, authorizationv1.ResourceAttributes{
+		Verb:        "create",
+		Group:       "",
+		Resource:    "pods",
+		Subresource: "eviction",
+	}); err != nil {
+		authzCancel()
+		writeError(w, http.StatusBadGateway, err)
+		return
+	}
+	authzCancel()
 	client, err := s.registry.Client(id)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
@@ -1026,6 +1072,19 @@ func (s *Server) handlePortForwards(w http.ResponseWriter, r *http.Request, id s
 			writeError(w, http.StatusBadRequest, err)
 			return
 		}
+		authzCtx, authzCancel := context.WithTimeout(r.Context(), 10*time.Second)
+		if err := s.authorize(authzCtx, id, authorizationv1.ResourceAttributes{
+			Namespace:   request.Namespace,
+			Verb:        "create",
+			Group:       "",
+			Resource:    "pods",
+			Subresource: "portforward",
+		}); err != nil {
+			authzCancel()
+			writeError(w, http.StatusBadGateway, err)
+			return
+		}
+		authzCancel()
 		row, err := s.startPortForward(r.Context(), id, request)
 		if err != nil {
 			writeError(w, http.StatusBadGateway, err)
@@ -2388,6 +2447,23 @@ func (s *Server) handleDynamicResourceApply(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusBadRequest, fmt.Errorf("secret editing is disabled because secret values are masked in this UI"))
 		return
 	}
+	authzCtx, authzCancel := context.WithTimeout(r.Context(), 10*time.Second)
+	authzNamespace := namespace
+	if !def.Namespaced || authzNamespace == "_" {
+		authzNamespace = ""
+	}
+	if err := s.authorize(authzCtx, id, authorizationv1.ResourceAttributes{
+		Namespace: authzNamespace,
+		Verb:      "patch",
+		Group:     def.GVR.Group,
+		Resource:  def.GVR.Resource,
+		Name:      name,
+	}); err != nil {
+		authzCancel()
+		writeError(w, http.StatusBadGateway, err)
+		return
+	}
+	authzCancel()
 	client, err := s.registry.Dynamic(id)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
@@ -2529,6 +2605,16 @@ func (s *Server) handleApply(w http.ResponseWriter, r *http.Request, id string) 
 			object.SetNamespace("")
 			resourceClient = client.Resource(mapping.Resource)
 		}
+		if err := s.authorize(ctx, id, authorizationv1.ResourceAttributes{
+			Namespace: object.GetNamespace(),
+			Verb:      "patch",
+			Group:     mapping.Resource.Group,
+			Resource:  mapping.Resource.Resource,
+			Name:      object.GetName(),
+		}); err != nil {
+			writeError(w, http.StatusBadGateway, fmt.Errorf("document %d %s/%s: %w", index+1, gvk.Kind, object.GetName(), err))
+			return
+		}
 		jsonBody, err := json.Marshal(object.Object)
 		if err != nil {
 			writeError(w, http.StatusBadRequest, err)
@@ -2562,6 +2648,27 @@ func applyPatchOptions(r *http.Request) metav1.PatchOptions {
 }
 
 func (s *Server) handleDynamicResourceDelete(w http.ResponseWriter, r *http.Request, id string, def resourceDefinition, namespace string, name string) {
+	if def.Namespaced && (namespace == "_" || namespace == "") {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("namespace is required for namespaced resources"))
+		return
+	}
+	authzNamespace := namespace
+	if !def.Namespaced {
+		authzNamespace = ""
+	}
+	authzCtx, authzCancel := context.WithTimeout(r.Context(), 10*time.Second)
+	if err := s.authorize(authzCtx, id, authorizationv1.ResourceAttributes{
+		Namespace: authzNamespace,
+		Verb:      "delete",
+		Group:     def.GVR.Group,
+		Resource:  def.GVR.Resource,
+		Name:      name,
+	}); err != nil {
+		authzCancel()
+		writeError(w, http.StatusBadGateway, err)
+		return
+	}
+	authzCancel()
 	client, err := s.registry.Dynamic(id)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
@@ -2572,10 +2679,6 @@ func (s *Server) handleDynamicResourceDelete(w http.ResponseWriter, r *http.Requ
 
 	var resourceClient dynamic.ResourceInterface
 	if def.Namespaced {
-		if namespace == "_" || namespace == "" {
-			writeError(w, http.StatusBadRequest, fmt.Errorf("namespace is required for namespaced resources"))
-			return
-		}
 		resourceClient = client.Resource(def.GVR).Namespace(namespace)
 	} else {
 		resourceClient = client.Resource(def.GVR)
@@ -2611,6 +2714,20 @@ func (s *Server) handleDynamicResourceScale(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusBadRequest, fmt.Errorf("replicas must be greater than or equal to 0"))
 		return
 	}
+	authzCtx, authzCancel := context.WithTimeout(r.Context(), 10*time.Second)
+	if err := s.authorize(authzCtx, id, authorizationv1.ResourceAttributes{
+		Namespace:   namespace,
+		Verb:        "patch",
+		Group:       def.GVR.Group,
+		Resource:    def.GVR.Resource,
+		Subresource: "scale",
+		Name:        name,
+	}); err != nil {
+		authzCancel()
+		writeError(w, http.StatusBadGateway, err)
+		return
+	}
+	authzCancel()
 	client, err := s.registry.Dynamic(id)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
@@ -2655,6 +2772,19 @@ func (s *Server) handleResourceRollback(w http.ResponseWriter, r *http.Request, 
 		writeError(w, http.StatusBadRequest, fmt.Errorf("revision must be a positive integer"))
 		return
 	}
+	authzCtx, authzCancel := context.WithTimeout(r.Context(), 10*time.Second)
+	if err := s.authorize(authzCtx, id, authorizationv1.ResourceAttributes{
+		Namespace: namespace,
+		Verb:      "patch",
+		Group:     "apps",
+		Resource:  resource,
+		Name:      name,
+	}); err != nil {
+		authzCancel()
+		writeError(w, http.StatusBadGateway, err)
+		return
+	}
+	authzCancel()
 	client, err := s.registry.Client(id)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
@@ -3118,8 +3248,16 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 	_ = json.NewEncoder(w).Encode(value)
 }
 
+// errForbidden is returned by (*Server).authorize when a SelfSubjectAccessReview
+// reports the caller is not allowed to perform the requested action. writeError
+// maps it to HTTP 403 so the server-side double-check produces a clean error
+// path independent of the eventual K8s 403 propagated as 502 BadGateway.
+var errForbidden = errors.New("forbidden by Kubernetes RBAC")
+
 func writeError(w http.ResponseWriter, status int, err error) {
-	if errors.Is(err, os.ErrNotExist) {
+	if errors.Is(err, errForbidden) {
+		status = http.StatusForbidden
+	} else if errors.Is(err, os.ErrNotExist) {
 		status = http.StatusNotFound
 	} else if apiStatus, ok := err.(apierrors.APIStatus); ok {
 		if code := int(apiStatus.Status().Code); code > 0 {
@@ -3127,6 +3265,34 @@ func writeError(w http.ResponseWriter, status int, err error) {
 		}
 	}
 	writeJSON(w, status, map[string]string{"error": err.Error()})
+}
+
+// authorize performs a SelfSubjectAccessReview against the cluster's typed
+// client and returns errForbidden if the action is not allowed. Any failure to
+// reach the authorization API is returned as a wrapped error (callers should
+// propagate it via writeError; it becomes 502 BadGateway).
+func (s *Server) authorize(ctx context.Context, id string, attrs authorizationv1.ResourceAttributes) error {
+	client, err := s.registry.Client(id)
+	if err != nil {
+		return err
+	}
+	review, err := client.AuthorizationV1().SelfSubjectAccessReviews().Create(ctx, &authorizationv1.SelfSubjectAccessReview{
+		Spec: authorizationv1.SelfSubjectAccessReviewSpec{ResourceAttributes: &attrs},
+	}, metav1.CreateOptions{})
+	if err != nil {
+		return fmt.Errorf("authorize %s %s/%s: %w", attrs.Verb, attrs.Group, attrs.Resource, err)
+	}
+	if !review.Status.Allowed || review.Status.Denied {
+		reason := strings.TrimSpace(review.Status.Reason)
+		if reason == "" {
+			reason = review.Status.EvaluationError
+		}
+		if reason != "" {
+			return fmt.Errorf("%w: %s %s/%s in %q: %s", errForbidden, attrs.Verb, attrs.Group, attrs.Resource, attrs.Namespace, reason)
+		}
+		return fmt.Errorf("%w: %s %s/%s in %q", errForbidden, attrs.Verb, attrs.Group, attrs.Resource, attrs.Namespace)
+	}
+	return nil
 }
 
 func logRequests(logger *slog.Logger, next http.Handler) http.Handler {

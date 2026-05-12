@@ -33,6 +33,7 @@ const workloadDrawerDeploymentName = `al-e2e-workload-${Date.now()}`;
 const portForwardPodName = `al-e2e-tray-${Date.now()}`;
 const logPodName = `al-e2e-logs-${Date.now()}`;
 const reconnectLogPodName = `al-e2e-log-reconnect-${Date.now()}`;
+const dockStreamPodName = `al-e2e-log-dock-${Date.now()}`;
 const execPodName = `al-e2e-exec-${Date.now()}`;
 const attachPodName = `al-e2e-attach-${Date.now()}`;
 const reconnectWatchConfigMapName = `al-e2e-watch-reconnect-${Date.now()}`;
@@ -80,6 +81,7 @@ let cleanupJobSetCRD = false;
 const vpaSampleName = `al-e2e-vpa-${Date.now()}`;
 const jobSetSampleName = `al-e2e-jobset-${Date.now()}`;
 const webhookConfigName = `al-e2e-webhook-${Date.now()}`;
+const hoverDeploymentName = `al-e2e-hover-${Date.now()}`;
 
 test.afterEach(async ({ request }) => {
   for (const sessionId of cleanupPortForwardIds) {
@@ -103,6 +105,7 @@ test.afterEach(async ({ request }) => {
     kubectl(cleanupContext, ["delete", "pod", portForwardPodName, "--ignore-not-found=true", "--grace-period=0", "--force"], true);
     kubectl(cleanupContext, ["delete", "pod", logPodName, "--ignore-not-found=true", "--grace-period=0", "--force"], true);
     kubectl(cleanupContext, ["delete", "pod", reconnectLogPodName, "--ignore-not-found=true", "--grace-period=0", "--force"], true);
+    kubectl(cleanupContext, ["delete", "pod", dockStreamPodName, "--ignore-not-found=true", "--grace-period=0", "--force"], true);
     kubectl(cleanupContext, ["delete", "pod", execPodName, "--ignore-not-found=true", "--grace-period=0", "--force"], true);
     kubectl(cleanupContext, ["delete", "pod", attachPodName, "--ignore-not-found=true", "--grace-period=0", "--force"], true);
     kubectl(cleanupContext, ["delete", "pod", readPagesPodName, "--ignore-not-found=true", "--grace-period=0", "--force"], true);
@@ -137,6 +140,7 @@ test.afterEach(async ({ request }) => {
     kubectl(cleanupContext, ["delete", "vpa", vpaSampleName, "--ignore-not-found=true"], true);
     kubectl(cleanupContext, ["delete", "jobset", jobSetSampleName, "--ignore-not-found=true"], true);
     kubectl(cleanupContext, ["delete", "validatingwebhookconfiguration", webhookConfigName, "--ignore-not-found=true"], true);
+    kubectl(cleanupContext, ["delete", "deployment", hoverDeploymentName, "--ignore-not-found=true"], true);
     if (cleanupVPACRD) {
       kubectl(cleanupContext, ["delete", "crd", "verticalpodautoscalers.autoscaling.k8s.io", "--ignore-not-found=true"], true);
     }
@@ -823,6 +827,19 @@ test("exposes the OpenAPI schema endpoint", async ({ request }) => {
   expect(doc.definitions?.["io.k8s.api.apps.v1.Deployment"]).toBeTruthy();
 });
 
+test("can-i endpoint returns SelfSubjectAccessReview results for mutating actions", async ({ request }) => {
+  const cluster = await reachableCluster(request);
+  const response = await request.post(`/api/clusters/${cluster.id}/can-i`, {
+    data: { verb: "patch", group: "apps", resource: "deployments", namespace: "default" }
+  });
+  expect(response.ok()).toBe(true);
+  const body = (await response.json()) as { allowed: boolean; denied: boolean; reason?: string; evaluationError?: string };
+  expect(typeof body.allowed).toBe("boolean");
+  expect(typeof body.denied).toBe("boolean");
+  // k3d default credentials are cluster-admin, so a deployment patch must be allowed.
+  expect(body.allowed).toBe(true);
+});
+
 test("rolls back a Deployment to a previous revision", async ({ request }) => {
   const cluster = await reachableCluster(request);
   cleanupContext = cluster.context;
@@ -983,6 +1000,33 @@ test("prometheus detect endpoint reports a result", async ({ request }) => {
   expect(typeof result.available).toBe("boolean");
 });
 
+test("metrics page degrades gracefully when Prometheus is absent", async ({ page, request }) => {
+  const cluster = await reachableCluster(request);
+  const detectResponse = await request.get(`/api/clusters/${cluster.id}/prom/detect`);
+  expect(detectResponse.ok()).toBe(true);
+  const detection = (await detectResponse.json()) as {
+    available: boolean;
+    target?: { namespace: string; service: string; port: number; source: string };
+    checkedAt: string;
+    reason?: string;
+  };
+  expect(typeof detection.available).toBe("boolean");
+  expect(typeof detection.checkedAt).toBe("string");
+  expect(detection.checkedAt.length).toBeGreaterThan(0);
+
+  await page.goto(`/clusters/${cluster.id}/metrics`);
+  await expect(page.getByRole("heading", { name: "Metrics" })).toBeVisible();
+
+  if (!detection.available) {
+    // Stock k3d path: badge says "No Prometheus" and the Range section is not rendered.
+    await expect(page.getByText("No Prometheus")).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^Range \(/ })).toHaveCount(0);
+  } else {
+    // If Prometheus is installed in the test environment, just confirm the badge.
+    await expect(page.getByText(`Prometheus: ${detection.target?.source ?? ""}`)).toBeVisible();
+  }
+});
+
 test("cluster links round-trip through the PATCH endpoint", async ({ request }) => {
   const cluster = await reachableCluster(request);
   const setResponse = await request.patch(`/api/clusters/${cluster.id}/links`, {
@@ -1021,6 +1065,60 @@ test("pod logs Pin-to-dock button adds and removes a dock entry", async ({ page,
   await page.getByRole("button", { name: "Pin to dock" }).click();
   await expect(page.getByText("Dock")).toBeVisible({ timeout: 5_000 });
   await page.getByRole("button", { name: "Unpin" }).click();
+});
+
+test("pinned pod logs activity survives navigation and indicates a live stream", async ({ page, request }) => {
+  // The persistent log stream lives in a global store that outlives the
+  // logs page component. We assert the durable observable surface here:
+  // pinning surfaces a dock entry with a "live" status, that entry
+  // persists across navigation, and unpin tears it down. Verifying
+  // counter advance over navigation is too timing-sensitive to be
+  // reliable in CI without longer waits.
+  const cluster = await reachableCluster(request);
+  cleanupContext = cluster.context;
+
+  kubectl(cluster.context, [
+    "run",
+    dockStreamPodName,
+    "--image=busybox:1.36",
+    "--restart=Never",
+    `--labels=app=${dockStreamPodName}`,
+    "--",
+    "/bin/sh",
+    "-c",
+    "i=0; while true; do echo AL_E2E_DOCK_LOG_$i; i=$((i+1)); sleep 1; done"
+  ]);
+  kubectl(cluster.context, ["wait", "--for=condition=Ready", `pod/${dockStreamPodName}`, "--timeout=90s"]);
+
+  const logsPath = `/clusters/${cluster.id}/pods/default/${dockStreamPodName}/logs`;
+  await page.goto(logsPath);
+  await expect(page.getByRole("heading", { name: dockStreamPodName })).toBeVisible();
+
+  const logViewport = page.locator("pre").first();
+  await expect(logViewport).toContainText(/AL_E2E_DOCK_LOG_\d+/, { timeout: 30_000 });
+
+  // Pin to the activity dock.
+  await page.getByRole("button", { name: "Pin to dock" }).click();
+  await expect(page.getByText("Dock", { exact: true })).toBeVisible({ timeout: 5_000 });
+  // The dock entry's green "live" dot must appear once the persistent
+  // stream is open.
+  await expect(page.getByLabel("Stream is live")).toBeVisible({ timeout: 10_000 });
+
+  // Navigate away — the dock should still show the pinned activity.
+  await page.goto(`/clusters/${cluster.id}/pods`);
+  await expect(page.getByRole("heading", { name: "Pods" })).toBeVisible();
+  await expect(page.getByText("Dock", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Stream is live")).toBeVisible();
+
+  // Navigate back to the logs page directly — the page must remount and
+  // still show the pinned activity (with Unpin replacing Pin to dock).
+  await page.goto(logsPath);
+  await expect(page.getByRole("heading", { name: dockStreamPodName })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Unpin" })).toBeVisible({ timeout: 10_000 });
+
+  // Cleanup: unpin so the persistent stream tears down.
+  await page.getByRole("button", { name: "Unpin" }).click();
+  await expect(page.getByText("Dock", { exact: true })).toBeHidden({ timeout: 5_000 });
 });
 
 test("renders a VerticalPodAutoscaler detail panel", async ({ page, request }) => {
@@ -1163,6 +1261,40 @@ webhooks:
   await expect(page.getByRole("heading", { name: "pods.example.com" })).toBeVisible();
   await expect(page.getByRole("cell", { name: "CREATE, UPDATE" })).toBeVisible();
   await expect(page.getByRole("cell", { name: "pods", exact: true })).toBeVisible();
+});
+
+test("Monaco YAML editor mounts with OpenAPI schema wired for hover docs", async ({ page, request }) => {
+  // The visible Monaco hover-card requires a real-user mousemove sequence
+  // that headless Chromium does not reliably replicate. Instead we verify
+  // the infrastructure that backs the hover provider:
+  //   1. The OpenAPI schema endpoint returns the K8s Swagger doc with a
+  //      Deployment description we can match.
+  //   2. The YAML view dialog mounts Monaco with the kind/apiVersion of
+  //      the active resource present in the rendered YAML buffer.
+  // If both hold, the registered hover provider will resolve descriptions
+  // for any key under that kind when a real user hovers.
+  const cluster = await reachableCluster(request);
+  cleanupContext = cluster.context;
+  kubectl(cluster.context, ["create", "deployment", hoverDeploymentName, "--image=nginx:1.27-alpine"]);
+
+  const openapiResponse = await request.get(`/api/clusters/${cluster.id}/openapi`);
+  expect(openapiResponse.ok()).toBe(true);
+  const doc = (await openapiResponse.json()) as { definitions?: Record<string, { properties?: Record<string, { description?: string }> }> };
+  const deploymentDef = doc.definitions?.["io.k8s.api.apps.v1.Deployment"];
+  expect(deploymentDef, "OpenAPI must define Deployment").toBeTruthy();
+  expect(deploymentDef?.properties?.spec?.description?.length ?? 0, "Deployment.spec description must be non-empty").toBeGreaterThan(0);
+
+  await page.goto(`/clusters/${cluster.id}/deployments`);
+  await expect(page.getByRole("heading", { name: "Deployments" })).toBeVisible();
+  await expect(page.getByText(hoverDeploymentName)).toBeVisible({ timeout: 30_000 });
+  await page.getByText(hoverDeploymentName).click();
+  await expect(page.getByRole("heading", { name: hoverDeploymentName })).toBeVisible();
+
+  await page.getByRole("button", { name: "yaml", exact: true }).click();
+  await page.getByRole("button", { name: "Open YAML" }).click();
+  const yamlEditor = page.locator(".monaco-editor").first();
+  await expect(yamlEditor).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator(".view-line", { hasText: "kind: Deployment" }).first()).toBeVisible({ timeout: 30_000 });
 });
 
 function writeTinyHelmChart(dir: string, releaseName: string) {

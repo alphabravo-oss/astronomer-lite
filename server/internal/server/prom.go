@@ -9,9 +9,9 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
+	"github.com/alphabravo/astronomer-lite/server/internal/cache"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -29,19 +29,17 @@ type promTarget struct {
 }
 
 type promDetectionResult struct {
-	Available bool       `json:"available"`
+	Available bool        `json:"available"`
 	Target    *promTarget `json:"target,omitempty"`
-	Reason    string     `json:"reason,omitempty"`
-	CheckedAt string     `json:"checkedAt"`
+	Reason    string      `json:"reason,omitempty"`
+	CheckedAt string      `json:"checkedAt"`
 }
 
-var (
-	promCacheMu sync.RWMutex
-	promCache   = map[string]promDetectionResult{}
-	promCacheAt = map[string]time.Time{}
-)
-
 const promCacheTTL = 10 * time.Minute
+
+// promCache stores prometheus detection results keyed by cluster id. It is
+// registered with the Registry invalidation hook in Server.New.
+var promCache = cache.NewTTLCache[promDetectionResult](promCacheTTL)
 
 type promCandidate struct {
 	Namespace string
@@ -77,11 +75,7 @@ func (s *Server) handleProm(w http.ResponseWriter, r *http.Request, id string, p
 }
 
 func (s *Server) promDetect(w http.ResponseWriter, r *http.Request, id string, write bool) promDetectionResult {
-	promCacheMu.RLock()
-	cached, ok := promCache[id]
-	cachedAt, _ := promCacheAt[id]
-	promCacheMu.RUnlock()
-	if ok && time.Since(cachedAt) < promCacheTTL {
+	if cached, ok := promCache.Get(id); ok {
 		if write {
 			writeJSON(w, http.StatusOK, cached)
 		}
@@ -120,10 +114,7 @@ func (s *Server) promDetect(w http.ResponseWriter, r *http.Request, id string, w
 	if found == nil {
 		result.Reason = "no known Prometheus service found"
 	}
-	promCacheMu.Lock()
-	promCache[id] = result
-	promCacheAt[id] = time.Now()
-	promCacheMu.Unlock()
+	promCache.Put(id, result)
 	if write {
 		writeJSON(w, http.StatusOK, result)
 	}

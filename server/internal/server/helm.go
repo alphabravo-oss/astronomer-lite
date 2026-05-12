@@ -16,6 +16,7 @@ import (
 	"helm.sh/helm/v3/pkg/action"
 	"helm.sh/helm/v3/pkg/release"
 	"helm.sh/helm/v3/pkg/storage/driver"
+	authorizationv1 "k8s.io/api/authorization/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 	"k8s.io/client-go/discovery"
@@ -215,6 +216,18 @@ func (s *Server) helmRollback(w http.ResponseWriter, r *http.Request, id, namesp
 		writeError(w, http.StatusBadRequest, fmt.Errorf("revision must be a positive integer"))
 		return
 	}
+	authzCtx, authzCancel := context.WithTimeout(r.Context(), 10*time.Second)
+	if err := s.authorize(authzCtx, id, authorizationv1.ResourceAttributes{
+		Namespace: namespace,
+		Verb:      "patch",
+		Group:     "",
+		Resource:  "secrets",
+	}); err != nil {
+		authzCancel()
+		writeError(w, http.StatusBadGateway, err)
+		return
+	}
+	authzCancel()
 	cfg, err := s.helmActionConfig(id, namespace)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
@@ -232,6 +245,18 @@ func (s *Server) helmRollback(w http.ResponseWriter, r *http.Request, id, namesp
 }
 
 func (s *Server) helmUninstall(w http.ResponseWriter, r *http.Request, id, namespace, name string) {
+	authzCtx, authzCancel := context.WithTimeout(r.Context(), 10*time.Second)
+	if err := s.authorize(authzCtx, id, authorizationv1.ResourceAttributes{
+		Namespace: namespace,
+		Verb:      "delete",
+		Group:     "",
+		Resource:  "secrets",
+	}); err != nil {
+		authzCancel()
+		writeError(w, http.StatusBadGateway, err)
+		return
+	}
+	authzCancel()
 	cfg, err := s.helmActionConfig(id, namespace)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)

@@ -9,6 +9,7 @@ import { Button } from "../components/ui/button";
 import { StatusBadge } from "../components/ui/status-badge";
 import { YamlViewDialog } from "../components/ui/yaml-view-dialog";
 import { useFavorites } from "../lib/favorites";
+import { useOpenAPIDoc } from "../lib/openapi";
 import { useWatch } from "../hooks/use-watch";
 import type { ClusterEvent, MetricsRow, Pod, PodContainer, PodDetail, PodToleration, PodVolume, WatchFrame } from "../lib/api";
 import { api } from "../lib/api";
@@ -261,6 +262,7 @@ function PodDrawer({
 }) {
   const labels = Object.entries(detail?.labels ?? {});
   const { isFavorite, toggleFavorite } = useFavorites(clusterId);
+  const openApiDoc = useOpenAPIDoc(clusterId);
   const pinned = isFavorite({ kind: "Pod", resource: "pods", namespace: pod.namespace, name: pod.name });
   const [metric, setMetric] = useState<MetricsRow | null>(null);
   const [metricError, setMetricError] = useState("");
@@ -491,6 +493,9 @@ function PodDrawer({
         onEditModeChange={setEditMode}
         allowEdit={false}
         readOnly
+        kind="Pod"
+        apiVersion="v1"
+        openApiDoc={openApiDoc}
       />
     </>
   );

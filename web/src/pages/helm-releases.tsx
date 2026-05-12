@@ -1,7 +1,7 @@
 import { Anchor, History, Package, RefreshCcw, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import type { HelmReleaseDetail, HelmReleaseSummary } from "../lib/api";
+import type { AccessReviewResponse, HelmReleaseDetail, HelmReleaseSummary } from "../lib/api";
 import { api, ApiError } from "../lib/api";
 import { Button } from "../components/ui/button";
 import { ConfirmDialog } from "../components/ui/confirm-dialog";
@@ -19,6 +19,13 @@ function ageOf(updated: string) {
   if (hours < 24) return `${hours}h`;
   const days = Math.floor(hours / 24);
   return `${days}d`;
+}
+
+function accessDeniedReason(response: AccessReviewResponse | null, label: string) {
+  if (!response) return `Cannot ${label} in this namespace.`;
+  if (response.allowed && !response.denied) return "";
+  const reason = response.reason?.trim();
+  return reason ? `Cannot ${label}: ${reason}` : `Cannot ${label} in this namespace.`;
 }
 
 function statusKind(status: string) {
@@ -42,6 +49,9 @@ export function HelmReleasesPage() {
   const [actionMessage, setActionMessage] = useState("");
   const [confirmUninstall, setConfirmUninstall] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [rollbackAccess, setRollbackAccess] = useState<AccessReviewResponse | null>(null);
+  const [uninstallAccess, setUninstallAccess] = useState<AccessReviewResponse | null>(null);
+  const [accessChecking, setAccessChecking] = useState(false);
 
   useEffect(() => {
     if (!clusterId) return;
@@ -72,6 +82,8 @@ export function HelmReleasesPage() {
     if (!selected) {
       setDetail(null);
       setHistory([]);
+      setRollbackAccess(null);
+      setUninstallAccess(null);
       return;
     }
     let cancelled = false;
@@ -91,6 +103,30 @@ export function HelmReleasesPage() {
       .finally(() => {
         if (!cancelled) setDetailLoading(false);
       });
+    return () => {
+      cancelled = true;
+    };
+  }, [clusterId, selected]);
+
+  useEffect(() => {
+    if (!selected) {
+      setRollbackAccess(null);
+      setUninstallAccess(null);
+      return;
+    }
+    let cancelled = false;
+    setAccessChecking(true);
+    setRollbackAccess(null);
+    setUninstallAccess(null);
+    void Promise.allSettled([
+      api.canI(clusterId, { verb: "patch", group: "", resource: "secrets", namespace: selected.namespace }),
+      api.canI(clusterId, { verb: "delete", group: "", resource: "secrets", namespace: selected.namespace })
+    ]).then(([patchResult, deleteResult]) => {
+      if (cancelled) return;
+      setRollbackAccess(patchResult.status === "fulfilled" ? patchResult.value : null);
+      setUninstallAccess(deleteResult.status === "fulfilled" ? deleteResult.value : null);
+      setAccessChecking(false);
+    });
     return () => {
       cancelled = true;
     };
@@ -145,6 +181,11 @@ export function HelmReleasesPage() {
       return "";
     }
   }, [detail]);
+
+  const canRollback = rollbackAccess?.allowed === true && rollbackAccess?.denied !== true;
+  const canUninstall = uninstallAccess?.allowed === true && uninstallAccess?.denied !== true;
+  const rollbackDeniedReason = accessDeniedReason(rollbackAccess, "patch secrets");
+  const uninstallDeniedReason = accessDeniedReason(uninstallAccess, "delete secrets");
 
   return (
     <div className="space-y-5">
@@ -219,7 +260,19 @@ export function HelmReleasesPage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" onClick={() => setConfirmUninstall(true)} disabled={actionState !== "idle"}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setConfirmUninstall(true)}
+                disabled={actionState !== "idle" || accessChecking || !canUninstall}
+                title={
+                  accessChecking
+                    ? "Checking Kubernetes authorization..."
+                    : !canUninstall
+                      ? uninstallDeniedReason
+                      : undefined
+                }
+              >
                 <Trash2 className="h-4 w-4" />
                 Uninstall
               </Button>
@@ -271,7 +324,14 @@ export function HelmReleasesPage() {
                                 variant="secondary"
                                 size="sm"
                                 onClick={() => void rollback(row.revision)}
-                                disabled={actionState !== "idle"}
+                                disabled={actionState !== "idle" || accessChecking || !canRollback}
+                                title={
+                                  accessChecking
+                                    ? "Checking Kubernetes authorization..."
+                                    : !canRollback
+                                      ? rollbackDeniedReason
+                                      : undefined
+                                }
                               >
                                 {actionState === "rolling-back" ? "Rolling back..." : "Roll back"}
                               </Button>
