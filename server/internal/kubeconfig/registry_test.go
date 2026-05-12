@@ -161,7 +161,7 @@ users:
     token: second-token
 `)
 
-	registry := NewRegistry(nil, managedDir, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	registry := NewRegistry(nil, managedDir, "", slog.New(slog.NewTextHandler(io.Discard, nil)))
 	contexts, err := registry.Preview(raw)
 	if err != nil {
 		t.Fatal(err)
@@ -241,7 +241,7 @@ users:
     token: managed-token
 `)
 
-	registry := NewRegistry([]string{systemPath}, managedDir, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	registry := NewRegistry([]string{systemPath}, managedDir, "", slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err := registry.Reload(); err != nil {
 		t.Fatal(err)
 	}
@@ -326,7 +326,7 @@ users:
 	if err := os.WriteFile(kubeconfigPath, []byte(raw), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	registry := NewRegistry([]string{kubeconfigPath}, managedDir, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	registry := NewRegistry([]string{kubeconfigPath}, managedDir, "", slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err := registry.Reload(); err != nil {
 		t.Fatal(err)
 	}
@@ -373,7 +373,7 @@ users:
 	if err := os.WriteFile(kubeconfigPath, []byte(raw), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	return NewRegistry([]string{kubeconfigPath}, managedDir, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	return NewRegistry([]string{kubeconfigPath}, managedDir, "", slog.New(slog.NewTextHandler(io.Discard, nil)))
 }
 
 func writeDiscoveryResponse(t *testing.T, w http.ResponseWriter, r *http.Request, failDiscovery bool) {

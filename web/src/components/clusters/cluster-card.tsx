@@ -1,4 +1,4 @@
-import { Box, ExternalLink, Layers, Server, Trash2 } from "lucide-react";
+import { Box, ExternalLink, Layers, Palette, Server, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { Cluster, Dashboard } from "../../lib/api";
@@ -7,14 +7,16 @@ import { cn } from "../../lib/utils";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import { StatusBadge } from "../ui/status-badge";
+import { ClusterChip } from "./cluster-chip";
 
 type ClusterCardProps = {
   cluster: Cluster;
   busy?: boolean;
   onRemove?: (cluster: Cluster) => void;
+  onCustomize?: (cluster: Cluster) => void;
 };
 
-export function ClusterCard({ cluster, busy, onRemove }: ClusterCardProps) {
+export function ClusterCard({ cluster, busy, onRemove, onCustomize }: ClusterCardProps) {
   const [dashboard, setDashboard] = useState<Dashboard | null>(null);
 
   useEffect(() => {
@@ -46,12 +48,15 @@ export function ClusterCard({ cluster, busy, onRemove }: ClusterCardProps) {
       )}
     >
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          <Link to={`/clusters/${cluster.id}`} className="flex min-w-0 items-center gap-2 font-medium text-foreground hover:text-foreground/90">
-            <span className="truncate">{cluster.name}</span>
-            <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
-          </Link>
-          <p className="mt-0.5 truncate text-xs text-muted-foreground">{cluster.context}</p>
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          <ClusterChip cluster={cluster} size="lg" />
+          <div className="min-w-0 flex-1">
+            <Link to={`/clusters/${cluster.id}`} className="flex min-w-0 items-center gap-2 font-medium text-foreground hover:text-foreground/90">
+              <span className="truncate">{cluster.name}</span>
+              <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+            </Link>
+            <p className="mt-0.5 truncate text-xs text-muted-foreground">{cluster.context}</p>
+          </div>
         </div>
         <StatusBadge status={clusterStatus(cluster)} label={clusterStatusLabel(cluster)} size="sm" />
       </div>
@@ -68,12 +73,20 @@ export function ClusterCard({ cluster, busy, onRemove }: ClusterCardProps) {
 
       <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3">
         <Badge tone={cluster.source === "managed" ? "default" : "muted"}>{cluster.source === "managed" ? "app-managed" : "managed externally"}</Badge>
-        {cluster.source === "managed" ? (
-          <Button variant="ghost" size="sm" onClick={() => onRemove?.(cluster)} disabled={busy} aria-label={`Remove ${cluster.name}`}>
-            <Trash2 className="h-4 w-4" />
-            Remove
-          </Button>
-        ) : null}
+        <div className="flex items-center gap-1">
+          {onCustomize ? (
+            <Button variant="ghost" size="sm" onClick={() => onCustomize(cluster)} aria-label={`Customize ${cluster.name} appearance`}>
+              <Palette className="h-4 w-4" />
+              Customize
+            </Button>
+          ) : null}
+          {cluster.source === "managed" ? (
+            <Button variant="ghost" size="sm" onClick={() => onRemove?.(cluster)} disabled={busy} aria-label={`Remove ${cluster.name}`}>
+              <Trash2 className="h-4 w-4" />
+              Remove
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       {cluster.error ? <p className="mt-3 truncate text-xs text-destructive">{cluster.error}</p> : null}

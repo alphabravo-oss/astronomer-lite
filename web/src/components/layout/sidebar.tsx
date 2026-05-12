@@ -6,13 +6,14 @@ import type { Cluster } from "../../lib/api";
 import { resourceConfigs } from "../../lib/resources";
 import { cn } from "../../lib/utils";
 import { navPlugins, type NavItemPlugin } from "../../plugins/registry";
+import { ClusterChip } from "../clusters/cluster-chip";
 
 type SidebarGroup = {
   label: string;
   items: NavItemPlugin[];
 };
 
-const groupOrder = ["Cluster", "Workloads", "Service Discovery", "Storage", "Policy", "More Resources"];
+const groupOrder = ["Cluster", "Workloads", "Service Discovery", "Storage", "Policy", "Helm", "More Resources"];
 
 function sidebarGroups(clusterId?: string, availableResourceIds?: Set<string>): SidebarGroup[] {
   if (!clusterId) {
@@ -149,7 +150,7 @@ function SidebarContent({
           </div>
           {!collapsed ? (
             <div className="flex min-w-0 flex-col">
-              <span className="truncate text-sm font-semibold leading-tight tracking-tight text-sidebar-accent-foreground">Astronomer-lite</span>
+              <span className="truncate text-sm font-semibold leading-tight tracking-tight text-sidebar-accent-foreground">Astronomer-Lite</span>
               <span className="truncate text-[10px] leading-tight text-sidebar-foreground">by AlphaBravo</span>
             </div>
           ) : null}
@@ -171,9 +172,12 @@ function SidebarContent({
             {!collapsed ? <span>All Clusters</span> : null}
           </Link>
           {!collapsed ? (
-            <div className="mt-1 px-2">
-              <p className="truncate text-sm font-medium text-sidebar-accent-foreground">{activeCluster?.name ?? "Cluster"}</p>
-              <p className="truncate text-2xs text-sidebar-foreground">{clusterStatusText(activeCluster)}</p>
+            <div className="mt-1 flex items-center gap-2 px-2">
+              {activeCluster ? <ClusterChip cluster={activeCluster} size="md" /> : null}
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-sidebar-accent-foreground">{activeCluster?.name ?? "Cluster"}</p>
+                <p className="truncate text-2xs text-sidebar-foreground">{clusterStatusText(activeCluster)}</p>
+              </div>
             </div>
           ) : null}
         </div>
@@ -191,6 +195,7 @@ function SidebarContent({
             onNavigate={onNavigate}
           />
         ))}
+        {!clusterId ? <ClusterListGroup clusters={clusters} collapsed={collapsed} onNavigate={onNavigate} /> : null}
       </nav>
 
       {!mobile && onToggleCollapsed ? (
@@ -206,7 +211,7 @@ function SidebarContent({
                 <BookOpen className="h-4 w-4" />
                 <span className="text-sm">Documentation</span>
               </a>
-              <p className="px-3 pb-2 text-xs text-sidebar-foreground/60">Astronomer-lite v0.0.0</p>
+              <p className="px-3 pb-2 text-xs text-sidebar-foreground/60">Astronomer-Lite v0.0.0</p>
             </>
           ) : null}
           <button
@@ -278,6 +283,61 @@ function SidebarGroup({
           ))}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function clusterDotClass(cluster: Cluster) {
+  const status = cluster.status ?? (cluster.reachable ? "reachable" : "unreachable");
+  if (status === "reachable") return "bg-status-success";
+  if (status === "degraded") return "bg-status-warning";
+  return "bg-status-error";
+}
+
+function statusText(cluster: Cluster) {
+  return cluster.status ?? (cluster.reachable ? "reachable" : "unreachable");
+}
+
+function ClusterListGroup({ clusters, collapsed, onNavigate }: { clusters: Cluster[]; collapsed: boolean; onNavigate?: () => void }) {
+  if (clusters.length === 0) return null;
+  if (collapsed) {
+    return (
+      <div className="mt-1 space-y-1">
+        {clusters.map((cluster) => (
+          <NavLink
+            key={cluster.id}
+            to={`/clusters/${cluster.id}`}
+            title={`${cluster.name} (${statusText(cluster)})`}
+            onClick={onNavigate}
+            className={({ isActive }) => cn("nav-item relative h-9 justify-center px-0", isActive ? "active" : "text-sidebar-foreground")}
+          >
+            <ClusterChip cluster={cluster} size="md" />
+            <span className={cn("absolute bottom-1 right-1 h-2 w-2 rounded-full ring-2 ring-sidebar", clusterDotClass(cluster))} aria-hidden />
+          </NavLink>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <div className="mb-1 mt-1">
+      <div className="flex h-8 w-full items-center px-3 text-xs font-semibold text-sidebar-foreground/75">
+        <span>Your Clusters</span>
+      </div>
+      <div className="mt-1 space-y-1">
+        {clusters.map((cluster) => (
+          <NavLink
+            key={cluster.id}
+            to={`/clusters/${cluster.id}`}
+            title={cluster.context ?? cluster.name}
+            onClick={onNavigate}
+            className={({ isActive }) => cn("nav-item h-9", isActive ? "active" : "text-sidebar-foreground")}
+          >
+            <ClusterChip cluster={cluster} size="md" />
+            <span className="truncate">{cluster.name}</span>
+            <span className={cn("ml-auto h-2 w-2 shrink-0 rounded-full", clusterDotClass(cluster))} aria-hidden />
+          </NavLink>
+        ))}
+      </div>
     </div>
   );
 }

@@ -1,8 +1,9 @@
-import { Outlet } from "react-router-dom";
+import { Outlet, useParams } from "react-router-dom";
 import { useState } from "react";
 import type { Cluster } from "../../lib/api";
 import { MobileSidebarDrawer, Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
+import { CommandPalette } from "../palette/command-palette";
 
 type AppShellProps = {
   clusters: Cluster[];
@@ -13,6 +14,7 @@ type AppShellProps = {
 
 export function AppShell({ clusters, onRefresh, selectedNamespaces, onSelectedNamespacesChange }: AppShellProps) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const { clusterId } = useParams();
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -33,6 +35,7 @@ export function AppShell({ clusters, onRefresh, selectedNamespaces, onSelectedNa
         </main>
         <div id="bottom-panel-root" className="shrink-0" />
       </div>
+      <CommandPalette clusters={clusters} activeClusterId={clusterId} />
     </div>
   );
 }

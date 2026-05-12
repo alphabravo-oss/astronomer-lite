@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Activity, BarChart3, Container, Gauge, Puzzle, Wrench, type LucideIcon } from "lucide-react";
+import { Activity, BarChart3, Container, Gauge, Package, Puzzle, Wrench, type LucideIcon } from "lucide-react";
 import { ClusterDashboard } from "../pages/cluster-dashboard";
 import { PodsPage } from "../pages/pods";
 import type { Cluster } from "../lib/api";
@@ -8,6 +8,7 @@ import { EventsPage } from "../pages/events";
 import { GenericResourceBrowser } from "../pages/generic-resource-browser";
 import { MetricsPage } from "../pages/metrics";
 import { ResourceListPage } from "../pages/resource-list";
+import { HelmReleasesPage } from "../pages/helm-releases";
 
 export type NavItemPlugin = {
   id: string;
@@ -65,6 +66,13 @@ const internalPagePlugins = [
     route: "pods",
     group: "Workloads",
     icon: Container
+  },
+  {
+    id: "helm-releases",
+    label: "Helm Releases",
+    route: "helm/releases",
+    group: "Helm",
+    icon: Package
   }
 ] satisfies NavItemPlugin[];
 
@@ -116,6 +124,10 @@ export function resourcePlugins(clusters: Cluster[], selectedNamespaces: string[
     {
       ...internalPagePlugins[4],
       element: <PodsPage selectedNamespaces={selectedNamespaces} />
+    },
+    {
+      ...internalPagePlugins[5],
+      element: <HelmReleasesPage />
     },
     ...resourceConfigs.filter((resource) => resource.id !== "events").map((resource) => ({
       id: resource.id,

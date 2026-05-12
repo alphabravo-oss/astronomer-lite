@@ -1,3 +1,6 @@
+export const DISPLAY_PALETTE = ["blue", "violet", "emerald", "amber", "rose", "cyan", "fuchsia", "indigo"] as const;
+export type DisplayColor = (typeof DISPLAY_PALETTE)[number];
+
 export type Cluster = {
   id: string;
   name: string;
@@ -8,6 +11,8 @@ export type Cluster = {
   status?: "reachable" | "degraded" | "unreachable";
   version?: string;
   error?: string;
+  displayColor: DisplayColor;
+  displayInitials: string;
 };
 
 export type KubeconfigContextPreview = {
@@ -263,6 +268,32 @@ export type NodeDrainPodResult = {
   error?: string;
 };
 
+export type SearchHit = {
+  kind: string;
+  apiVersion: string;
+  resource: string;
+  namespace?: string;
+  name: string;
+};
+
+export type HelmReleaseSummary = {
+  name: string;
+  namespace: string;
+  chart: string;
+  version: string;
+  appVersion?: string;
+  revision: number;
+  status: string;
+  updated: string;
+};
+
+export type HelmReleaseDetail = HelmReleaseSummary & {
+  notes?: string;
+  manifest?: string;
+  values?: Record<string, unknown>;
+  config?: Record<string, unknown>;
+};
+
 export type NodeDrainResponse = {
   nodeCordoned: boolean;
   nodeWasCordoned: boolean;
@@ -312,6 +343,12 @@ export const api = {
     });
   },
   removeCluster: (id: string) => request<void>(`/api/clusters/${id}`, { method: "DELETE" }),
+  updateClusterDisplay: (id: string, payload: { color?: string; initials?: string }) =>
+    request<Cluster>(`/api/clusters/${id}/display`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }),
   dashboard: (id: string) => request<Dashboard>(`/api/clusters/${id}/dashboard`),
   canI: (id: string, review: AccessReviewRequest) =>
     request<AccessReviewResponse>(`/api/clusters/${id}/can-i`, {
@@ -448,7 +485,45 @@ export const api = {
         body: JSON.stringify({ replicas })
       }
     ),
+  rollbackResource: (id: string, resource: string, namespace: string, name: string, revision: number) =>
+    request<{ revision: number; name: string }>(
+      `/api/clusters/${id}/resources/${resource}/${encodeURIComponent(namespace || "_")}/${encodeURIComponent(name)}/rollback`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ revision })
+      }
+    ),
   discovery: (id: string) => request<DiscoveredResource[]>(`/api/clusters/${id}/discovery`),
+  openapi: (id: string) => request<Record<string, unknown>>(`/api/clusters/${id}/openapi`),
+  search: (id: string, query: string) =>
+    request<SearchHit[]>(`/api/clusters/${id}/search?q=${encodeURIComponent(query)}`),
+  helmReleases: (id: string, namespace = "") =>
+    request<HelmReleaseSummary[]>(
+      `/api/clusters/${id}/helm/releases${namespace ? `?namespace=${encodeURIComponent(namespace)}` : ""}`
+    ),
+  helmRelease: (id: string, namespace: string, name: string) =>
+    request<HelmReleaseDetail>(
+      `/api/clusters/${id}/helm/releases/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}`
+    ),
+  helmReleaseHistory: (id: string, namespace: string, name: string) =>
+    request<HelmReleaseSummary[]>(
+      `/api/clusters/${id}/helm/releases/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}/history`
+    ),
+  helmRollback: (id: string, namespace: string, name: string, revision: number) =>
+    request<{ name: string; revision: number }>(
+      `/api/clusters/${id}/helm/releases/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}/rollback`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ revision })
+      }
+    ),
+  helmUninstall: (id: string, namespace: string, name: string) =>
+    request<{ name: string; status?: string }>(
+      `/api/clusters/${id}/helm/releases/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}`,
+      { method: "DELETE" }
+    ),
   applyManifests: (id: string, yaml: string, dryRun = false, force = false) => {
     const params = new URLSearchParams();
     if (dryRun) params.set("dryRun", "true");

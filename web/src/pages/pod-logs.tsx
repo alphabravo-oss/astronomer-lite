@@ -109,7 +109,9 @@ export function PodLogsPage() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `${decodedNamespace}-${decodedName}.log`;
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const parts = [decodedNamespace, decodedName, container, stamp].filter(Boolean);
+    link.download = `${parts.join("-")}.log`;
     link.click();
     URL.revokeObjectURL(url);
   }

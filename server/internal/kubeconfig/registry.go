@@ -43,18 +43,39 @@ const (
 )
 
 type Cluster struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Context   string `json:"context"`
-	Server    string `json:"server"`
-	Source    Source `json:"source"`
-	Reachable bool   `json:"reachable"`
-	Status    string `json:"status"`
-	Version   string `json:"version,omitempty"`
-	Error     string `json:"error,omitempty"`
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	Context         string `json:"context"`
+	Server          string `json:"server"`
+	Source          Source `json:"source"`
+	Reachable       bool   `json:"reachable"`
+	Status          string `json:"status"`
+	Version         string `json:"version,omitempty"`
+	Error           string `json:"error,omitempty"`
+	DisplayColor    string `json:"displayColor"`
+	DisplayInitials string `json:"displayInitials"`
 
 	filePath string
 	raw      []byte
+}
+
+// DisplayPalette lists the chip background colors the UI exposes. Index 0 is
+// the fallback. Picking a deterministic index by hashing the cluster ID gives
+// each cluster a stable color without admins having to choose one.
+var DisplayPalette = []string{
+	"blue",
+	"violet",
+	"emerald",
+	"amber",
+	"rose",
+	"cyan",
+	"fuchsia",
+	"indigo",
+}
+
+type displayOverride struct {
+	Color    string `json:"color,omitempty"`
+	Initials string `json:"initials,omitempty"`
 }
 
 type ContextPreview struct {
@@ -75,21 +96,145 @@ type Registry struct {
 	dynamics    map[string]dynamic.Interface
 	systemPaths []string
 	managedDir  string
+	displayFile string
+	displays    map[string]displayOverride
 	logger      *slog.Logger
 	httpClient  *http.Client
 }
 
-func NewRegistry(systemPaths []string, managedDir string, logger *slog.Logger) *Registry {
-	return &Registry{
+func NewRegistry(systemPaths []string, managedDir, displayFile string, logger *slog.Logger) *Registry {
+	r := &Registry{
 		clusters:    map[string]Cluster{},
 		restConfigs: map[string]*rest.Config{},
 		clients:     map[string]*kubernetes.Clientset{},
 		dynamics:    map[string]dynamic.Interface{},
 		systemPaths: systemPaths,
 		managedDir:  managedDir,
+		displayFile: displayFile,
+		displays:    map[string]displayOverride{},
 		logger:      logger,
 		httpClient:  &http.Client{Timeout: 3 * time.Second},
 	}
+	if err := r.loadDisplays(); err != nil && !errors.Is(err, os.ErrNotExist) {
+		logger.Warn("failed to load cluster display overrides", "error", err)
+	}
+	return r
+}
+
+func (r *Registry) loadDisplays() error {
+	if r.displayFile == "" {
+		return nil
+	}
+	raw, err := os.ReadFile(r.displayFile)
+	if err != nil {
+		return err
+	}
+	if len(raw) == 0 {
+		return nil
+	}
+	var parsed map[string]displayOverride
+	if err := json.Unmarshal(raw, &parsed); err != nil {
+		return err
+	}
+	r.displays = parsed
+	return nil
+}
+
+func (r *Registry) writeDisplays() error {
+	if r.displayFile == "" {
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(r.displayFile), 0o700); err != nil {
+		return err
+	}
+	raw, err := json.MarshalIndent(r.displays, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(r.displayFile, raw, 0o600)
+}
+
+func (r *Registry) applyDisplay(c Cluster) Cluster {
+	override := r.displays[c.ID]
+	if override.Color != "" {
+		c.DisplayColor = override.Color
+	} else {
+		c.DisplayColor = defaultDisplayColor(c.ID)
+	}
+	if override.Initials != "" {
+		c.DisplayInitials = override.Initials
+	} else {
+		c.DisplayInitials = defaultDisplayInitials(c.Name)
+	}
+	return c
+}
+
+func defaultDisplayColor(id string) string {
+	if id == "" {
+		return DisplayPalette[0]
+	}
+	sum := sha1.Sum([]byte(id))
+	return DisplayPalette[int(sum[0])%len(DisplayPalette)]
+}
+
+func defaultDisplayInitials(name string) string {
+	parts := strings.FieldsFunc(name, func(r rune) bool {
+		return r == '-' || r == '_' || r == ' ' || r == '.' || r == '/' || r == ':'
+	})
+	out := make([]rune, 0, 2)
+	for _, part := range parts {
+		for _, ch := range part {
+			out = append(out, ch)
+			break
+		}
+		if len(out) >= 2 {
+			break
+		}
+	}
+	if len(out) == 0 {
+		return "?"
+	}
+	return strings.ToUpper(string(out))
+}
+
+func isValidDisplayColor(c string) bool {
+	for _, name := range DisplayPalette {
+		if name == c {
+			return true
+		}
+	}
+	return false
+}
+
+// SetDisplay updates the persisted color/initials override for a cluster.
+// Empty values reset that field back to the deterministic default.
+func (r *Registry) SetDisplay(id, color, initials string) (Cluster, error) {
+	color = strings.TrimSpace(color)
+	initials = strings.TrimSpace(initials)
+	if color != "" && !isValidDisplayColor(color) {
+		return Cluster{}, fmt.Errorf("unknown color %q", color)
+	}
+	if l := len([]rune(initials)); l > 3 {
+		return Cluster{}, fmt.Errorf("initials must be 1-3 characters")
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	cluster, ok := r.clusters[id]
+	if !ok {
+		return Cluster{}, os.ErrNotExist
+	}
+	if color == "" && initials == "" {
+		delete(r.displays, id)
+	} else {
+		r.displays[id] = displayOverride{Color: color, Initials: strings.ToUpper(initials)}
+	}
+	if err := r.writeDisplays(); err != nil {
+		return Cluster{}, err
+	}
+	cluster = r.applyDisplay(cluster)
+	cluster.filePath = ""
+	cluster.raw = nil
+	return cluster, nil
 }
 
 func (r *Registry) Start(ctx context.Context) {
@@ -374,6 +519,7 @@ func (r *Registry) List() []Cluster {
 	defer r.mu.RUnlock()
 	out := make([]Cluster, 0, len(r.clusters))
 	for _, cluster := range r.clusters {
+		cluster = r.applyDisplay(cluster)
 		cluster.filePath = ""
 		cluster.raw = nil
 		out = append(out, cluster)
@@ -385,9 +531,13 @@ func (r *Registry) Get(id string) (Cluster, bool) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	cluster, ok := r.clusters[id]
+	if !ok {
+		return cluster, false
+	}
+	cluster = r.applyDisplay(cluster)
 	cluster.filePath = ""
 	cluster.raw = nil
-	return cluster, ok
+	return cluster, true
 }
 
 func (r *Registry) Client(id string) (*kubernetes.Clientset, error) {

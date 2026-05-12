@@ -8,6 +8,7 @@ import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { StatusBadge } from "../ui/status-badge";
+import { ClusterChip } from "../clusters/cluster-chip";
 import { Breadcrumbs } from "./breadcrumbs";
 
 type TopbarProps = {
@@ -363,7 +364,7 @@ export function Topbar({ clusters, onRefresh, selectedNamespaces, onSelectedName
             aria-expanded={clusterOpen}
             aria-label="Select cluster"
           >
-            <Server className="h-3.5 w-3.5 shrink-0" />
+            {activeCluster ? <ClusterChip cluster={activeCluster} size="sm" /> : <Server className="h-3.5 w-3.5 shrink-0" />}
             <span className="truncate">{activeCluster?.name ?? "All Clusters"}</span>
             <ChevronDown className="h-3.5 w-3.5 shrink-0" />
           </button>
@@ -415,7 +416,7 @@ export function Topbar({ clusters, onRefresh, selectedNamespaces, onSelectedName
                     role="option"
                     aria-selected={activeCluster?.id === cluster.id}
                   >
-                    <Server className="h-4 w-4 shrink-0" />
+                    <ClusterChip cluster={cluster} size="md" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">{cluster.name}</p>
                       <p className="truncate text-2xs text-muted-foreground">{cluster.context || cluster.server}</p>

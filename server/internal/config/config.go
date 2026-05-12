@@ -11,6 +11,7 @@ type Config struct {
 	Port           string
 	ConfigDir      string
 	ClustersDir    string
+	DisplayFile    string
 	Kubeconfig     string
 	PortForwardTTL time.Duration
 }
@@ -30,6 +31,7 @@ func Load() (Config, error) {
 		Port:           getenv("PORT", "8080"),
 		ConfigDir:      cfgDir,
 		ClustersDir:    filepath.Join(cfgDir, "clusters.d"),
+		DisplayFile:    filepath.Join(cfgDir, "cluster-display.json"),
 		Kubeconfig:     os.Getenv("KUBECONFIG"),
 		PortForwardTTL: portForwardTTL,
 	}, nil

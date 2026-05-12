@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Cluster, KubeconfigContextPreview } from "../lib/api";
 import { api } from "../lib/api";
 import { ClusterCard } from "../components/clusters/cluster-card";
+import { ClusterDisplayDialog } from "../components/clusters/cluster-display-dialog";
 import { Button } from "../components/ui/button";
 import { ConfirmDialog } from "../components/ui/confirm-dialog";
 import { Textarea } from "../components/ui/input";
@@ -23,6 +24,7 @@ export function ClusterList({ clusters, onRefresh }: ClusterListProps) {
   const [contextPreview, setContextPreview] = useState<KubeconfigContextPreview[]>([]);
   const [selectedContexts, setSelectedContexts] = useState<string[]>([]);
   const [removeTarget, setRemoveTarget] = useState<Cluster | null>(null);
+  const [customizeTarget, setCustomizeTarget] = useState<Cluster | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const reachableCount = clusters.filter((cluster) => clusterStatus(cluster) === "reachable").length;
   const degradedCount = clusters.filter((cluster) => clusterStatus(cluster) === "degraded").length;
@@ -121,7 +123,7 @@ export function ClusterList({ clusters, onRefresh }: ClusterListProps) {
       {clusters.length > 0 ? (
         <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {clusters.map((cluster) => (
-            <ClusterCard key={cluster.id} cluster={cluster} busy={busy} onRemove={setRemoveTarget} />
+            <ClusterCard key={cluster.id} cluster={cluster} busy={busy} onRemove={setRemoveTarget} onCustomize={setCustomizeTarget} />
           ))}
         </section>
       ) : (
@@ -176,6 +178,8 @@ export function ClusterList({ clusters, onRefresh }: ClusterListProps) {
         variant="destructive"
         loading={busy}
       />
+
+      <ClusterDisplayDialog cluster={customizeTarget} onClose={() => setCustomizeTarget(null)} onSaved={() => void onRefresh()} />
     </div>
   );
 }

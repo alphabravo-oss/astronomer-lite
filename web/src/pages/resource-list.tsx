@@ -23,6 +23,7 @@ import type {
   WatchFrame
 } from "../lib/api";
 import { ApiError, api } from "../lib/api";
+import { lookupFieldDoc, useOpenAPIDoc, type OpenAPIDocument } from "../lib/openapi";
 import { resourceByRoute, resourceConfigs } from "../lib/resources";
 import { cn } from "../lib/utils";
 
@@ -619,7 +620,9 @@ function ResourceDrawer({
   const [applyState, setApplyState] = useState<"idle" | "dry-running" | "applying">("idle");
   const [applyMessage, setApplyMessage] = useState("");
   const [preRefreshYaml, setPreRefreshYaml] = useState("");
-  const [actionState, setActionState] = useState<"idle" | "scaling" | "deleting" | "cordoning" | "draining">("idle");
+  const [actionState, setActionState] = useState<"idle" | "scaling" | "deleting" | "cordoning" | "draining" | "rolling-back">("idle");
+  const [rollbackRevision, setRollbackRevision] = useState<number | null>(null);
+  const openApiDoc = useOpenAPIDoc(clusterId);
   const [actionMessage, setActionMessage] = useState("");
   const [replicas, setReplicas] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState("");
@@ -1185,6 +1188,26 @@ function ResourceDrawer({
     }
   }
 
+  async function rollbackToRevision(revision: number) {
+    if (!item.namespace) return;
+    setActionState("rolling-back");
+    setRollbackRevision(revision);
+    setActionMessage("");
+    try {
+      await api.rollbackResource(clusterId, activeResource.id, item.namespace, item.name, revision);
+      const nextDetail = discoveredResource
+        ? await api.gvrResourceDetail(clusterId, discoveredResource, item.namespace, item.name)
+        : await api.resourceDetail(clusterId, activeResource.id, item.namespace, item.name);
+      onApplied(nextDetail);
+      setActionMessage(`Rolled back to revision ${revision}.`);
+    } catch (err) {
+      setActionMessage(err instanceof Error ? err.message : "Failed to roll back");
+    } finally {
+      setActionState("idle");
+      setRollbackRevision(null);
+    }
+  }
+
   async function deleteResource() {
     if (!canDelete || deleteConfirm !== item.name) return;
     setActionState("deleting");
@@ -1555,6 +1578,9 @@ function ResourceDrawer({
                 revisionHistory={revisionHistory}
                 revisionHistoryLoading={revisionHistoryLoading}
                 revisionHistoryError={revisionHistoryError}
+                onRollback={canEdit && supportsRevisionHistory(text(cleanedDetail?.kind ?? "")) ? rollbackToRevision : undefined}
+                rollbackingRevision={rollbackRevision}
+                openApiDoc={openApiDoc}
                 serviceEndpoints={serviceEndpoints}
                 serviceEndpointsLoading={serviceEndpointsLoading}
                 serviceEndpointsError={serviceEndpointsError}
@@ -2053,11 +2079,15 @@ function ResourceSummary({
   nodePods,
   nodePodsLoading,
   nodePodsError,
-  secretState
+  secretState,
+  onRollback,
+  rollbackingRevision,
+  openApiDoc
 }: {
   detail: Record<string, unknown>;
   activeResource: ActiveResource;
   discoveredResource?: DiscoveredResource;
+  openApiDoc?: OpenAPIDocument | null;
   ownedPods: K8sResourceRow[];
   ownedPodsLoading: boolean;
   ownedPodsError: string;
@@ -2067,6 +2097,8 @@ function ResourceSummary({
   revisionHistory: RevisionRow[];
   revisionHistoryLoading: boolean;
   revisionHistoryError: string;
+  onRollback?: (revision: number) => void;
+  rollbackingRevision?: number | null;
   serviceEndpoints: ServiceEndpointRow[];
   serviceEndpointsLoading: boolean;
   serviceEndpointsError: string;
@@ -2114,7 +2146,12 @@ function ResourceSummary({
           <h3 className="mb-3 text-sm font-semibold">Status</h3>
           <dl className="grid gap-3 text-sm sm:grid-cols-2">
             {Object.entries(status).slice(0, 8).map(([key, value]) => (
-              <SummaryField key={key} label={key} value={summaryValue(value)} />
+              <SummaryField
+                key={key}
+                label={key}
+                value={summaryValue(value)}
+                description={openApiDoc ? lookupFieldDoc(openApiDoc, text(detail.kind), text(detail.apiVersion), `status.${key}`) : undefined}
+              />
             ))}
           </dl>
         </section>
@@ -2132,6 +2169,8 @@ function ResourceSummary({
           revisionHistory={revisionHistory}
           revisionHistoryLoading={revisionHistoryLoading}
           revisionHistoryError={revisionHistoryError}
+          onRollback={onRollback}
+          rollbackingRevision={rollbackingRevision ?? null}
         />
       ) : null}
 
@@ -2373,7 +2412,9 @@ function WorkloadDetailsSection({
   ownedJobsError,
   revisionHistory,
   revisionHistoryLoading,
-  revisionHistoryError
+  revisionHistoryError,
+  onRollback,
+  rollbackingRevision
 }: {
   detail: Record<string, unknown>;
   ownedPods: K8sResourceRow[];
@@ -2385,6 +2426,8 @@ function WorkloadDetailsSection({
   revisionHistory: RevisionRow[];
   revisionHistoryLoading: boolean;
   revisionHistoryError: string;
+  onRollback?: (revision: number) => void;
+  rollbackingRevision: number | null;
 }) {
   const kind = text(detail.kind);
   const spec = record(detail.spec);
@@ -2433,7 +2476,15 @@ function WorkloadDetailsSection({
       {kind === "CronJob" ? <OwnedJobsSection rows={ownedJobs} loading={ownedJobsLoading} error={ownedJobsError} /> : null}
       {containers.length > 0 ? <ContainerSpecSection title={kind === "Pod" ? "Containers" : "Container Spec"} rows={containers} /> : null}
       {initContainers.length > 0 ? <ContainerSpecSection title="Init Containers" rows={initContainers} /> : null}
-      {supportsRevisionHistory(kind) ? <RevisionHistorySection rows={revisionHistory} loading={revisionHistoryLoading} error={revisionHistoryError} /> : null}
+      {supportsRevisionHistory(kind) ? (
+        <RevisionHistorySection
+          rows={revisionHistory}
+          loading={revisionHistoryLoading}
+          error={revisionHistoryError}
+          onRollback={onRollback}
+          rollbackingRevision={rollbackingRevision}
+        />
+      ) : null}
     </>
   );
 }
@@ -2572,7 +2623,19 @@ type RevisionRow = {
   current: boolean;
 };
 
-function RevisionHistorySection({ rows, loading, error }: { rows: RevisionRow[]; loading: boolean; error: string }) {
+function RevisionHistorySection({
+  rows,
+  loading,
+  error,
+  onRollback,
+  rollbackingRevision
+}: {
+  rows: RevisionRow[];
+  loading: boolean;
+  error: string;
+  onRollback?: (revision: number) => void;
+  rollbackingRevision?: number | null;
+}) {
   return (
     <section className="overflow-hidden rounded-lg border border-border bg-background">
       <div className="border-b border-border px-4 py-3">
@@ -2588,6 +2651,7 @@ function RevisionHistorySection({ rows, loading, error }: { rows: RevisionRow[];
               <th className="px-4 py-3 font-medium">Created</th>
               <th className="px-4 py-3 font-medium">Images</th>
               <th className="px-4 py-3 font-medium">Status</th>
+              {onRollback ? <th className="px-4 py-3 font-medium text-right">Action</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -2614,11 +2678,28 @@ function RevisionHistorySection({ rows, loading, error }: { rows: RevisionRow[];
                 <td className="px-4 py-3">
                   <StatusBadge status={row.current ? "success" : "unknown"} label={row.current ? "Current" : "Previous"} pulse={false} />
                 </td>
+                {onRollback ? (
+                  <td className="px-4 py-3 text-right">
+                    {row.current ? (
+                      <span className="text-xs text-muted-foreground">Current</span>
+                    ) : (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => onRollback(row.revision)}
+                        disabled={rollbackingRevision !== null && rollbackingRevision !== undefined}
+                        aria-label={`Roll back to revision ${row.revision}`}
+                      >
+                        {rollbackingRevision === row.revision ? "Rolling back..." : "Roll back"}
+                      </Button>
+                    )}
+                  </td>
+                ) : null}
               </tr>
             ))}
             {rows.length === 0 ? (
               <tr>
-                <td className="px-4 py-8 text-center text-muted-foreground" colSpan={4}>
+                <td className="px-4 py-8 text-center text-muted-foreground" colSpan={onRollback ? 5 : 4}>
                   {loading ? "Loading revision history..." : "No revision history available."}
                 </td>
               </tr>
@@ -3713,10 +3794,10 @@ function SimpleRowsTable({ columns, rows, empty }: { columns: string[]; rows: st
   );
 }
 
-function SummaryField({ label, value, className }: { label: string; value: string; className?: string }) {
+function SummaryField({ label, value, className, description }: { label: string; value: string; className?: string; description?: string }) {
   return (
     <div className={className}>
-      <dt className="text-xs uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dt className="text-xs uppercase tracking-wide text-muted-foreground" title={description}>{label}</dt>
       <dd className="mt-1 break-words font-mono text-xs text-foreground">{value || "-"}</dd>
     </div>
   );
