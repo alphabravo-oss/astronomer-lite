@@ -2,6 +2,7 @@ import { Activity, AlertTriangle, Plus, Server, Upload, WifiOff, X } from "lucid
 import { useEffect, useRef, useState } from "react";
 import type { Cluster, KubeconfigContextPreview } from "../lib/api";
 import { api } from "../lib/api";
+import { clusterStatus } from "../lib/cluster";
 import { ClusterCard } from "../components/clusters/cluster-card";
 import { ClusterDisplayDialog } from "../components/clusters/cluster-display-dialog";
 import { Button } from "../components/ui/button";
@@ -182,10 +183,6 @@ export function ClusterList({ clusters, onRefresh }: ClusterListProps) {
       <ClusterDisplayDialog cluster={customizeTarget} onClose={() => setCustomizeTarget(null)} onSaved={() => void onRefresh()} />
     </div>
   );
-}
-
-function clusterStatus(cluster: Cluster) {
-  return cluster.status ?? (cluster.reachable ? "reachable" : "unreachable");
 }
 
 type AddKubeconfigDialogProps = {

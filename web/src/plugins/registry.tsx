@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Activity, BarChart3, Container, Gauge, Network, Package, Puzzle, Wrench, type LucideIcon } from "lucide-react";
+import { Activity, BarChart3, Container, Gauge, Network, Package, Puzzle, type LucideIcon } from "lucide-react";
 import { ClusterDashboard } from "../pages/cluster-dashboard";
 import { PodsPage } from "../pages/pods";
 import type { Cluster } from "../lib/api";
@@ -84,21 +84,9 @@ const internalPagePlugins = [
   }
 ] satisfies NavItemPlugin[];
 
-const internalToolPlugins = [
-  {
-    id: "tools",
-    label: "Tools",
-    route: "tools",
-    group: "Cluster",
-    icon: Wrench,
-    disabled: true
-  }
-] satisfies NavItemPlugin[];
-
 export function navPlugins(): NavItemPlugin[] {
   return [
     ...internalPagePlugins,
-    ...internalToolPlugins,
     ...resourceConfigs
       .filter((resource) => resource.id !== "events")
       .map((resource) => ({

@@ -6,6 +6,7 @@ import { MetricCard } from "../components/ui/metric-card";
 import { StatusBadge } from "../components/ui/status-badge";
 import type { Cluster, Dashboard, WorkloadsOverview } from "../lib/api";
 import { api } from "../lib/api";
+import { clusterStatus } from "../lib/cluster";
 
 export function ClusterDashboard({ clusters }: { clusters: Cluster[] }) {
   const { clusterId = "" } = useParams();
@@ -58,7 +59,7 @@ export function ClusterDashboard({ clusters }: { clusters: Cluster[] }) {
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <div>
           <div className="mb-2 flex items-center gap-2">
-            <StatusBadge status={cluster.status ?? (cluster.reachable ? "reachable" : "unreachable")} />
+            <StatusBadge status={clusterStatus(cluster)} />
             <Badge tone="muted">{cluster.source === "managed" ? "app-managed" : "managed externally"}</Badge>
           </div>
           <h1 className="text-2xl font-semibold tracking-tight">{cluster.name}</h1>

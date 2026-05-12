@@ -1,11 +1,12 @@
 import { dump, load, YAMLException } from "js-yaml";
-import { ArrowDownUp, Check, ChevronLeft, ChevronRight, Copy, Eye, EyeOff, FileCode2, Plug, Plus, RefreshCcw, Scale, Search, Star, Trash2, X } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Copy, Eye, EyeOff, FileCode2, Plug, Plus, RefreshCcw, Scale, Search, Star, Trash2, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { MetricSummary } from "../components/metrics/metric-summary";
 import { Button } from "../components/ui/button";
 import { CodeBlock } from "../components/ui/code-block";
+import { SortableHeader, type SortDirection } from "../components/ui/sortable-header";
 import { StatusBadge } from "../components/ui/status-badge";
 import { YamlViewDialog } from "../components/ui/yaml-view-dialog";
 import { useWatch } from "../hooks/use-watch";
@@ -34,12 +35,11 @@ import {
 import { useFavorites } from "../lib/favorites";
 import { lookupFieldDoc, useOpenAPIDoc, type OpenAPIDocument } from "../lib/openapi";
 import { resourceByRoute, resourceConfigs } from "../lib/resources";
-import { cn } from "../lib/utils";
+import { cn, formatAge, record, text } from "../lib/utils";
 
 const YamlEditor = lazy(() => import("../components/ui/yaml-editor").then((module) => ({ default: module.YamlEditor })));
 
 type SortKey = "name" | "namespace" | "kind" | "status" | "age";
-type SortDirection = "asc" | "desc";
 const resourcePageSizeOptions = [25, 50, 100] as const;
 const resourcePageSizeStorageKey = "astronomer-lite-resource-page-size";
 
@@ -148,16 +148,11 @@ export function ResourceListPage({ resourceId, discoveredResource, selectedNames
     }
     let cancelled = false;
     setCreateAccess(pendingAccessCheck);
-    void api
-      .canI(clusterId, accessReviewForResource(activeResource.watchDescriptor, "create", activeResource.namespaced ? selectedNamespaces[0] || "default" : undefined))
-      .then((response) => {
-        if (!cancelled) setCreateAccess({ checking: false, response, error: "" });
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setCreateAccess({ checking: false, response: null, error: err instanceof Error ? err.message : "Authorization check unavailable" });
-        }
-      });
+    void Promise.allSettled([
+      api.canI(clusterId, accessReviewForResource(activeResource.watchDescriptor, "create", activeResource.namespaced ? selectedNamespaces[0] || "default" : undefined))
+    ]).then(([result]) => {
+      if (!cancelled) setCreateAccess(accessCheckFromSettled(result));
+    });
     return () => {
       cancelled = true;
     };
@@ -176,11 +171,17 @@ export function ResourceListPage({ resourceId, discoveredResource, selectedNames
       if (!row) return;
       const rowKey = resourceRowKey(row);
       setItems((current) => {
+        const index = current.findIndex((item) => resourceRowKey(item) === rowKey);
         if (frame.type === "DELETED") {
-          return current.filter((item) => resourceRowKey(item) !== rowKey);
+          if (index < 0) return current;
+          const next = current.slice();
+          next.splice(index, 1);
+          return next;
         }
-        const next = current.filter((item) => resourceRowKey(item) !== rowKey);
-        next.push(row);
+        if (index < 0) return [...current, row];
+        if (sameResourceRow(current[index], row)) return current;
+        const next = current.slice();
+        next[index] = row;
         return next;
       });
     }
@@ -357,8 +358,8 @@ export function ResourceListPage({ resourceId, discoveredResource, selectedNames
             />
           </div>
         </div>
-        <table className="w-full border-collapse text-left text-sm">
-          <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
+        <table className="k8s-table">
+          <thead className="k8s-thead">
             <tr>
               <SortableHeader label="Name" sortKey="name" active={sortKey} direction={sortDirection} onSort={toggleSort} />
               <SortableHeader label="Namespace" sortKey="namespace" active={sortKey} direction={sortDirection} onSort={toggleSort} />
@@ -369,14 +370,14 @@ export function ResourceListPage({ resourceId, discoveredResource, selectedNames
           </thead>
           <tbody>
             {pageItems.map((item) => (
-              <tr key={`${item.namespace ?? "_cluster"}/${item.name}`} className="table-row-hover border-t border-border" onClick={() => setSelected(item)}>
-                <td className="px-4 py-3 font-mono text-xs font-medium">{item.name}</td>
-                <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{item.namespace || "-"}</td>
-                <td className="px-4 py-3 text-muted-foreground">{item.kind || activeResource.label}</td>
-                <td className="px-4 py-3">
+              <tr key={`${item.namespace ?? "_cluster"}/${item.name}`} className="table-row-hover k8s-row" onClick={() => setSelected(item)}>
+                <td className="k8s-td-name">{item.name}</td>
+                <td className="k8s-td-muted">{item.namespace || "-"}</td>
+                <td className="k8s-td-muted">{item.kind || activeResource.label}</td>
+                <td className="k8s-td">
                   {item.status ? <StatusBadge status={item.status} label={item.status} /> : <span className="text-muted-foreground">-</span>}
                 </td>
-                <td className="px-4 py-3 text-muted-foreground">{item.age}</td>
+                <td className="k8s-td-muted">{item.age}</td>
               </tr>
             ))}
             {sortedItems.length === 0 ? (
@@ -461,29 +462,6 @@ export function ResourceListPage({ resourceId, discoveredResource, selectedNames
         onClose={() => setCreateOpen(false)}
       />
     </div>
-  );
-}
-
-function SortableHeader({
-  label,
-  sortKey,
-  active,
-  direction,
-  onSort
-}: {
-  label: string;
-  sortKey: SortKey;
-  active: SortKey;
-  direction: SortDirection;
-  onSort: (key: SortKey) => void;
-}) {
-  return (
-    <th className="px-4 py-3 font-medium">
-      <button type="button" className="inline-flex items-center gap-1 hover:text-foreground" onClick={() => onSort(sortKey)}>
-        {label}
-        <ArrowDownUp className={cn("h-3 w-3", active === sortKey && direction === "desc" && "rotate-180")} />
-      </button>
-    </th>
   );
 }
 
@@ -1075,8 +1053,9 @@ function ResourceDrawer({
       const message = err instanceof Error ? err.message : "Failed to validate YAML";
       setValidatedYaml("");
       setForceApplyValidated(false);
-      setApplyConflict(isApplyConflictMessage(message));
-      setApplyMessage(isApplyConflictMessage(message) ? `${message}\n\nKubernetes reported a server-side apply conflict. Force apply can take ownership of the conflicting fields after a successful force dry run.` : message);
+      const conflict = isApplyConflictError(err, message);
+      setApplyConflict(conflict);
+      setApplyMessage(conflict ? `${message}\n\nKubernetes reported a server-side apply conflict. Force apply can take ownership of the conflicting fields after a successful force dry run.` : message);
     } finally {
       setApplyState("idle");
     }
@@ -1791,7 +1770,7 @@ function ObjectEventsPanel({
                 </td>
                 <td className="px-4 py-3 font-medium text-foreground">{event.reason || "-"}</td>
                 <td className="max-w-md px-4 py-3 text-muted-foreground">{event.note || event.action || "-"}</td>
-                <td className="px-4 py-3 text-muted-foreground">{event.age || formatEventTimestamp(event.lastTimestamp || event.eventTime)}</td>
+                <td className="px-4 py-3 text-muted-foreground">{event.age || formatAge(event.lastTimestamp || event.eventTime) || "-"}</td>
                 <td className="px-4 py-3 tabular-nums text-muted-foreground">{event.count}</td>
               </tr>
             ))}
@@ -1807,19 +1786,6 @@ function ObjectEventsPanel({
       </div>
     </section>
   );
-}
-
-function formatEventTimestamp(value: string) {
-  if (!value) return "-";
-  const timestamp = new Date(value).getTime();
-  if (Number.isNaN(timestamp)) return "-";
-  const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 48) return `${hours}h`;
-  return `${Math.floor(hours / 24)}d`;
 }
 
 function createTemplate(resource: ActiveResource, preferredNamespace?: string) {
@@ -4003,7 +3969,7 @@ function serviceEndpointRow(detail: Record<string, unknown>): ServiceEndpointRow
     name: text(metadata.name),
     addresses: [...addresses],
     ports: [...ports],
-    age: ageFromTimestamp(text(metadata.creationTimestamp))
+    age: formatAge(text(metadata.creationTimestamp))
   };
 }
 
@@ -4029,7 +3995,7 @@ function serviceEndpointSliceRow(detail: Record<string, unknown>): ServiceEndpoi
     addresses: [...addresses],
     ports: [...ports],
     addressType: text(detail.addressType),
-    age: ageFromTimestamp(text(metadata.creationTimestamp))
+    age: formatAge(text(metadata.creationTimestamp))
   };
 }
 
@@ -4209,7 +4175,7 @@ async function loadRevisionHistory(clusterId: string, namespace: string, name: s
         return {
           revision,
           createdAt: text(metadata.creationTimestamp),
-          age: text(metadata.creationTimestamp) ? ageFromTimestamp(text(metadata.creationTimestamp)) : "",
+          age: formatAge(text(metadata.creationTimestamp)),
           images: podTemplateImages(record(record(item.spec).template)),
           current: currentRevision ? String(revision) === currentRevision : false
         };
@@ -4232,7 +4198,7 @@ async function loadRevisionHistory(clusterId: string, namespace: string, name: s
         return {
           revision,
           createdAt: text(record(item.metadata).creationTimestamp),
-          age: text(record(item.metadata).creationTimestamp) ? ageFromTimestamp(text(record(item.metadata).creationTimestamp)) : "",
+          age: formatAge(text(record(item.metadata).creationTimestamp)),
           images: podTemplateImages(record(record(record(item.data).spec).template)),
           current: false
         };
@@ -4331,7 +4297,7 @@ function workloadConditionRows(status: Record<string, unknown>): ConditionRow[] 
       status: text(condition.status),
       reason: text(condition.reason),
       message: text(condition.message),
-      age: timestamp ? ageFromTimestamp(timestamp) : ""
+      age: formatAge(timestamp)
     };
   });
 }
@@ -4380,16 +4346,11 @@ function resourceMapSummary(values: Record<string, unknown>) {
 }
 
 function stripManagedFields(input: Record<string, unknown>) {
-  const clone = JSON.parse(JSON.stringify(input)) as Record<string, unknown>;
-  const metadata = clone.metadata;
-  if (metadata && typeof metadata === "object") {
-    delete (metadata as Record<string, unknown>).managedFields;
-  }
-  return clone;
-}
-
-function record(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+  const metadata = record(input.metadata);
+  if (!("managedFields" in metadata)) return input;
+  const rest = { ...metadata };
+  delete rest.managedFields;
+  return { ...input, metadata: rest };
 }
 
 function stringRecord(value: unknown): Record<string, string> {
@@ -4407,11 +4368,6 @@ function objectSummaryRows(value: Record<string, unknown>, limit: number) {
     .filter(([, item]) => item !== undefined && item !== null && item !== "")
     .slice(0, limit)
     .map(([key, item]) => [key, summaryValue(item)]);
-}
-
-function text(value: unknown) {
-  if (value === null || value === undefined) return "";
-  return String(value);
 }
 
 function summaryValue(value: unknown): string {
@@ -4509,6 +4465,15 @@ function buildLineDiff(before: string, after: string): DiffRow[] {
   return rows;
 }
 
+function sameResourceRow(a: K8sResourceRow, b: K8sResourceRow) {
+  return (
+    a.kind === b.kind &&
+    a.apiVersion === b.apiVersion &&
+    a.status === b.status &&
+    a.age === b.age
+  );
+}
+
 function resourceRowKey(item: K8sResourceRow) {
   return `${item.namespace ?? ""}/${item.name}`;
 }
@@ -4539,7 +4504,7 @@ function resourceRowFromObject(object: Record<string, unknown>): K8sResourceRow 
     kind: typeof object.kind === "string" ? object.kind : "",
     apiVersion: typeof object.apiVersion === "string" ? object.apiVersion : "",
     status: resourceStatusFromObject(object),
-    age: creationTimestamp ? ageFromTimestamp(creationTimestamp) : "",
+    age: formatAge(creationTimestamp),
     ownerReferences
   };
 }
@@ -4561,14 +4526,3 @@ function resourceStatusFromObject(object: Record<string, unknown>) {
   return typeof object.type === "string" ? object.type : "";
 }
 
-function ageFromTimestamp(value: string) {
-  const created = new Date(value).getTime();
-  if (Number.isNaN(created)) return "";
-  const seconds = Math.max(0, Math.floor((Date.now() - created) / 1000));
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 48) return `${hours}h`;
-  return `${Math.floor(hours / 24)}d`;
-}

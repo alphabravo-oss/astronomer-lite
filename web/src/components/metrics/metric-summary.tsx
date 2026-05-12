@@ -1,7 +1,7 @@
 import { Cpu, HardDrive } from "lucide-react";
 import type { ReactNode } from "react";
 import type { MetricsRow } from "../../lib/api";
-import { cn } from "../../lib/utils";
+import { cn, formatBytes, formatCPU, gaugeColor } from "../../lib/utils";
 
 type MetricSummaryProps = {
   title: string;
@@ -61,7 +61,7 @@ function MetricTile({
       {percentage !== undefined ? (
         <div className="mt-3">
           <div className="gauge-bar">
-            <div className={cn("gauge-bar-fill", gaugeBarColor(percentage))} style={{ width: `${Math.min(100, percentage)}%` }} />
+            <div className={cn("gauge-bar-fill", gaugeColor(percentage))} style={{ width: `${Math.min(100, percentage)}%` }} />
           </div>
           <div className="mt-1 text-xs text-muted-foreground">{percentage.toFixed(1)}%</div>
         </div>
@@ -70,20 +70,3 @@ function MetricTile({
   );
 }
 
-function formatCPU(value: number) {
-  if (value >= 1000) return `${(value / 1000).toFixed(2)} cores`;
-  return `${value}m`;
-}
-
-function formatBytes(value: number) {
-  if (value >= 1024 ** 3) return `${(value / 1024 ** 3).toFixed(2)} GiB`;
-  if (value >= 1024 ** 2) return `${(value / 1024 ** 2).toFixed(1)} MiB`;
-  if (value >= 1024) return `${(value / 1024).toFixed(1)} KiB`;
-  return `${value} B`;
-}
-
-function gaugeBarColor(percentage: number) {
-  if (percentage >= 90) return "bg-status-error";
-  if (percentage >= 75) return "bg-status-warning";
-  return "bg-status-success";
-}

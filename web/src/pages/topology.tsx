@@ -1,10 +1,10 @@
 import { RefreshCcw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import ReactFlow, { Background, Controls, MarkerType, type Edge, type Node } from "reactflow";
+import ReactFlow, { Background, Controls, MarkerType, ReactFlowProvider, useReactFlow, type Edge, type Node } from "reactflow";
 import "reactflow/dist/style.css";
 import { api } from "../lib/api";
-import type { TopologyEdge, TopologyGraph, TopologyNode } from "../lib/api";
+import type { Namespace, TopologyEdge, TopologyGraph, TopologyNode } from "../lib/api";
 import { Button } from "../components/ui/button";
 import { cn } from "../lib/utils";
 
@@ -93,13 +93,79 @@ function layout(graph: TopologyGraph): { nodes: Node[]; edges: Edge[] } {
   return { nodes, edges };
 }
 
+function TopologyCanvas({ nodes, edges }: { nodes: Node[]; edges: Edge[] }) {
+  const { fitView } = useReactFlow();
+  const nodeKey = useMemo(() => nodes.map((node) => node.id).sort().join("|"), [nodes]);
+
+  // Refit whenever the set of nodes changes (e.g. namespace switch, refresh).
+  useEffect(() => {
+    if (nodes.length === 0) return;
+    const id = window.setTimeout(() => fitView({ padding: 0.15, duration: 250 }), 0);
+    return () => window.clearTimeout(id);
+  }, [fitView, nodeKey, nodes.length]);
+
+  // Refit on container resize so the graph stays framed when the viewport shrinks/grows.
+  useEffect(() => {
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(() => fitView({ padding: 0.15, duration: 0 }));
+    const target = document.querySelector(".topology-canvas");
+    if (target) observer.observe(target);
+    return () => observer.disconnect();
+  }, [fitView]);
+
+  return (
+    <div className="topology-canvas h-full w-full">
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        fitView
+        fitViewOptions={{ padding: 0.15 }}
+        proOptions={{ hideAttribution: true }}
+        nodesDraggable={false}
+        nodesConnectable={false}
+        edgesFocusable={false}
+        elementsSelectable
+        minZoom={0.1}
+      >
+        <Background gap={24} size={1} color="rgba(148, 163, 184, 0.18)" />
+        <Controls position="bottom-right" showInteractive={false} />
+      </ReactFlow>
+    </div>
+  );
+}
+
 export function TopologyPage() {
   const { clusterId = "" } = useParams();
   const [graph, setGraph] = useState<TopologyGraph | null>(null);
   const [namespace, setNamespace] = useState<string>("default");
+  const [namespaces, setNamespaces] = useState<Namespace[]>([]);
+  const [namespacesError, setNamespacesError] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    if (!clusterId) return;
+    let cancelled = false;
+    api
+      .namespaces(clusterId)
+      .then((rows) => {
+        if (cancelled) return;
+        setNamespaces(rows);
+        setNamespacesError("");
+        setNamespace((current) => {
+          if (rows.some((row) => row.name === current)) return current;
+          if (rows.some((row) => row.name === "default")) return "default";
+          return rows[0]?.name ?? current;
+        });
+      })
+      .catch((err) => {
+        if (!cancelled) setNamespacesError(err instanceof Error ? err.message : "Failed to load namespaces");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [clusterId]);
 
   useEffect(() => {
     if (!clusterId || !namespace) return;
@@ -135,13 +201,21 @@ export function TopologyPage() {
           <label className="text-xs font-medium text-muted-foreground" htmlFor="topology-namespace">
             Namespace
           </label>
-          <input
+          <select
             id="topology-namespace"
-            type="text"
             value={namespace}
             onChange={(event) => setNamespace(event.target.value)}
-            className="h-8 w-48 rounded-md border border-input bg-background px-2 font-mono text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
-          />
+            disabled={namespaces.length === 0}
+            className="h-8 w-56 rounded-md border border-input bg-background px-2 font-mono text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+          >
+            {namespaces.length === 0 && !namespacesError ? <option value={namespace}>Loading…</option> : null}
+            {namespaces.length === 0 && namespacesError ? <option value={namespace}>{namespace}</option> : null}
+            {namespaces.map((row) => (
+              <option key={row.name} value={row.name}>
+                {row.name}
+              </option>
+            ))}
+          </select>
           <Button variant="secondary" size="sm" onClick={() => setTick((t) => t + 1)} disabled={loading}>
             <RefreshCcw className={cn("h-3.5 w-3.5", loading && "animate-spin")} />
             Refresh
@@ -149,21 +223,14 @@ export function TopologyPage() {
         </div>
       </div>
       {error ? <div className="rounded-md border border-destructive/35 bg-destructive/10 p-3 text-sm text-destructive">{error}</div> : null}
+      {namespacesError && !error ? (
+        <div className="rounded-md border border-amber-500/35 bg-amber-500/10 p-3 text-xs text-amber-200">Namespace list unavailable: {namespacesError}</div>
+      ) : null}
       <div className="flex-1 overflow-hidden rounded-lg border border-border bg-background">
         {graph && graph.nodes.length > 0 ? (
-          <ReactFlow
-            nodes={flow.nodes}
-            edges={flow.edges}
-            fitView
-            proOptions={{ hideAttribution: true }}
-            nodesDraggable={false}
-            nodesConnectable={false}
-            edgesFocusable={false}
-            elementsSelectable
-          >
-            <Background gap={24} size={1} color="rgba(148, 163, 184, 0.18)" />
-            <Controls position="bottom-right" showInteractive={false} />
-          </ReactFlow>
+          <ReactFlowProvider>
+            <TopologyCanvas nodes={flow.nodes} edges={flow.edges} />
+          </ReactFlowProvider>
         ) : (
           <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
             {loading ? "Building topology..." : "No resources in this namespace."}

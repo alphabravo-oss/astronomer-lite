@@ -1,20 +1,20 @@
-import { ArrowDownUp, RefreshCcw, Search, X } from "lucide-react";
+import { RefreshCcw, Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { Badge } from "../components/ui/badge";
 import { BottomPanel } from "../components/ui/bottom-panel";
 import { Button } from "../components/ui/button";
+import { SortableHeader, type SortDirection } from "../components/ui/sortable-header";
 import { useWatch } from "../hooks/use-watch";
 import type { ClusterEvent, WatchFrame } from "../lib/api";
 import { api } from "../lib/api";
-import { cn } from "../lib/utils";
+import { cn, formatAge, record, text } from "../lib/utils";
 
 type EventsPageProps = {
   selectedNamespaces: string[];
 };
 
 type SortKey = "lastTimestamp" | "namespace" | "type" | "reason" | "regardingKind" | "count";
-type SortDirection = "asc" | "desc";
 
 export function EventsPage({ selectedNamespaces }: EventsPageProps) {
   const { clusterId = "" } = useParams();
@@ -58,11 +58,17 @@ export function EventsPage({ selectedNamespaces }: EventsPageProps) {
       if (!event) return;
       const key = eventKey(event);
       setEvents((current) => {
+        const index = current.findIndex((item) => eventKey(item) === key);
         if (frame.type === "DELETED") {
-          return current.filter((item) => eventKey(item) !== key);
+          if (index < 0) return current;
+          const next = current.slice();
+          next.splice(index, 1);
+          return next;
         }
-        const next = current.filter((item) => eventKey(item) !== key);
-        next.push(event);
+        if (index < 0) return [...current, event];
+        if (sameEventRow(current[index], event)) return current;
+        const next = current.slice();
+        next[index] = event;
         return next;
       });
     }
@@ -178,33 +184,33 @@ export function EventsPage({ selectedNamespaces }: EventsPageProps) {
       <div className="text-xs uppercase text-muted-foreground">Watch: {watchStatus}</div>
 
       <section className="overflow-hidden rounded-lg border border-border bg-card">
-        <table className="w-full border-collapse text-left text-sm">
-          <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
+        <table className="k8s-table">
+          <thead className="k8s-thead">
             <tr>
               <SortableHeader label="Last seen" sortKey="lastTimestamp" active={sortKey} direction={sortDirection} onSort={toggleSort} />
               <SortableHeader label="Namespace" sortKey="namespace" active={sortKey} direction={sortDirection} onSort={toggleSort} />
               <SortableHeader label="Type" sortKey="type" active={sortKey} direction={sortDirection} onSort={toggleSort} />
               <SortableHeader label="Reason" sortKey="reason" active={sortKey} direction={sortDirection} onSort={toggleSort} />
               <SortableHeader label="Object" sortKey="regardingKind" active={sortKey} direction={sortDirection} onSort={toggleSort} />
-              <th className="px-4 py-3 font-medium">Message</th>
+              <th className="k8s-th">Message</th>
               <SortableHeader label="Count" sortKey="count" active={sortKey} direction={sortDirection} onSort={toggleSort} />
             </tr>
           </thead>
           <tbody>
             {visibleEvents.map((event) => (
-              <tr key={eventKey(event)} className="table-row-hover border-t border-border" onClick={() => setSelectedEvent(event)}>
-                <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">{event.age || formatEventTime(event.lastTimestamp)}</td>
-                <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{event.namespace || "-"}</td>
-                <td className="px-4 py-3">
+              <tr key={eventKey(event)} className="table-row-hover k8s-row" onClick={() => setSelectedEvent(event)}>
+                <td className="k8s-td-muted whitespace-nowrap">{event.age || formatEventTime(event.lastTimestamp)}</td>
+                <td className="k8s-td-muted">{event.namespace || "-"}</td>
+                <td className="k8s-td">
                   <Badge tone={event.type === "Warning" ? "warning" : "success"}>{event.type || "Normal"}</Badge>
                 </td>
-                <td className="px-4 py-3 font-medium">{event.reason || "-"}</td>
-                <td className="max-w-64 px-4 py-3">
-                  <div className="truncate font-mono text-xs">{event.regardingName || "-"}</div>
+                <td className="k8s-td-name">{event.reason || "-"}</td>
+                <td className="k8s-td max-w-64">
+                  <div className="truncate">{event.regardingName || "-"}</div>
                   <div className="mt-1 text-xs text-muted-foreground">{event.regardingKind || "Object"}</div>
                 </td>
-                <td className="max-w-[28rem] truncate px-4 py-3 text-muted-foreground">{event.note || event.action || "-"}</td>
-                <td className="px-4 py-3 tabular-nums">{event.count}</td>
+                <td className="k8s-td-muted max-w-[28rem] truncate">{event.note || event.action || "-"}</td>
+                <td className="k8s-td-numeric">{event.count}</td>
               </tr>
             ))}
             {visibleEvents.length === 0 ? (
@@ -220,29 +226,6 @@ export function EventsPage({ selectedNamespaces }: EventsPageProps) {
 
       {selectedEvent ? <EventDrawer event={selectedEvent} onClose={() => setSelectedEvent(null)} /> : null}
     </div>
-  );
-}
-
-function SortableHeader({
-  label,
-  sortKey,
-  active,
-  direction,
-  onSort
-}: {
-  label: string;
-  sortKey: SortKey;
-  active: SortKey;
-  direction: SortDirection;
-  onSort: (key: SortKey) => void;
-}) {
-  return (
-    <th className="px-4 py-3 font-medium">
-      <button type="button" className="inline-flex items-center gap-1 hover:text-foreground" onClick={() => onSort(sortKey)}>
-        {label}
-        <ArrowDownUp className={cn("h-3 w-3", active === sortKey && direction === "desc" && "rotate-180")} />
-      </button>
-    </th>
   );
 }
 
@@ -322,8 +305,21 @@ function eventFromObject(object: Record<string, unknown>): ClusterEvent | null {
     eventTime,
     firstTimestamp,
     lastTimestamp,
-    age: ageFromTimestamp(lastTimestamp)
+    age: formatAge(lastTimestamp)
   };
+}
+
+function sameEventRow(a: ClusterEvent, b: ClusterEvent) {
+  return (
+    a.type === b.type &&
+    a.reason === b.reason &&
+    a.note === b.note &&
+    a.action === b.action &&
+    a.count === b.count &&
+    a.lastTimestamp === b.lastTimestamp &&
+    a.regardingKind === b.regardingKind &&
+    a.regardingName === b.regardingName
+  );
 }
 
 function eventKey(event: ClusterEvent) {
@@ -344,15 +340,6 @@ function uniqueValues(values: string[]) {
   return Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
 }
 
-function record(value: unknown): Record<string, unknown> {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
-}
-
-function text(value: unknown) {
-  if (value === null || value === undefined) return "";
-  return String(value);
-}
-
 function numberValue(value: unknown) {
   if (typeof value === "number") return value;
   if (typeof value === "string") {
@@ -360,18 +347,6 @@ function numberValue(value: unknown) {
     return Number.isFinite(parsed) ? parsed : 0;
   }
   return 0;
-}
-
-function ageFromTimestamp(value: string) {
-  const timestamp = new Date(value).getTime();
-  if (Number.isNaN(timestamp)) return "";
-  const seconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 48) return `${hours}h`;
-  return `${Math.floor(hours / 24)}d`;
 }
 
 function formatEventTime(value: string) {

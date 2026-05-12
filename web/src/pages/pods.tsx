@@ -1,4 +1,4 @@
-import { ArrowDownUp, ChevronLeft, ChevronRight, FileCode2, Plug, PlugZap, RefreshCcw, ScrollText, Star, TerminalSquare, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileCode2, Plug, PlugZap, RefreshCcw, ScrollText, Star, TerminalSquare, X } from "lucide-react";
 import { dump } from "js-yaml";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -6,6 +6,7 @@ import { MetricSummary } from "../components/metrics/metric-summary";
 import { ActionMenu } from "../components/ui/action-menu";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
+import { SortableHeader, type SortDirection } from "../components/ui/sortable-header";
 import { StatusBadge } from "../components/ui/status-badge";
 import { YamlViewDialog } from "../components/ui/yaml-view-dialog";
 import { useFavorites } from "../lib/favorites";
@@ -13,10 +14,9 @@ import { useOpenAPIDoc } from "../lib/openapi";
 import { useWatch } from "../hooks/use-watch";
 import type { ClusterEvent, MetricsRow, Pod, PodContainer, PodDetail, PodToleration, PodVolume, WatchFrame } from "../lib/api";
 import { api } from "../lib/api";
-import { cn } from "../lib/utils";
+import { cn, formatAge } from "../lib/utils";
 
 type SortKey = "name" | "namespace" | "status" | "restarts" | "age" | "node";
-type SortDirection = "asc" | "desc";
 
 type PodsPageProps = {
   selectedNamespaces: string[];
@@ -26,6 +26,7 @@ const pageSize = 10;
 
 export function PodsPage({ selectedNamespaces }: PodsPageProps) {
   const { clusterId = "" } = useParams();
+  const navigate = useNavigate();
   const [pods, setPods] = useState<Pod[]>([]);
   const [selectedPod, setSelectedPod] = useState<Pod | null>(null);
   const [podDetail, setPodDetail] = useState<PodDetail | null>(null);
@@ -68,11 +69,17 @@ export function PodsPage({ selectedNamespaces }: PodsPageProps) {
       if (!pod) return;
       const key = podRowKey(pod);
       setPods((current) => {
+        const index = current.findIndex((item) => podRowKey(item) === key);
         if (frame.type === "DELETED") {
-          return current.filter((item) => podRowKey(item) !== key);
+          if (index < 0) return current;
+          const next = current.slice();
+          next.splice(index, 1);
+          return next;
         }
-        const next = current.filter((item) => podRowKey(item) !== key);
-        next.push(pod);
+        if (index < 0) return [...current, pod];
+        if (samePodRow(current[index], pod)) return current;
+        const next = current.slice();
+        next[index] = pod;
         return next;
       });
     }
@@ -148,39 +155,55 @@ export function PodsPage({ selectedNamespaces }: PodsPageProps) {
       <div className="text-xs uppercase text-muted-foreground">Watch: {watchStatus}</div>
 
       <section className="overflow-hidden rounded-lg border border-border bg-card">
-        <table className="w-full border-collapse text-left text-sm">
-          <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
+        <table className="k8s-table">
+          <thead className="k8s-thead">
             <tr>
               <SortableHeader label="Name" sortKey="name" active={sortKey} direction={sortDirection} onSort={toggleSort} />
               <SortableHeader label="Namespace" sortKey="namespace" active={sortKey} direction={sortDirection} onSort={toggleSort} />
               <SortableHeader label="Status" sortKey="status" active={sortKey} direction={sortDirection} onSort={toggleSort} />
-              <th className="px-4 py-3 font-medium">Ready</th>
+              <th className="k8s-th">Ready</th>
               <SortableHeader label="Restarts" sortKey="restarts" active={sortKey} direction={sortDirection} onSort={toggleSort} />
               <SortableHeader label="Age" sortKey="age" active={sortKey} direction={sortDirection} onSort={toggleSort} className="hidden md:table-cell" />
               <SortableHeader label="Node" sortKey="node" active={sortKey} direction={sortDirection} onSort={toggleSort} className="hidden lg:table-cell" />
+              <th className="w-12 px-2 py-3" aria-label="Actions" />
             </tr>
           </thead>
           <tbody>
-            {pagePods.map((pod) => (
-              <tr
-                key={`${pod.namespace}/${pod.name}`}
-                className="table-row-hover border-t border-border"
-                onClick={() => setSelectedPod(pod)}
-              >
-                <td className="px-4 py-3 font-medium">{pod.name}</td>
-                <td className="px-4 py-3 text-muted-foreground">{pod.namespace}</td>
-                <td className="px-4 py-3">
-                  <StatusBadge status={pod.status} />
-                </td>
-                <td className="px-4 py-3 text-muted-foreground">{pod.ready}</td>
-                <td className="px-4 py-3 tabular-nums">{pod.restarts}</td>
-                <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">{pod.age}</td>
-                <td className="hidden max-w-64 truncate px-4 py-3 text-muted-foreground lg:table-cell">{pod.node}</td>
-              </tr>
-            ))}
+            {pagePods.map((pod) => {
+              const podRoute = `/clusters/${clusterId}/pods/${encodeURIComponent(pod.namespace)}/${encodeURIComponent(pod.name)}`;
+              return (
+                <tr
+                  key={`${pod.namespace}/${pod.name}`}
+                  className="table-row-hover k8s-row"
+                  onClick={() => setSelectedPod(pod)}
+                >
+                  <td className="k8s-td-name">{pod.name}</td>
+                  <td className="k8s-td-muted">{pod.namespace}</td>
+                  <td className="k8s-td">
+                    <StatusBadge status={pod.status} />
+                  </td>
+                  <td className="k8s-td-muted">{pod.ready}</td>
+                  <td className="k8s-td-numeric">{pod.restarts}</td>
+                  <td className="k8s-td-muted hidden md:table-cell">{pod.age}</td>
+                  <td className="k8s-td-muted hidden max-w-64 truncate lg:table-cell">{pod.node}</td>
+                  <td className="k8s-td-actions" onClick={(event) => event.stopPropagation()}>
+                    <ActionMenu
+                      label={`Actions for ${pod.name}`}
+                      items={[
+                        { label: "View details", icon: <FileCode2 className="h-3.5 w-3.5" />, onClick: () => setSelectedPod(pod) },
+                        { label: "Logs", icon: <ScrollText className="h-3.5 w-3.5" />, onClick: () => navigate(`${podRoute}/logs`) },
+                        { label: "Exec", icon: <TerminalSquare className="h-3.5 w-3.5" />, onClick: () => navigate(`${podRoute}/exec`) },
+                        { label: "Attach", icon: <PlugZap className="h-3.5 w-3.5" />, onClick: () => navigate(`${podRoute}/attach`) },
+                        { label: "Port-forward", icon: <Plug className="h-3.5 w-3.5" />, onClick: () => navigate(`${podRoute}/port-forward`) }
+                      ]}
+                    />
+                  </td>
+                </tr>
+              );
+            })}
             {pods.length === 0 ? (
               <tr>
-                <td className="bg-card px-4 py-8 text-center text-muted-foreground" colSpan={7}>
+                <td className="bg-card px-4 py-8 text-center text-muted-foreground" colSpan={8}>
                   {loading ? "Loading pods..." : "No pods found."}
                 </td>
               </tr>
@@ -222,30 +245,6 @@ export function PodsPage({ selectedNamespaces }: PodsPageProps) {
   );
 }
 
-function SortableHeader({
-  label,
-  sortKey,
-  active,
-  direction,
-  onSort,
-  className
-}: {
-  label: string;
-  sortKey: SortKey;
-  active: SortKey;
-  direction: SortDirection;
-  onSort: (key: SortKey) => void;
-  className?: string;
-}) {
-  return (
-    <th className={cn("px-4 py-3 font-medium", className)}>
-      <button type="button" className="inline-flex items-center gap-1 hover:text-foreground" onClick={() => onSort(sortKey)}>
-        {label}
-        <ArrowDownUp className={cn("h-3 w-3", active === sortKey && direction === "desc" && "rotate-180")} />
-      </button>
-    </th>
-  );
-}
 
 function PodDrawer({
   clusterId,
@@ -745,6 +744,17 @@ function podRowKey(pod: Pod) {
   return `${pod.namespace}/${pod.name}`;
 }
 
+function samePodRow(a: Pod, b: Pod) {
+  return (
+    a.status === b.status &&
+    a.ready === b.ready &&
+    a.restarts === b.restarts &&
+    a.age === b.age &&
+    a.node === b.node &&
+    a.ip === b.ip
+  );
+}
+
 function podRowFromObject(object: Record<string, unknown>): Pod | null {
   const metadata = object.metadata;
   if (!metadata || typeof metadata !== "object") return null;
@@ -769,21 +779,10 @@ function podRowFromObject(object: Record<string, unknown>): Pod | null {
     namespace,
     status: typeof meta.deletionTimestamp === "string" ? "Terminating" : typeof status.phase === "string" ? status.phase : "",
     restarts,
-    age: typeof meta.creationTimestamp === "string" ? ageFromTimestamp(meta.creationTimestamp) : "",
+    age: typeof meta.creationTimestamp === "string" ? formatAge(meta.creationTimestamp) : "",
     node: typeof spec.nodeName === "string" ? spec.nodeName : "",
     ready: `${ready}/${containers.length}`,
     ip: typeof status.podIP === "string" ? status.podIP : ""
   };
 }
 
-function ageFromTimestamp(value: string) {
-  const created = new Date(value).getTime();
-  if (Number.isNaN(created)) return "";
-  const seconds = Math.max(0, Math.floor((Date.now() - created) / 1000));
-  if (seconds < 60) return `${seconds}s`;
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 48) return `${hours}h`;
-  return `${Math.floor(hours / 24)}d`;
-}

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import type { Cluster, Dashboard } from "../../lib/api";
 import { api } from "../../lib/api";
+import { clusterStatus } from "../../lib/cluster";
 import { cn } from "../../lib/utils";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -104,10 +105,6 @@ function ClusterStat({ icon, label, value }: { icon: React.ReactNode; label: str
       <div className="mt-1 text-lg font-semibold tabular-nums text-foreground">{value}</div>
     </div>
   );
-}
-
-function clusterStatus(cluster: Cluster) {
-  return cluster.status ?? (cluster.reachable ? "reachable" : "unreachable");
 }
 
 function clusterStatusLabel(cluster: Cluster) {

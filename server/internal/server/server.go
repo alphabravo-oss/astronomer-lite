@@ -70,6 +70,8 @@ type Server struct {
 	portForwardMu sync.Mutex
 	portForwards  map[string]*portForwardSession
 	informers     *cache.InformerManager
+	helmGetterMu  sync.Mutex
+	helmGetters   map[string]*restClientGetter
 }
 
 var wsUpgrader = websocket.Upgrader{
@@ -92,15 +94,47 @@ func New(logger *slog.Logger) (*Server, error) {
 	}
 	registry.Start(ctx)
 	informerMgr := cache.NewInformerManager()
+	s := &Server{Config: cfg, registry: registry, logger: logger, portForwards: map[string]*portForwardSession{}, informers: informerMgr, helmGetters: map[string]*restClientGetter{}}
 	// Drop per-cluster cached state (openapi, prom detection, informer
-	// factories) when a kubeconfig disappears or is reloaded so the next
-	// request rebuilds from scratch.
+	// factories, helm getters) when a kubeconfig disappears or is reloaded
+	// so the next request rebuilds from scratch.
 	registry.OnClusterInvalidated(func(id string) {
 		openAPICache.Invalidate(id)
 		promCache.Invalidate(id)
+		restMapperCache.Invalidate(id)
 		informerMgr.Invalidate(id)
+		s.invalidateHelmGetters(id)
 	})
-	return &Server{Config: cfg, registry: registry, logger: logger, portForwards: map[string]*portForwardSession{}, informers: informerMgr}, nil
+	return s, nil
+}
+
+func (s *Server) restMapperFor(id string) (meta.RESTMapper, error) {
+	return restMapperCache.Do(id, func() (meta.RESTMapper, error) {
+		restConfig, err := s.registry.RESTConfig(id)
+		if err != nil {
+			return nil, err
+		}
+		discoveryClient, err := discovery.NewDiscoveryClientForConfig(restConfig)
+		if err != nil {
+			return nil, err
+		}
+		groupResources, err := restmapper.GetAPIGroupResources(discoveryClient)
+		if err != nil {
+			return nil, err
+		}
+		return restmapper.NewDiscoveryRESTMapper(groupResources), nil
+	})
+}
+
+func (s *Server) invalidateHelmGetters(id string) {
+	s.helmGetterMu.Lock()
+	defer s.helmGetterMu.Unlock()
+	prefix := id + "\x00"
+	for key := range s.helmGetters {
+		if strings.HasPrefix(key, prefix) {
+			delete(s.helmGetters, key)
+		}
+	}
 }
 
 func (s *Server) Routes() http.Handler {
@@ -671,12 +705,7 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request, id string)
 	}
 	rows := []eventRow{}
 	for _, namespace := range namespaces {
-		var resourceClient dynamic.ResourceInterface
-		if namespace != "" {
-			resourceClient = client.Resource(def.GVR).Namespace(namespace)
-		} else {
-			resourceClient = client.Resource(def.GVR)
-		}
+		resourceClient := resourceClientFor(client, def, namespace)
 		list, err := resourceClient.List(ctx, metav1.ListOptions{})
 		if err != nil {
 			writeError(w, http.StatusBadGateway, err)
@@ -1924,12 +1953,7 @@ func (s *Server) handleWatchWS(w http.ResponseWriter, r *http.Request, id string
 }
 
 func (s *Server) watchResource(ctx context.Context, client dynamic.Interface, def resourceDefinition, namespace string, conn *websocket.Conn, writeMu *sync.Mutex) error {
-	var resourceClient dynamic.ResourceInterface
-	if def.Namespaced && namespace != "" {
-		resourceClient = client.Resource(def.GVR).Namespace(namespace)
-	} else {
-		resourceClient = client.Resource(def.GVR)
-	}
+	resourceClient := resourceClientFor(client, def, namespace)
 	resourceVersion := ""
 	for {
 		if err := ctx.Err(); err != nil {
@@ -2120,6 +2144,13 @@ type resourceDefinition struct {
 	Namespaced bool
 }
 
+func resourceClientFor(client dynamic.Interface, def resourceDefinition, namespace string) dynamic.ResourceInterface {
+	if def.Namespaced && namespace != "" {
+		return client.Resource(def.GVR).Namespace(namespace)
+	}
+	return client.Resource(def.GVR)
+}
+
 var resourceDefinitions = map[string]resourceDefinition{
 	"pods":                            {Label: "Pods", GVR: schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}, Namespaced: true},
 	"deployments":                     {Label: "Deployments", GVR: schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}, Namespaced: true},
@@ -2211,12 +2242,7 @@ func (s *Server) handleResourceList(w http.ResponseWriter, r *http.Request, id s
 	}
 	rows := []resourceRow{}
 	for _, namespace := range namespaces {
-		var resourceClient dynamic.ResourceInterface
-		if def.Namespaced && namespace != "" {
-			resourceClient = client.Resource(def.GVR).Namespace(namespace)
-		} else {
-			resourceClient = client.Resource(def.GVR)
-		}
+		resourceClient := resourceClientFor(client, def, namespace)
 		list, err := resourceClient.List(ctx, metav1.ListOptions{LabelSelector: labelSelector, FieldSelector: fieldSelector})
 		if err != nil {
 			writeError(w, http.StatusBadGateway, err)
@@ -2320,12 +2346,7 @@ func (s *Server) handleDynamicResourceList(w http.ResponseWriter, r *http.Reques
 	}
 	rows := []resourceRow{}
 	for _, namespace := range namespaces {
-		var resourceClient dynamic.ResourceInterface
-		if def.Namespaced && namespace != "" {
-			resourceClient = client.Resource(def.GVR).Namespace(namespace)
-		} else {
-			resourceClient = client.Resource(def.GVR)
-		}
+		resourceClient := resourceClientFor(client, def, namespace)
 		list, err := resourceClient.List(ctx, metav1.ListOptions{})
 		if err != nil {
 			writeError(w, http.StatusBadGateway, err)
@@ -2416,12 +2437,7 @@ func (s *Server) handleDynamicResourceDetail(w http.ResponseWriter, r *http.Requ
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	var resourceClient dynamic.ResourceInterface
-	if def.Namespaced {
-		resourceClient = client.Resource(def.GVR).Namespace(namespace)
-	} else {
-		resourceClient = client.Resource(def.GVR)
-	}
+	resourceClient := resourceClientFor(client, def, namespace)
 	item, err := resourceClient.Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
@@ -2495,12 +2511,7 @@ func (s *Server) handleDynamicResourceApply(w http.ResponseWriter, r *http.Reque
 
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
-	var resourceClient dynamic.ResourceInterface
-	if def.Namespaced {
-		resourceClient = client.Resource(def.GVR).Namespace(namespace)
-	} else {
-		resourceClient = client.Resource(def.GVR)
-	}
+	resourceClient := resourceClientFor(client, def, namespace)
 	options := applyPatchOptions(r)
 	if r.URL.Query().Get("dryRun") == "true" {
 		options.DryRun = []string{metav1.DryRunAll}
@@ -2519,22 +2530,11 @@ func (s *Server) handleApply(w http.ResponseWriter, r *http.Request, id string) 
 		writeError(w, http.StatusBadGateway, err)
 		return
 	}
-	restConfig, err := s.registry.RESTConfig(id)
+	mapper, err := s.restMapperFor(id)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
 		return
 	}
-	discoveryClient, err := discovery.NewDiscoveryClientForConfig(restConfig)
-	if err != nil {
-		writeError(w, http.StatusBadGateway, err)
-		return
-	}
-	groupResources, err := restmapper.GetAPIGroupResources(discoveryClient)
-	if err != nil {
-		writeError(w, http.StatusBadGateway, err)
-		return
-	}
-	mapper := restmapper.NewDiscoveryRESTMapper(groupResources)
 
 	raw, err := io.ReadAll(io.LimitReader(r.Body, 10<<20))
 	if err != nil {
@@ -2668,12 +2668,7 @@ func (s *Server) handleDynamicResourceDelete(w http.ResponseWriter, r *http.Requ
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	var resourceClient dynamic.ResourceInterface
-	if def.Namespaced {
-		resourceClient = client.Resource(def.GVR).Namespace(namespace)
-	} else {
-		resourceClient = client.Resource(def.GVR)
-	}
+	resourceClient := resourceClientFor(client, def, namespace)
 	if err := resourceClient.Delete(ctx, name, metav1.DeleteOptions{}); err != nil {
 		writeError(w, http.StatusBadGateway, err)
 		return

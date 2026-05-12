@@ -47,6 +47,7 @@ export function useWatch({ clusterId, gvr, namespaces = [], enabled = true, onFr
     }
     let closed = false;
     let retryTimer: number | undefined;
+    let retryAttempt = 0;
     let socket: WebSocket | null = null;
     const watchNamespaces = namespaceKey ? namespaceKey.split("\0") : [];
 
@@ -54,7 +55,10 @@ export function useWatch({ clusterId, gvr, namespaces = [], enabled = true, onFr
       setStatus((current) => (current === "connected" ? "connected" : "connecting"));
       socket = new WebSocket(api.watchUrl(clusterId, watchDescriptor, watchNamespaces));
       socket.onopen = () => {
-        if (!closed) setStatus("connected");
+        if (!closed) {
+          retryAttempt = 0;
+          setStatus("connected");
+        }
       };
       socket.onmessage = (event) => {
         const frame = JSON.parse(event.data) as WatchFrame;
@@ -72,7 +76,10 @@ export function useWatch({ clusterId, gvr, namespaces = [], enabled = true, onFr
       socket.onclose = () => {
         if (closed) return;
         setStatus("reconnecting");
-        retryTimer = window.setTimeout(connect, 1500);
+        const base = Math.min(30_000, 1500 * 2 ** Math.min(retryAttempt, 5));
+        const delay = base + Math.random() * 500;
+        retryAttempt++;
+        retryTimer = window.setTimeout(connect, delay);
       };
       socket.onerror = () => {
         if (!closed) setStatus("error");

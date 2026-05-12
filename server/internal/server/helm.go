@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"helm.sh/helm/v3/pkg/action"
@@ -90,13 +91,14 @@ func unescapeNsName(rawNs, rawName string) (string, string, error) {
 }
 
 // helmActionConfig wires action.Configuration against the cluster's REST
-// config without depending on an on-disk kubeconfig path.
+// config without depending on an on-disk kubeconfig path. The underlying
+// REST-client getter (and its memoized discovery + RESTMapper) is cached per
+// (cluster, namespace) so repeated Helm requests skip the discovery walk.
 func (s *Server) helmActionConfig(id, namespace string) (*action.Configuration, error) {
-	restCfg, err := s.registry.RESTConfig(id)
+	getter, err := s.helmGetterFor(id, namespace)
 	if err != nil {
 		return nil, err
 	}
-	getter := newRESTClientGetter(restCfg, namespace)
 	cfg := new(action.Configuration)
 	helmLogger := func(format string, args ...any) {
 		log.Printf("helm: "+format, args...)
@@ -107,12 +109,39 @@ func (s *Server) helmActionConfig(id, namespace string) (*action.Configuration, 
 	return cfg, nil
 }
 
+func (s *Server) helmGetterFor(id, namespace string) (*restClientGetter, error) {
+	key := id + "\x00" + namespace
+	s.helmGetterMu.Lock()
+	if g, ok := s.helmGetters[key]; ok {
+		s.helmGetterMu.Unlock()
+		return g, nil
+	}
+	s.helmGetterMu.Unlock()
+	restCfg, err := s.registry.RESTConfig(id)
+	if err != nil {
+		return nil, err
+	}
+	getter := newRESTClientGetter(restCfg, namespace)
+	s.helmGetterMu.Lock()
+	if existing, ok := s.helmGetters[key]; ok {
+		s.helmGetterMu.Unlock()
+		return existing, nil
+	}
+	s.helmGetters[key] = getter
+	s.helmGetterMu.Unlock()
+	return getter, nil
+}
+
 type restClientGetter struct {
 	cfg       *rest.Config
 	namespace string
+
+	mu        sync.Mutex
+	discovery discovery.CachedDiscoveryInterface
+	mapper    meta.RESTMapper
 }
 
-func newRESTClientGetter(cfg *rest.Config, namespace string) genericclioptions.RESTClientGetter {
+func newRESTClientGetter(cfg *rest.Config, namespace string) *restClientGetter {
 	return &restClientGetter{cfg: cfg, namespace: namespace}
 }
 
@@ -121,26 +150,45 @@ func (g *restClientGetter) ToRESTConfig() (*rest.Config, error) {
 }
 
 func (g *restClientGetter) ToDiscoveryClient() (discovery.CachedDiscoveryInterface, error) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.discovery != nil {
+		return g.discovery, nil
+	}
 	dc, err := discovery.NewDiscoveryClientForConfig(g.cfg)
 	if err != nil {
 		return nil, err
 	}
-	return memory.NewMemCacheClient(dc), nil
+	g.discovery = memory.NewMemCacheClient(dc)
+	return g.discovery, nil
 }
 
 func (g *restClientGetter) ToRESTMapper() (meta.RESTMapper, error) {
+	g.mu.Lock()
+	if g.mapper != nil {
+		m := g.mapper
+		g.mu.Unlock()
+		return m, nil
+	}
+	g.mu.Unlock()
 	dc, err := g.ToDiscoveryClient()
 	if err != nil {
 		return nil, err
 	}
 	mapper := restmapper.NewDeferredDiscoveryRESTMapper(dc)
-	return restmapper.NewShortcutExpander(mapper, dc, nil), nil
+	expanded := restmapper.NewShortcutExpander(mapper, dc, nil)
+	g.mu.Lock()
+	g.mapper = expanded
+	g.mu.Unlock()
+	return expanded, nil
 }
 
 func (g *restClientGetter) ToRawKubeConfigLoader() clientcmd.ClientConfig {
 	overrides := &clientcmd.ConfigOverrides{Context: clientcmdapi.Context{Namespace: g.namespace}}
 	return clientcmd.NewDefaultClientConfig(*clientcmdapi.NewConfig(), overrides)
 }
+
+var _ genericclioptions.RESTClientGetter = (*restClientGetter)(nil)
 
 func (s *Server) helmListReleases(w http.ResponseWriter, r *http.Request, id string) {
 	namespace := r.URL.Query().Get("namespace")
