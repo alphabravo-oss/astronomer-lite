@@ -1,0 +1,51 @@
+# Astronomer-lite — single-process Kubernetes UI.
+#
+# Quick start:
+#   docker compose up -d
+#   open http://localhost:8080
+#
+# Build a fresh image from this checkout instead of pulling:
+#   docker compose build
+#
+# Override the host port without editing this file:
+#   ASTRONOMER_LITE_PORT=18080 docker compose up -d
+#
+# The container reads kubeconfigs from ~/.kube (mounted read-only) on first
+# boot, and persists user-added kubeconfigs / display overrides to the named
+# volume `astronomer-lite-config`.
+
+services:
+  astronomer-lite:
+    image: astronomer-lite:dev
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile
+      args:
+        VERSION: ${VERSION:-dev}
+    container_name: astronomer-lite
+    restart: unless-stopped
+    ports:
+      - "${ASTRONOMER_LITE_PORT:-8080}:8080"
+    environment:
+      # Override the default 60m port-forward TTL if you want shorter sessions.
+      ASTRONOMER_LITE_PORT_FORWARD_TTL: ${ASTRONOMER_LITE_PORT_FORWARD_TTL:-60m}
+    volumes:
+      # Read-only mount of your local kubeconfigs. Every context shows up as
+      # a cluster on first boot. Drop the :ro if you want the UI's "remove
+      # cluster" action to be able to edit the system kubeconfig (not
+      # recommended — let the UI manage its own copies under the named volume).
+      - ${HOME}/.kube:/home/astronomer/.kube:ro
+      # App-managed kubeconfigs and display overrides live here. Survives
+      # container restarts and image rebuilds.
+      - astronomer-lite-config:/home/astronomer/.config/astronomer-lite
+    # Healthcheck hits the cluster-list endpoint; it stays healthy even when
+    # no clusters are reachable, but goes unhealthy if the server is down.
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8080/api/clusters"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  astronomer-lite-config:
