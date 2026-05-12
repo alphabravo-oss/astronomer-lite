@@ -2115,6 +2115,8 @@ var resourceDefinitions = map[string]resourceDefinition{
 	"crds":                            {Label: "CustomResourceDefinitions", GVR: schema.GroupVersionResource{Group: "apiextensions.k8s.io", Version: "v1", Resource: "customresourcedefinitions"}, Namespaced: false},
 	"endpoints":                       {Label: "Endpoints", GVR: schema.GroupVersionResource{Group: "", Version: "v1", Resource: "endpoints"}, Namespaced: true},
 	"poddisruptionbudgets":            {Label: "PodDisruptionBudgets", GVR: schema.GroupVersionResource{Group: "policy", Version: "v1", Resource: "poddisruptionbudgets"}, Namespaced: true},
+	"verticalpodautoscalers":          {Label: "VerticalPodAutoscalers", GVR: schema.GroupVersionResource{Group: "autoscaling.k8s.io", Version: "v1", Resource: "verticalpodautoscalers"}, Namespaced: true},
+	"jobsets":                         {Label: "JobSets", GVR: schema.GroupVersionResource{Group: "jobset.x-k8s.io", Version: "v1alpha2", Resource: "jobsets"}, Namespaced: true},
 }
 
 type resourceOwnerRef struct {

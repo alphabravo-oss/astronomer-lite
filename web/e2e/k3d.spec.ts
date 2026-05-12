@@ -75,6 +75,11 @@ let cleanupPortForwardIds: string[] = [];
 let cleanupTLSPolicyCRD = false;
 let cleanupTrafficPolicyCRD = false;
 let cleanupHelmRelease = false;
+let cleanupVPACRD = false;
+let cleanupJobSetCRD = false;
+const vpaSampleName = `al-e2e-vpa-${Date.now()}`;
+const jobSetSampleName = `al-e2e-jobset-${Date.now()}`;
+const webhookConfigName = `al-e2e-webhook-${Date.now()}`;
 
 test.afterEach(async ({ request }) => {
   for (const sessionId of cleanupPortForwardIds) {
@@ -129,6 +134,15 @@ test.afterEach(async ({ request }) => {
         }
       }
     }
+    kubectl(cleanupContext, ["delete", "vpa", vpaSampleName, "--ignore-not-found=true"], true);
+    kubectl(cleanupContext, ["delete", "jobset", jobSetSampleName, "--ignore-not-found=true"], true);
+    kubectl(cleanupContext, ["delete", "validatingwebhookconfiguration", webhookConfigName, "--ignore-not-found=true"], true);
+    if (cleanupVPACRD) {
+      kubectl(cleanupContext, ["delete", "crd", "verticalpodautoscalers.autoscaling.k8s.io", "--ignore-not-found=true"], true);
+    }
+    if (cleanupJobSetCRD) {
+      kubectl(cleanupContext, ["delete", "crd", "jobsets.jobset.x-k8s.io", "--ignore-not-found=true"], true);
+    }
   }
   cleanupClusterId = "";
   cleanupContext = "";
@@ -136,6 +150,8 @@ test.afterEach(async ({ request }) => {
   cleanupTLSPolicyCRD = false;
   cleanupTrafficPolicyCRD = false;
   cleanupHelmRelease = false;
+  cleanupVPACRD = false;
+  cleanupJobSetCRD = false;
 });
 
 test("reports reachable and unreachable kubeconfig contexts", async ({ page, request }) => {
@@ -1005,6 +1021,148 @@ test("pod logs Pin-to-dock button adds and removes a dock entry", async ({ page,
   await page.getByRole("button", { name: "Pin to dock" }).click();
   await expect(page.getByText("Dock")).toBeVisible({ timeout: 5_000 });
   await page.getByRole("button", { name: "Unpin" }).click();
+});
+
+test("renders a VerticalPodAutoscaler detail panel", async ({ page, request }) => {
+  const cluster = await reachableCluster(request);
+  cleanupContext = cluster.context;
+  const tlsCrdExists = kubectlOutput(cluster.context, ["get", "crd", "verticalpodautoscalers.autoscaling.k8s.io", "--ignore-not-found=true"]) !== "";
+  if (!tlsCrdExists) {
+    kubectlApply(cluster.context, `apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: verticalpodautoscalers.autoscaling.k8s.io
+  annotations:
+    api-approved.kubernetes.io: "https://github.com/kubernetes/community/pull/338"
+spec:
+  group: autoscaling.k8s.io
+  scope: Namespaced
+  names:
+    plural: verticalpodautoscalers
+    singular: verticalpodautoscaler
+    kind: VerticalPodAutoscaler
+    shortNames: ["vpa"]
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          x-kubernetes-preserve-unknown-fields: true`);
+    cleanupVPACRD = true;
+  }
+  kubectl(cluster.context, ["wait", "--for=condition=Established", "crd/verticalpodautoscalers.autoscaling.k8s.io", "--timeout=30s"]);
+  kubectlApply(cluster.context, `apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: ${vpaSampleName}
+  namespace: default
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: nonexistent
+  updatePolicy:
+    updateMode: "Off"`);
+
+  await page.goto(`/clusters/${cluster.id}/verticalpodautoscalers`);
+  await expect(page.getByRole("heading", { name: "VPAs" })).toBeVisible();
+  await expect(page.getByText(vpaSampleName)).toBeVisible({ timeout: 30_000 });
+  await page.getByText(vpaSampleName).click();
+  await expect(page.getByRole("heading", { name: "Vertical Pod Autoscaler" })).toBeVisible();
+  await expect(page.getByText("Deployment/nonexistent")).toBeVisible();
+  await expect(page.getByText("Off", { exact: true }).first()).toBeVisible();
+});
+
+test("renders a JobSet detail panel", async ({ page, request }) => {
+  const cluster = await reachableCluster(request);
+  cleanupContext = cluster.context;
+  const crdExists = kubectlOutput(cluster.context, ["get", "crd", "jobsets.jobset.x-k8s.io", "--ignore-not-found=true"]) !== "";
+  if (!crdExists) {
+    kubectlApply(cluster.context, `apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: jobsets.jobset.x-k8s.io
+spec:
+  group: jobset.x-k8s.io
+  scope: Namespaced
+  names:
+    plural: jobsets
+    singular: jobset
+    kind: JobSet
+  versions:
+    - name: v1alpha2
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          x-kubernetes-preserve-unknown-fields: true`);
+    cleanupJobSetCRD = true;
+  }
+  kubectl(cluster.context, ["wait", "--for=condition=Established", "crd/jobsets.jobset.x-k8s.io", "--timeout=30s"]);
+  kubectlApply(cluster.context, `apiVersion: jobset.x-k8s.io/v1alpha2
+kind: JobSet
+metadata:
+  name: ${jobSetSampleName}
+  namespace: default
+spec:
+  successPolicy:
+    operator: All
+  replicatedJobs:
+    - name: leader
+      replicas: 1
+      template:
+        spec:
+          template:
+            spec:
+              restartPolicy: Never
+              containers:
+                - name: hello
+                  image: busybox:1.36
+                  command: ["sh","-c","sleep 5"]`);
+
+  await page.goto(`/clusters/${cluster.id}/jobsets`);
+  await expect(page.getByRole("heading", { name: "JobSets" })).toBeVisible();
+  await expect(page.getByText(jobSetSampleName)).toBeVisible({ timeout: 30_000 });
+  await page.getByText(jobSetSampleName).click();
+  await expect(page.getByRole("heading", { name: "JobSet", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Replicated Jobs" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "leader" })).toBeVisible();
+});
+
+test("renders a ValidatingWebhookConfiguration with expanded rule rows", async ({ page, request }) => {
+  const cluster = await reachableCluster(request);
+  cleanupContext = cluster.context;
+  kubectlApply(cluster.context, `apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: ${webhookConfigName}
+webhooks:
+  - name: pods.example.com
+    clientConfig:
+      url: https://example.com/validate
+    rules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["pods"]
+        scope: "Namespaced"
+    sideEffects: None
+    failurePolicy: Fail
+    admissionReviewVersions: ["v1"]
+    timeoutSeconds: 5`);
+
+  await page.goto(`/clusters/${cluster.id}/validatingwebhookconfigurations`);
+  await expect(page.getByRole("heading", { name: "Validating Webhooks" })).toBeVisible();
+  await expect(page.getByText(webhookConfigName)).toBeVisible({ timeout: 30_000 });
+  await page.getByText(webhookConfigName).click();
+  // Webhook details show one entry with the rule operations expanded as a table.
+  await expect(page.getByRole("heading", { name: "Validating Webhooks" }).nth(1)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "pods.example.com" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "CREATE, UPDATE" })).toBeVisible();
+  await expect(page.getByRole("cell", { name: "pods", exact: true })).toBeVisible();
 });
 
 function writeTinyHelmChart(dir: string, releaseName: string) {

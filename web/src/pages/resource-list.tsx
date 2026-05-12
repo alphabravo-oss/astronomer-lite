@@ -2351,6 +2351,14 @@ function ResourceSpecificSections({
     sections.push(<HorizontalPodAutoscalerDetailsSection key="hpa-details" detail={detail} />);
   }
 
+  if (id === "verticalpodautoscalers") {
+    sections.push(<VerticalPodAutoscalerDetailsSection key="vpa-details" detail={detail} />);
+  }
+
+  if (id === "jobsets") {
+    sections.push(<JobSetDetailsSection key="jobset-details" detail={detail} />);
+  }
+
   if (id === "poddisruptionbudgets") {
     sections.push(<PodDisruptionBudgetDetailsSection key="pod-disruption-budget-details" detail={detail} />);
   }
@@ -3082,6 +3090,94 @@ function HorizontalPodAutoscalerDetailsSection({ detail }: { detail: Record<stri
   );
 }
 
+function VerticalPodAutoscalerDetailsSection({ detail }: { detail: Record<string, unknown> }) {
+  const spec = record(detail.spec);
+  const status = record(detail.status);
+  const targetRef = record(spec.targetRef);
+  const updatePolicy = record(spec.updatePolicy);
+  const policy = record(spec.resourcePolicy);
+  const containerPolicies = arrayRecords(policy.containerPolicies);
+  const recommendation = arrayRecords(record(status.recommendation).containerRecommendations);
+  return (
+    <>
+      <section className="rounded-lg border border-border bg-background p-4">
+        <h3 className="mb-3 text-sm font-semibold">Vertical Pod Autoscaler</h3>
+        <dl className="grid gap-3 text-sm sm:grid-cols-2">
+          <SummaryField label="Target" value={[text(targetRef.kind), text(targetRef.name)].filter(Boolean).join("/") || "-"} />
+          <SummaryField label="Update Mode" value={text(updatePolicy.updateMode) || "Auto"} />
+          <SummaryField label="Recommenders" value={summaryValue(arrayRecords(spec.recommenders).length)} />
+          <SummaryField label="Container Policies" value={summaryValue(containerPolicies.length)} />
+        </dl>
+      </section>
+      {recommendation.length > 0 ? (
+        <section className="overflow-hidden rounded-lg border border-border bg-background">
+          <div className="border-b border-border px-4 py-3">
+            <h3 className="text-sm font-semibold">Recommendation</h3>
+          </div>
+          <SimpleRowsTable
+            columns={["Container", "Target", "Lower Bound", "Upper Bound", "Uncapped Target"]}
+            rows={recommendation.map((rec) => [
+              text(rec.containerName) || "-",
+              resourceMapSummary(record(rec.target)) || "-",
+              resourceMapSummary(record(rec.lowerBound)) || "-",
+              resourceMapSummary(record(rec.upperBound)) || "-",
+              resourceMapSummary(record(rec.uncappedTarget)) || "-"
+            ])}
+            empty="No recommendations yet."
+          />
+        </section>
+      ) : null}
+    </>
+  );
+}
+
+function JobSetDetailsSection({ detail }: { detail: Record<string, unknown> }) {
+  const spec = record(detail.spec);
+  const status = record(detail.status);
+  const replicatedJobs = arrayRecords(spec.replicatedJobs);
+  const jobStatuses = arrayRecords(status.replicatedJobsStatus);
+  const statusByName = new Map<string, Record<string, unknown>>();
+  for (const entry of jobStatuses) {
+    const name = text(entry.name);
+    if (name) statusByName.set(name, entry);
+  }
+  return (
+    <>
+      <section className="rounded-lg border border-border bg-background p-4">
+        <h3 className="mb-3 text-sm font-semibold">JobSet</h3>
+        <dl className="grid gap-3 text-sm sm:grid-cols-2">
+          <SummaryField label="Success Policy" value={text(record(spec.successPolicy).operator) || "-"} />
+          <SummaryField label="Failure Policy" value={text(record(spec.failurePolicy).operator) || "-"} />
+          <SummaryField label="Replicated Jobs" value={summaryValue(replicatedJobs.length)} />
+          <SummaryField label="Suspend" value={summaryValue(spec.suspend)} />
+        </dl>
+      </section>
+      <section className="overflow-hidden rounded-lg border border-border bg-background">
+        <div className="border-b border-border px-4 py-3">
+          <h3 className="text-sm font-semibold">Replicated Jobs</h3>
+        </div>
+        <SimpleRowsTable
+          columns={["Name", "Replicas", "Ready", "Succeeded", "Failed", "Active"]}
+          rows={replicatedJobs.map((job) => {
+            const name = text(job.name) || "-";
+            const st = statusByName.get(name) ?? {};
+            return [
+              name,
+              text(job.replicas) || "1",
+              text(st.ready) || "0",
+              text(st.succeeded) || "0",
+              text(st.failed) || "0",
+              text(st.active) || "0"
+            ];
+          })}
+          empty="No replicated jobs."
+        />
+      </section>
+      <ConditionsSection rows={workloadConditionRows(status)} />
+    </>
+  );
+}
+
 function ResourceQuotaDetailsSection({ detail }: { detail: Record<string, unknown> }) {
   const spec = record(detail.spec);
   const status = record(detail.status);
@@ -3258,19 +3354,58 @@ function WebhookConfigurationDetailsSection({ detail, resourceId }: { detail: Re
     <section className="overflow-hidden rounded-lg border border-border bg-background">
       <div className="border-b border-border px-4 py-3">
         <h3 className="text-sm font-semibold">{resourceId === "mutatingwebhookconfigurations" ? "Mutating Webhooks" : "Validating Webhooks"}</h3>
+        <p className="mt-0.5 text-xs text-muted-foreground">{webhooks.length} webhook{webhooks.length === 1 ? "" : "s"} configured.</p>
       </div>
-      <SimpleRowsTable
-        columns={["Name", "Client", "Failure Policy", "Side Effects", "Timeout", "Rules"]}
-        rows={webhooks.map((webhook) => [
-          text(webhook.name) || "-",
-          webhookClientSummary(record(webhook.clientConfig)),
-          text(webhook.failurePolicy) || "-",
-          text(webhook.sideEffects) || "-",
-          text(webhook.timeoutSeconds) || "-",
-          summaryValue(arrayRecords(webhook.rules).length)
-        ])}
-        empty="No webhooks found."
-      />
+      <div className="divide-y divide-border">
+        {webhooks.length === 0 ? (
+          <div className="px-4 py-6 text-center text-sm text-muted-foreground">No webhooks found.</div>
+        ) : (
+          webhooks.map((webhook) => {
+            const name = text(webhook.name) || "webhook";
+            const rules = arrayRecords(webhook.rules);
+            const namespaceSelector = stringRecord(record(webhook.namespaceSelector).matchLabels);
+            const objectSelector = stringRecord(record(webhook.objectSelector).matchLabels);
+            return (
+              <div key={name} className="px-4 py-4">
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <h4 className="font-mono text-sm font-semibold">{name}</h4>
+                  <span className="text-xs text-muted-foreground">{webhookClientSummary(record(webhook.clientConfig))}</span>
+                </div>
+                <dl className="mt-2 grid gap-2 text-xs sm:grid-cols-3">
+                  <SummaryField label="Failure Policy" value={text(webhook.failurePolicy) || "-"} />
+                  <SummaryField label="Match Policy" value={text(webhook.matchPolicy) || "-"} />
+                  <SummaryField label="Side Effects" value={text(webhook.sideEffects) || "-"} />
+                  <SummaryField label="Timeout" value={text(webhook.timeoutSeconds) ? `${text(webhook.timeoutSeconds)}s` : "-"} />
+                  <SummaryField label="Reinvocation Policy" value={text(webhook.reinvocationPolicy) || "-"} />
+                  <SummaryField label="Admission Versions" value={stringList(webhook.admissionReviewVersions).join(", ") || "-"} />
+                </dl>
+                {rules.length > 0 ? (
+                  <div className="mt-3">
+                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Rules</p>
+                    <SimpleRowsTable
+                      columns={["Operations", "API Groups", "API Versions", "Resources", "Scope"]}
+                      rows={rules.map((rule) => [
+                        stringList(rule.operations).join(", ") || "*",
+                        stringList(rule.apiGroups).join(", ") || "*",
+                        stringList(rule.apiVersions).join(", ") || "*",
+                        stringList(rule.resources).join(", ") || "*",
+                        text(rule.scope) || "*"
+                      ])}
+                      empty="No rule matchers."
+                    />
+                  </div>
+                ) : null}
+                {Object.keys(namespaceSelector).length > 0 || Object.keys(objectSelector).length > 0 ? (
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    <InlineMetadataMap title="Namespace Selector" values={namespaceSelector} empty="No namespace selector" />
+                    <InlineMetadataMap title="Object Selector" values={objectSelector} empty="No object selector" />
+                  </div>
+                ) : null}
+              </div>
+            );
+          })
+        )}
+      </div>
     </section>
   );
 }
