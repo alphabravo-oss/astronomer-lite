@@ -1,6 +1,7 @@
 package kubeconfig
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha1"
 	"encoding/hex"
@@ -371,26 +372,43 @@ func (r *Registry) Reload() error {
 
 	r.mu.Lock()
 	var invalidated []string
+	clients := map[string]*kubernetes.Clientset{}
+	dynamics := map[string]dynamic.Interface{}
 	for id, existing := range r.clusters {
-		if next, ok := nextClusters[id]; ok {
-			next.Reachable = existing.Reachable
-			next.Status = existing.Status
-			next.Version = existing.Version
-			next.Error = existing.Error
-			nextClusters[id] = next
+		next, ok := nextClusters[id]
+		if !ok {
+			invalidated = append(invalidated, id)
+			continue
+		}
+		next.Reachable = existing.Reachable
+		next.Status = existing.Status
+		next.Version = existing.Version
+		next.Error = existing.Error
+		nextClusters[id] = next
+		if kubeconfigUnchanged(existing, next) {
+			if c, ok := r.clients[id]; ok {
+				clients[id] = c
+			}
+			if d, ok := r.dynamics[id]; ok {
+				dynamics[id] = d
+			}
 		} else {
 			invalidated = append(invalidated, id)
 		}
 	}
 	r.clusters = nextClusters
 	r.restConfigs = nextREST
-	r.clients = map[string]*kubernetes.Clientset{}
-	r.dynamics = map[string]dynamic.Interface{}
+	r.clients = clients
+	r.dynamics = dynamics
 	r.mu.Unlock()
 	for _, id := range invalidated {
 		r.fireInvalidate(id)
 	}
 	return joined
+}
+
+func kubeconfigUnchanged(a, b Cluster) bool {
+	return a.filePath == b.filePath && a.Context == b.Context && bytes.Equal(a.raw, b.raw)
 }
 
 func (r *Registry) loadFile(path string, source Source, clusters map[string]Cluster, configs map[string]*rest.Config) error {
@@ -691,9 +709,19 @@ func (r *Registry) ProbeAll(ctx context.Context) {
 	}
 	r.mu.RUnlock()
 
+	const maxConcurrent = 8
+	sem := make(chan struct{}, maxConcurrent)
+	var wg sync.WaitGroup
 	for _, id := range ids {
-		r.probe(ctx, id)
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(id string) {
+			defer wg.Done()
+			defer func() { <-sem }()
+			r.probe(ctx, id)
+		}(id)
 	}
+	wg.Wait()
 }
 
 func (r *Registry) probe(ctx context.Context, id string) {

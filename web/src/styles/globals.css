@@ -140,6 +140,45 @@
     @apply cursor-pointer transition-colors hover:bg-muted/50;
   }
 
+  /* Shared resource-table look. Use these class names on hand-rolled
+     <table>s so pods / events / deployments / etc. stay visually consistent.
+     Drift = bug — change the look here, not at the call site. */
+  .k8s-table {
+    @apply w-full border-collapse text-left text-sm;
+  }
+
+  .k8s-thead {
+    @apply bg-muted/60 text-xs uppercase text-muted-foreground;
+  }
+
+  .k8s-th {
+    @apply px-4 py-3 font-medium;
+  }
+
+  .k8s-row {
+    @apply border-t border-border;
+  }
+
+  .k8s-td {
+    @apply px-4 py-3;
+  }
+
+  .k8s-td-name {
+    @apply px-4 py-3 font-medium;
+  }
+
+  .k8s-td-muted {
+    @apply px-4 py-3 text-muted-foreground;
+  }
+
+  .k8s-td-numeric {
+    @apply px-4 py-3 tabular-nums;
+  }
+
+  .k8s-td-actions {
+    @apply w-12 px-2 py-2 text-right;
+  }
+
   .nav-item {
     @apply flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-all duration-150 hover:bg-accent hover:text-foreground;
   }

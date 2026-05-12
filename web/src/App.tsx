@@ -11,6 +11,27 @@ import { resourcePlugins } from "./plugins/registry";
 const emptyNamespaces: string[] = [];
 const PodExecPage = lazy(() => import("./pages/pod-exec").then((module) => ({ default: module.PodExecPage })));
 
+function sameClusters(a: Cluster[], b: Cluster[]) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i];
+    const y = b[i];
+    if (
+      x.id !== y.id ||
+      x.name !== y.name ||
+      x.status !== y.status ||
+      x.reachable !== y.reachable ||
+      x.version !== y.version ||
+      x.error !== y.error ||
+      x.displayColor !== y.displayColor ||
+      x.displayInitials !== y.displayInitials
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 export function App() {
   const [clusters, setClusters] = useState<Cluster[]>([]);
   const [error, setError] = useState("");
@@ -22,7 +43,8 @@ export function App() {
 
   async function refresh() {
     try {
-      setClusters(await api.clusters());
+      const next = await api.clusters();
+      setClusters((prev) => (sameClusters(prev, next) ? prev : next));
       setError("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load clusters");

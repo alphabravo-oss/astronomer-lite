@@ -8,10 +8,9 @@ import { DataTable, type Column } from "../components/ui/data-table";
 import { MetricCard } from "../components/ui/metric-card";
 import type { ClusterMetrics, MetricsRow, PromDetection, PromRangeResponse } from "../lib/api";
 import { api } from "../lib/api";
-import { cn } from "../lib/utils";
+import { cn, formatBytes, formatCPU, gaugeColor } from "../lib/utils";
 import type { RangeSeries } from "../components/metrics/range-chart";
 
-const MetricChart = lazy(() => import("../components/metrics/metric-chart").then((module) => ({ default: module.MetricChart })));
 const RangeChart = lazy(() => import("../components/metrics/range-chart").then((module) => ({ default: module.RangeChart })));
 
 type PromRangeKey = "15m" | "1h" | "6h" | "24h";
@@ -156,8 +155,6 @@ export function MetricsPage() {
 
   const topPods = useMemo(() => [...(metrics?.pods ?? [])].sort((a, b) => b.cpu - a.cpu).slice(0, 15), [metrics?.pods]);
   const topNodes = useMemo(() => [...(metrics?.nodes ?? [])].sort((a, b) => b.cpu - a.cpu), [metrics?.nodes]);
-  const podChartRows = useMemo(() => topPods.slice(0, 10).map(metricChartRow), [topPods]);
-  const nodeChartRows = useMemo(() => topNodes.map(metricChartRow), [topNodes]);
 
   return (
     <div className="space-y-6">
@@ -198,29 +195,18 @@ export function MetricsPage() {
         <MetricCard title="Pods" value={metrics?.podCount ?? "-"} subtitle="reporting metrics" icon={<Shapes className="h-4 w-4" />} />
       </div>
 
-      {metrics?.available ? (
-        <Suspense fallback={<div className="shimmer h-72 rounded-lg bg-muted" />}>
-          <div className="grid gap-4 xl:grid-cols-2">
-            <MetricChart title="Node CPU" rows={nodeChartRows} dataKey="cpu" unit="m" empty={loading ? "Loading node metrics..." : "No node metrics found."} />
-            <MetricChart title="Node Memory" rows={nodeChartRows} dataKey="memory" unit="bytes" empty={loading ? "Loading node metrics..." : "No node metrics found."} />
-            <MetricChart title="Top Pod CPU" rows={podChartRows} dataKey="cpu" unit="m" empty={loading ? "Loading pod metrics..." : "No pod metrics found."} />
-            <MetricChart title="Top Pod Memory" rows={podChartRows} dataKey="memory" unit="bytes" empty={loading ? "Loading pod metrics..." : "No pod metrics found."} />
-          </div>
-        </Suspense>
-      ) : null}
-
       <section className="overflow-hidden rounded-lg border border-border bg-card">
         <div className="border-b border-border px-4 py-3">
           <h2 className="text-sm font-semibold">Node usage</h2>
         </div>
-        <MetricsTable rows={topNodes} empty={loading ? "Loading node metrics..." : "No node metrics found."} showPercent />
+        <MetricsTable rows={topNodes} empty={loading ? "Loading node metrics..." : "No node metrics found."} variant="node" />
       </section>
 
       <section className="overflow-hidden rounded-lg border border-border bg-card">
         <div className="border-b border-border px-4 py-3">
           <h2 className="text-sm font-semibold">Top pods by CPU</h2>
         </div>
-        <MetricsTable rows={topPods} empty={loading ? "Loading pod metrics..." : "No pod metrics found."} />
+        <MetricsTable rows={topPods} empty={loading ? "Loading pod metrics..." : "No pod metrics found."} variant="pod" />
       </section>
 
       {promAvailable ? (
@@ -312,64 +298,54 @@ function PromRangeCard({
   );
 }
 
-type MetricChartRow = {
-  label: string;
-  fullName: string;
-  cpu: number;
-  memory: number;
-};
+function MetricsTable({ rows, empty, variant }: { rows: MetricsRow[]; empty: string; variant: "node" | "pod" }) {
+  const maxCPU = rows.reduce((m, r) => Math.max(m, r.cpu), 0);
+  const maxMem = rows.reduce((m, r) => Math.max(m, r.memory), 0);
 
-function MetricsTable({ rows, empty, showPercent = false }: { rows: MetricsRow[]; empty: string; showPercent?: boolean }) {
   const columns: Column<MetricsRow>[] = [
     {
       key: "name",
       header: "Name",
-      accessor: (row) => <span className="font-mono text-xs font-medium">{row.name}</span>,
+      accessor: (row) => <span className="font-medium">{row.name}</span>,
       sortAccessor: (row) => row.name
     },
-    {
-      key: "namespace",
-      header: "Namespace",
-      accessor: (row) => <span className="font-mono text-xs text-muted-foreground">{row.namespace || "-"}</span>,
-      sortAccessor: (row) => row.namespace || ""
-    },
+    ...(variant === "pod"
+      ? [
+          {
+            key: "namespace",
+            header: "Namespace",
+            accessor: (row: MetricsRow) => <span className="text-muted-foreground">{row.namespace || "-"}</span>,
+            sortAccessor: (row: MetricsRow) => row.namespace || ""
+          }
+        ]
+      : []),
     {
       key: "cpu",
       header: "CPU",
-      accessor: (row) => <span className="tabular-nums">{formatCPU(row.cpu)}</span>,
+      width: "30%",
+      accessor: (row) => (
+        <UsageCell
+          value={formatCPU(row.cpu)}
+          percent={row.cpuPercent !== undefined ? row.cpuPercent : maxCPU > 0 ? (row.cpu / maxCPU) * 100 : 0}
+          percentLabel={row.cpuPercent !== undefined ? formatPercent(row.cpuPercent) : null}
+          tone={row.cpuPercent !== undefined ? "util" : "info"}
+        />
+      ),
       sortAccessor: (row) => row.cpu
     },
     {
       key: "memory",
       header: "Memory",
-      accessor: (row) => <span className="tabular-nums">{formatBytes(row.memory)}</span>,
+      width: "30%",
+      accessor: (row) => (
+        <UsageCell
+          value={formatBytes(row.memory)}
+          percent={row.memoryPercent !== undefined ? row.memoryPercent : maxMem > 0 ? (row.memory / maxMem) * 100 : 0}
+          percentLabel={row.memoryPercent !== undefined ? formatPercent(row.memoryPercent) : null}
+          tone={row.memoryPercent !== undefined ? "util" : "info"}
+        />
+      ),
       sortAccessor: (row) => row.memory
-    },
-    ...(showPercent
-      ? [
-          {
-            key: "utilization",
-            header: "Utilization",
-            accessor: (row: MetricsRow) => {
-              const value = Math.max(row.cpuPercent ?? 0, row.memoryPercent ?? 0);
-              return (
-                <div className="flex min-w-36 items-center gap-2">
-                  <div className="gauge-bar flex-1">
-                    <div className={cn("gauge-bar-fill", gaugeBarColor(value))} style={{ width: `${Math.min(100, value)}%` }} />
-                  </div>
-                  <span className="w-14 text-right text-xs text-muted-foreground">{(row.cpuPercent ?? 0).toFixed(1)}%</span>
-                </div>
-              );
-            },
-            sortAccessor: (row: MetricsRow) => Math.max(row.cpuPercent ?? 0, row.memoryPercent ?? 0)
-          }
-        ]
-      : []),
-    {
-      key: "window",
-      header: "Window",
-      accessor: (row) => <span className="text-muted-foreground">{row.window || "-"}</span>,
-      sortAccessor: (row) => row.window || ""
     }
   ];
 
@@ -380,38 +356,37 @@ function MetricsTable({ rows, empty, showPercent = false }: { rows: MetricsRow[]
   );
 }
 
-function formatCPU(value: number) {
-  if (value >= 1000) return `${(value / 1000).toFixed(2)} cores`;
-  return `${value}m`;
+function UsageCell({
+  value,
+  percent,
+  percentLabel,
+  tone
+}: {
+  value: string;
+  percent: number;
+  percentLabel: string | null;
+  tone: "info" | "util";
+}) {
+  const clamped = Math.min(100, Math.max(0, percent));
+  // info: relative scale (% of column max) — neutral bar.
+  // util: real utilization — warning/error thresholds via gaugeColor.
+  const barClass = tone === "util" ? gaugeColor(percent) : "bg-primary/60";
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex items-baseline justify-between gap-2 text-xs">
+        <span>{value}</span>
+        {percentLabel ? <span className="text-muted-foreground">{percentLabel}</span> : null}
+      </div>
+      <div className="gauge-bar">
+        <div className={cn("gauge-bar-fill", barClass)} style={{ width: `${clamped}%` }} />
+      </div>
+    </div>
+  );
 }
 
-function formatBytes(value: number) {
-  if (value >= 1024 ** 3) return `${(value / 1024 ** 3).toFixed(2)} GiB`;
-  if (value >= 1024 ** 2) return `${(value / 1024 ** 2).toFixed(1)} MiB`;
-  if (value >= 1024) return `${(value / 1024).toFixed(1)} KiB`;
-  return `${value} B`;
-}
-
-function gaugeBarColor(percentage: number) {
-  if (percentage >= 90) return "bg-status-error";
-  if (percentage >= 75) return "bg-status-warning";
-  return "bg-status-success";
-}
-
-function metricChartRow(row: MetricsRow): MetricChartRow {
-  return {
-    label: truncateMiddle(row.name, 18),
-    fullName: row.namespace ? `${row.namespace}/${row.name}` : row.name,
-    cpu: row.cpu,
-    memory: row.memory
-  };
-}
-
-function truncateMiddle(value: string, maxLength: number) {
-  if (value.length <= maxLength) return value;
-  const head = Math.max(4, Math.floor((maxLength - 1) / 2));
-  const tail = Math.max(4, maxLength - head - 1);
-  return `${value.slice(0, head)}...${value.slice(-tail)}`;
+function formatPercent(value: number) {
+  if (value >= 10) return `${value.toFixed(0)}%`;
+  return `${value.toFixed(1)}%`;
 }
 
 function loadStoredRange(): PromRangeKey {

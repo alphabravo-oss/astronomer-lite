@@ -25,6 +25,11 @@ const defaultResync = 5 * time.Minute
 // boot doesn't hang.
 const SyncWait = 5 * time.Second
 
+// failedSyncCooldown is how long a failed WaitForSync result is cached before
+// the next caller is allowed to retry. Avoids paying SyncWait on every request
+// when an informer is permanently broken (RBAC, deleted resource, etc.).
+const failedSyncCooldown = 30 * time.Second
+
 // InformerSet exposes the typed listers a cluster's informer factory
 // publishes. Callers should always WaitForSync before reading.
 type InformerSet struct {
@@ -33,6 +38,7 @@ type InformerSet struct {
 
 	syncMu       sync.Mutex
 	syncedResult bool
+	lastFailedAt time.Time
 
 	Pods         corev1listers.PodLister
 	Services     corev1listers.ServiceLister
@@ -56,6 +62,10 @@ func (i *InformerSet) WaitForSync(ctx context.Context) bool {
 		i.syncMu.Unlock()
 		return true
 	}
+	if !i.lastFailedAt.IsZero() && time.Since(i.lastFailedAt) < failedSyncCooldown {
+		i.syncMu.Unlock()
+		return false
+	}
 	i.syncMu.Unlock()
 
 	waitCtx, cancel := context.WithTimeout(ctx, SyncWait)
@@ -72,6 +82,9 @@ func (i *InformerSet) WaitForSync(ctx context.Context) bool {
 	i.syncMu.Lock()
 	if ok {
 		i.syncedResult = true
+		i.lastFailedAt = time.Time{}
+	} else {
+		i.lastFailedAt = time.Now()
 	}
 	result := i.syncedResult
 	i.syncMu.Unlock()

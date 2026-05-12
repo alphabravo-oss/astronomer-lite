@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import type { Cluster, Namespace, PortForward } from "../../lib/api";
 import { api } from "../../lib/api";
+import { clusterStatus } from "../../lib/cluster";
 import { useTheme } from "../../lib/theme";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
@@ -43,7 +44,7 @@ export function Topbar({ clusters, onRefresh, selectedNamespaces, onSelectedName
     const query = clusterQuery.trim().toLowerCase();
     if (!query) return clusters;
     return clusters.filter((cluster) =>
-      [cluster.name, cluster.context, cluster.server, cluster.status ?? (cluster.reachable ? "reachable" : "unreachable")]
+      [cluster.name, cluster.context, cluster.server, clusterStatus(cluster)]
         .join(" ")
         .toLowerCase()
         .includes(query)
@@ -54,7 +55,7 @@ export function Topbar({ clusters, onRefresh, selectedNamespaces, onSelectedName
     if (!clusterId) return;
     try {
       const rows = await api.portForwards(clusterId);
-      setPortForwards(rows);
+      setPortForwards((prev) => (samePortForwards(prev, rows) ? prev : rows));
       setPortForwardError("");
     } catch (err) {
       setPortForwardError(err instanceof Error ? err.message : "Failed to load port-forwards");
@@ -421,7 +422,7 @@ export function Topbar({ clusters, onRefresh, selectedNamespaces, onSelectedName
                       <p className="truncate font-medium">{cluster.name}</p>
                       <p className="truncate text-2xs text-muted-foreground">{cluster.context || cluster.server}</p>
                     </div>
-                    <StatusBadge status={cluster.status ?? (cluster.reachable ? "reachable" : "unreachable")} size="sm" label={cluster.status ?? (cluster.reachable ? "Reachable" : "Unreachable")} pulse={false} />
+                    <StatusBadge status={clusterStatus(cluster)} size="sm" label={cluster.status ?? (cluster.reachable ? "Reachable" : "Unreachable")} pulse={false} />
                   </button>
                 ))}
                 {filteredClusters.length === 0 ? (
@@ -446,6 +447,18 @@ export function Topbar({ clusters, onRefresh, selectedNamespaces, onSelectedName
       </div>
     </header>
   );
+}
+
+function samePortForwards(a: PortForward[], b: PortForward[]) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i];
+    const y = b[i];
+    if (x.id !== y.id || x.expiresAt !== y.expiresAt || x.error !== y.error || x.url !== y.url || x.localPort !== y.localPort) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function formatPortForwardExpiry(value?: string) {

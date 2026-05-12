@@ -6,16 +6,24 @@ import (
 	"net/http"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/meta"
+
 	"github.com/alphabravo/astronomer-lite/server/internal/cache"
 )
 
 const openAPITTL = 10 * time.Minute
+const restMapperTTL = 5 * time.Minute
 
 // openAPICache is a process-wide cache of /openapi/v2 bodies keyed by cluster
 // id. It is initialized in init() and registered with the Registry's
 // invalidation hook in Server.New so per-cluster state is dropped when a
 // kubeconfig disappears or is reloaded.
 var openAPICache = cache.NewTTLCache[[]byte](openAPITTL)
+
+// restMapperCache holds discovery-backed RESTMappers keyed by cluster id so
+// per-request handlers (notably handleApply) don't redo the full /apis walk on
+// each call. Invalidated when the cluster's kubeconfig is reloaded.
+var restMapperCache = cache.NewTTLCache[meta.RESTMapper](restMapperTTL)
 
 func (s *Server) handleOpenAPI(w http.ResponseWriter, r *http.Request, id string) {
 	body, err := s.fetchOpenAPIv2(r.Context(), id)

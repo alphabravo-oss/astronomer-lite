@@ -1,8 +1,8 @@
 # Astronomer-lite
 
-A Headlamp-style, single-container Kubernetes UI. Add kubeconfigs, manage multiple remote clusters, and get the full astronomer look in a small-footprint app.
+A Headlamp-style, single-container Kubernetes UI. Add kubeconfigs, manage multiple remote clusters, get the full astronomer look in a small-footprint app.
 
-> **Status:** Pre-alpha. Spec complete; implementation underway.
+> **Status:** Alpha — Tier 1–3.1 features are in place (cluster management, all standard workload/networking/storage/RBAC pages, Helm, VPA/JobSet, topology, metrics, exec/logs/port-forward, generic resource browser, YAML edit + apply with server-side dry-run). Three simplify passes have landed since the initial spec.
 > **Spec:** [`docs/specs/i-want-to-make-a-headlamp-style-single-container--process-ui.md`](docs/specs/i-want-to-make-a-headlamp-style-single-container--process-ui.md)
 
 ## What it is
@@ -23,12 +23,24 @@ A Headlamp-style, single-container Kubernetes UI. Add kubeconfigs, manage multip
 |---|---|
 | Frontend | Vite + React SPA, reusing Tailwind tokens and layout patterns from [`../astronomer/frontend`](../astronomer/frontend) |
 | Backend | Go + `client-go`, embeds Vite build via `embed.FS` |
-| API style | Thin REST proxy `/api/clusters/{id}/k8s/*` → forwards to that cluster's API server (using its `rest.Config`) |
-| Live data | One WebSocket per stream (watch / logs / exec) |
+| API style | Thin REST proxy `/api/clusters/{id}/...` → forwards to that cluster's API server (using its `rest.Config`) |
+| Live data | One WebSocket per stream (watch / logs / exec / attach) |
 | Storage | Flat files under `~/.config/astronomer-lite/` — no DB |
+| Caching | Per-cluster informer factories, TTL caches for OpenAPI / discovery / Prometheus detection / Helm getters |
 | Distribution | Container image (Docker / Podman) |
 
 ## Quickstart
+
+### Docker Compose (recommended)
+
+```bash
+docker compose up -d
+open http://localhost:8080
+```
+
+The compose file mounts `~/.kube` read-only and persists app-managed state to a named volume. Override the host port with `ASTRONOMER_LITE_PORT=18080 docker compose up -d`. Rebuild from your checkout with `docker compose build`.
+
+### Plain `docker run`
 
 ```bash
 docker run \
@@ -38,48 +50,66 @@ docker run \
   astronomer-lite:dev
 ```
 
-Open http://localhost:8080. Every context in your `~/.kube/config` shows up as a cluster. Add more via the UI with file upload or pasted YAML; app-managed kubeconfigs are stored under `/home/astronomer/.config/astronomer-lite/clusters.d` in the mounted volume.
-
-Build the local image first if needed:
+### Build your own image first
 
 ```bash
 make image
 make image-size
 ```
 
-If your kubeconfig uses an exec plugin such as `gke-gcloud-auth-plugin`, `aws-iam-authenticator`, or a cloud CLI helper, that executable must be available on `PATH` inside the container. This image does not bundle cloud-provider auth plugins. When the binary is missing, the affected cluster remains visible and shows a clear error such as ``Exec plugin `gke-gcloud-auth-plugin` not found on PATH``.
+Every context in your `~/.kube/config` shows up as a cluster on first boot. Add more from the UI via file upload or pasted YAML; app-managed kubeconfigs live under `/home/astronomer/.config/astronomer-lite/clusters.d` in the mounted volume.
+
+If your kubeconfig uses an exec plugin such as `gke-gcloud-auth-plugin`, `aws-iam-authenticator`, or a cloud CLI helper, that executable must be available on `PATH` inside the container. This image does not bundle cloud-provider auth plugins. When the binary is missing, the affected cluster still shows up and displays a clear error such as ``Exec plugin `gke-gcloud-auth-plugin` not found on PATH``.
 
 The runtime image runs as the unprivileged `astronomer` user and only needs write access to its config volume.
 
-Port-forward sessions bind to `127.0.0.1` and expire after 60 minutes by default. Set `ASTRONOMER_LITE_PORT_FORWARD_TTL`, for example `ASTRONOMER_LITE_PORT_FORWARD_TTL=15m`, to change that max lifetime.
+### Environment variables
 
-## Features (MVP)
+| Variable | Default | Purpose |
+|---|---|---|
+| `PORT` | `8080` | HTTP listen port inside the container. |
+| `ASTRONOMER_LITE_CONFIG_DIR` | `$HOME/.config/astronomer-lite` | Where managed kubeconfigs and display overrides are persisted. |
+| `ASTRONOMER_LITE_PORT_FORWARD_TTL` | `60m` | Max lifetime of a port-forward session. Port-forwards bind to `127.0.0.1` inside the container. |
+| `KUBECONFIG` | _(unset → `~/.kube/config`)_ | System kubeconfig path(s); colon-separated like kubectl. |
+
+## Features
 
 **Cluster management**
 - Auto-load `~/.kube/config`; UI to add/remove additional kubeconfigs
-- Per-context cluster entries with reachability indicator
-- Clear errors when a cluster is unreachable or kubeconfig exec plugins (gke-gcloud-auth-plugin, aws-iam-authenticator, oidc) aren't on PATH
+- Per-context cluster entries with reachability status (reachable / degraded / unreachable)
+- Clear errors when a cluster is unreachable or kubeconfig exec plugins (`gke-gcloud-auth-plugin`, `aws-iam-authenticator`, OIDC) aren't on `PATH`
+- Display customization: pick a chip color and initials for each cluster
 
-**Resources**
-- Workloads: Pods, Deployments, StatefulSets, DaemonSets, ReplicaSets, Jobs, CronJobs
-- Storage: PVs, PVCs, StorageClasses, ConfigMaps, Secrets (masked by default)
-- Networking: Services, Ingresses, Endpoints, NetworkPolicies
+**Resources** (standard kinds plus generic CRD browser)
+- Workloads: Pods, Deployments, StatefulSets, DaemonSets, ReplicaSets, Jobs, CronJobs, **JobSets**
+- Storage: PVs, PVCs, StorageClasses, ConfigMaps, Secrets (masked by default, server-side reveal gated by RBAC)
+- Networking: Services, Ingresses, Endpoints, EndpointSlices, NetworkPolicies
+- Policy: PodDisruptionBudgets, **VerticalPodAutoscalers**, ResourceQuotas, LimitRanges, PriorityClasses, RuntimeClasses, MutatingWebhookConfigurations, ValidatingWebhookConfigurations
 - Security (read-only): ServiceAccounts, Roles, ClusterRoles, RoleBindings, ClusterRoleBindings
 - Cluster: Namespaces, Nodes, Events, CRDs
 - Generic resource browser via discovery + dynamic client (covers any GVR/CRD)
 
 **Interactive**
-- Live log tail
-- `kubectl exec` terminal (xterm.js)
-- Port-forward UI (server-managed lifecycle)
+- Live log tail with multi-container selection
+- `kubectl exec` terminal (xterm.js) — and a separate **Attach** mode for connecting to PID 1's stdin/stdout
+- Port-forward UI with server-managed session lifecycle
 - YAML view + edit (Monaco) with server-side dry-run preview and split/unified diff
-- Pasted single- or multi-document YAML apply through the API Resources page, dry-run gated before apply
-- Recharts CPU/memory charts and Pod/Node detail metric cards from `metrics.k8s.io`, refreshed every 15s when metrics-server is installed
+- Pasted single- or multi-document YAML apply through the API Resources page, dry-run gated before apply, with conflict / force-apply flow
+- Helm: releases list, release detail, history, rollback, uninstall — all via Helm SDK against the live cluster
+
+**Visualization & ops**
+- **Topology** page with React Flow swimlanes (Service / Deployment / StatefulSet / DaemonSet / ReplicaSet / Pod / ConfigMap / Secret / PVC) and owns/selects/mounts edges; auto-fits on namespace switch and refresh
+- **Metrics** page with cluster CPU / memory gauges, sortable per-node and per-pod tables with inline utilization bars, and Prometheus range charts (cluster CPU, cluster memory, top-N pods) when Prometheus is detected on-cluster
+- Cluster dashboard with workload health rollup and node conditions
 
 **UX**
 - Single active cluster + top-bar context switcher
 - Multi-select namespace filter, persisted per-cluster
+- Command palette (`Cmd/Ctrl-K`) with quick navigation and cross-cluster search
+- Activity dock surfacing recent actions, port-forwards, and applied manifests
+- Sidebar favorites — pin frequently-used resource types per cluster
 - Dark default + light toggle
+- Per-row triple-dots action menu on pod rows (logs / exec / attach / port-forward / view details) — no drawer round-trip required for common actions
 
 ## Out of scope
 
@@ -90,19 +120,36 @@ The following are intentionally **not** part of `astronomer-lite`:
 - ArgoCD integration / app-of-apps views
 - Persistent app database (Postgres / SQLite / migrations)
 - External plugin runtime (an architectural seam exists; the runtime loader doesn't)
-- Bundled cloud-provider exec plugins (you provide them on PATH)
-- Raw-binary / Helm / Homebrew / scoop / apt distribution
+- Bundled cloud-provider exec plugins (you provide them on `PATH`)
+- Raw-binary / Helm chart / Homebrew / scoop / apt distribution
 
 ## Repository layout
 
 ```
 astronomer-lite/
-├── server/           # Go (cmd/, internal/)
-├── web/              # Vite + React + TS
-├── deploy/docker/
+├── server/                 # Go (cmd/, internal/)
+│   ├── cmd/astronomer-lite/
+│   └── internal/
+│       ├── cache/          # TTL cache + informer manager
+│       ├── config/
+│       ├── kubeconfig/     # Registry, probing, display overrides
+│       ├── plugins/
+│       └── server/         # REST + WS handlers, Helm, Prom, OpenAPI, topology
+├── web/                    # Vite + React + TS
+│   ├── src/
+│   │   ├── components/     # layout, ui, clusters, metrics, palette, activity
+│   │   ├── hooks/
+│   │   ├── lib/            # api client, openapi, access checks, formatters
+│   │   ├── pages/
+│   │   ├── plugins/
+│   │   └── styles/globals.css   # shared design tokens + .k8s-table classes
+│   └── e2e/                # Playwright suite
+├── deploy/docker/Dockerfile
+├── docker-compose.yml
+├── scripts/                # k3d-e2e runner
 ├── docs/
-│   ├── plugins.md    # Plugin registry interfaces (stub)
-│   └── specs/        # Source-of-truth specs
+│   ├── plugins.md          # Plugin registry interfaces (stub)
+│   └── specs/              # Source-of-truth specs + progress log
 └── Makefile
 ```
 
@@ -127,10 +174,10 @@ make image-size
 For local verification without k3d:
 
 ```bash
-make verify-local
+make verify-local   # go test + go vet + npm lint + full build
 ```
 
-Set `VERSION` when building release artifacts to stamp the Kubernetes API `User-Agent` as `astronomer-lite/<version>`:
+Set `VERSION` when building release artifacts to stamp the Kubernetes API `User-Agent` as `astronomer-lite/<version>` and embed it in `/api/version`:
 
 ```bash
 VERSION=0.1.0 make build image
@@ -162,12 +209,36 @@ Useful k3d runner environment variables:
 | `KUBECONFIG_PATH` | `.kube/config` | Kubeconfig file generated for the test run. |
 | `KEEP_E2E_CONFIG_DIR` | `0` | Set to `1` to keep the temporary app config directory for debugging. |
 
+## Design system
+
+Shared visual primitives live in `web/src/styles/globals.css` under `@layer components`. New tables should opt in via class names, not hand-copied Tailwind strings:
+
+```html
+<table class="k8s-table">
+  <thead class="k8s-thead">
+    <tr><th class="k8s-th">Name</th>…</tr>
+  </thead>
+  <tbody>
+    <tr class="k8s-row table-row-hover">
+      <td class="k8s-td-name">…</td>
+      <td class="k8s-td-muted">…</td>
+      <td class="k8s-td-numeric">…</td>
+      <td class="k8s-td-actions">…</td>
+    </tr>
+  </tbody>
+</table>
+```
+
+Changing the look of every resource list in the app is then a one-file edit.
+
 ## Implementation phases
 
-1. **Walking skeleton** — Repo scaffolding, design-system port, kubeconfig loading, cluster list, dashboard, Pods page.
-2. **Live data + read pages** — WebSocket plumbing, watch on every list, logs, events, all read-only resource pages.
-3. **Write & interactive** — YAML edit, exec terminal, port-forward, metrics, secrets reveal.
-4. **Plugin seam** — Internal pages registered through the plugin registry; documented in `docs/plugins.md`.
+1. **Walking skeleton** — Repo scaffolding, design-system port, kubeconfig loading, cluster list, dashboard, Pods page. _(done)_
+2. **Live data + read pages** — WebSocket plumbing, watch on every list, logs, events, all read-only resource pages. _(done)_
+3. **Write & interactive** — YAML edit, exec terminal, port-forward, metrics, secrets reveal. _(done)_
+4. **Tier 2 / 3.1 features** — Helm, VPA, JobSet, webhook detail panels, topology, Prometheus range charts. _(done)_
+5. **Simplify passes** — Three rounds of dedupe / efficiency / cohesion. _(done; latest in `simplify-pass-3` branch)_
+6. **Plugin seam** — Internal pages registered through the plugin registry; documented in `docs/plugins.md`. _(in-place; external plugin loader still out of scope)_
 
 See [`docs/specs/...progress.txt`](docs/specs/i-want-to-make-a-headlamp-style-single-container--process-ui-progress.txt) for live progress and [`docs/verification.md`](docs/verification.md) for the current completion checklist.
 

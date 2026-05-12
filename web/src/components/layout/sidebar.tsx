@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, NavLink, useLocation, useParams } from "react-router-dom";
 import { api } from "../../lib/api";
 import type { Cluster } from "../../lib/api";
+import { clusterStatus } from "../../lib/cluster";
 import { useFavorites } from "../../lib/favorites";
 import { resourceConfigs } from "../../lib/resources";
 import { cn } from "../../lib/utils";
@@ -285,7 +286,7 @@ function SidebarContent({
 function clusterStatusText(cluster?: Cluster) {
   if (!cluster) return "unreachable";
   if (cluster.version && cluster.status !== "degraded") return cluster.version;
-  return cluster.status ?? (cluster.reachable ? "reachable" : "unreachable");
+  return clusterStatus(cluster);
 }
 
 function SidebarGroup({
@@ -318,7 +319,7 @@ function SidebarGroup({
       <button
         type="button"
         onClick={onToggle}
-        className="flex h-8 w-full items-center justify-between rounded-md px-3 text-xs font-semibold text-sidebar-foreground/75 transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
+        className="flex h-7 w-full items-center justify-between rounded-md px-3 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground"
       >
         <span>{group.label}</span>
         <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", isOpen && "rotate-180")} />
@@ -335,14 +336,10 @@ function SidebarGroup({
 }
 
 function clusterDotClass(cluster: Cluster) {
-  const status = cluster.status ?? (cluster.reachable ? "reachable" : "unreachable");
+  const status = clusterStatus(cluster);
   if (status === "reachable") return "bg-status-success";
   if (status === "degraded") return "bg-status-warning";
   return "bg-status-error";
-}
-
-function statusText(cluster: Cluster) {
-  return cluster.status ?? (cluster.reachable ? "reachable" : "unreachable");
 }
 
 function ClusterListGroup({ clusters, collapsed, onNavigate }: { clusters: Cluster[]; collapsed: boolean; onNavigate?: () => void }) {
@@ -354,7 +351,7 @@ function ClusterListGroup({ clusters, collapsed, onNavigate }: { clusters: Clust
           <NavLink
             key={cluster.id}
             to={`/clusters/${cluster.id}`}
-            title={`${cluster.name} (${statusText(cluster)})`}
+            title={`${cluster.name} (${clusterStatus(cluster)})`}
             onClick={onNavigate}
             className={({ isActive }) => cn("nav-item relative h-9 justify-center px-0", isActive ? "active" : "text-sidebar-foreground")}
           >
@@ -367,7 +364,7 @@ function ClusterListGroup({ clusters, collapsed, onNavigate }: { clusters: Clust
   }
   return (
     <div className="mb-1 mt-1">
-      <div className="flex h-8 w-full items-center px-3 text-xs font-semibold text-sidebar-foreground/75">
+      <div className="flex h-7 w-full items-center px-3 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/60">
         <span>Your Clusters</span>
       </div>
       <div className="mt-1 space-y-1">
