@@ -6,6 +6,9 @@ export type AccessCheck = {
   error: string;
 };
 
+export const idleAccessCheck: AccessCheck = { checking: false, response: null, error: "" };
+export const pendingAccessCheck: AccessCheck = { checking: true, response: null, error: "" };
+
 export function accessCheckFromSettled(result: PromiseSettledResult<AccessReviewResponse | null>): AccessCheck {
   if (result.status === "fulfilled") {
     return { checking: false, response: result.value, error: "" };

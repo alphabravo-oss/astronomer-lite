@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -113,24 +114,45 @@ func (s *Server) handleTopology(w http.ResponseWriter, r *http.Request, id strin
 			}
 		}
 	} else {
-		if list, err := client.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{Limit: 500}); err == nil {
-			deps = list.Items
-		}
-		if list, err := client.AppsV1().ReplicaSets(namespace).List(ctx, metav1.ListOptions{Limit: 500}); err == nil {
-			rss = list.Items
-		}
-		if list, err := client.AppsV1().StatefulSets(namespace).List(ctx, metav1.ListOptions{Limit: 500}); err == nil {
-			statefulSet = list.Items
-		}
-		if list, err := client.AppsV1().DaemonSets(namespace).List(ctx, metav1.ListOptions{Limit: 500}); err == nil {
-			daemonSet = list.Items
-		}
-		if list, err := client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{Limit: 1000}); err == nil {
-			pods = list.Items
-		}
-		if list, err := client.CoreV1().Services(namespace).List(ctx, metav1.ListOptions{Limit: 500}); err == nil {
-			services = list.Items
-		}
+		var wg sync.WaitGroup
+		wg.Add(6)
+		go func() {
+			defer wg.Done()
+			if list, err := client.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{Limit: 500}); err == nil {
+				deps = list.Items
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			if list, err := client.AppsV1().ReplicaSets(namespace).List(ctx, metav1.ListOptions{Limit: 500}); err == nil {
+				rss = list.Items
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			if list, err := client.AppsV1().StatefulSets(namespace).List(ctx, metav1.ListOptions{Limit: 500}); err == nil {
+				statefulSet = list.Items
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			if list, err := client.AppsV1().DaemonSets(namespace).List(ctx, metav1.ListOptions{Limit: 500}); err == nil {
+				daemonSet = list.Items
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			if list, err := client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{Limit: 1000}); err == nil {
+				pods = list.Items
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			if list, err := client.CoreV1().Services(namespace).List(ctx, metav1.ListOptions{Limit: 500}); err == nil {
+				services = list.Items
+			}
+		}()
+		wg.Wait()
 	}
 
 	for _, d := range deps {
@@ -160,7 +182,7 @@ func (s *Server) handleTopology(w http.ResponseWriter, r *http.Request, id strin
 	}
 
 	for _, pod := range pods {
-		pn := topologyNode{ID: nodeID("Pod", pod.Namespace, pod.Name), Kind: "Pod", Namespace: pod.Namespace, Name: pod.Name, Status: podRollupStatus(pod)}
+		pn := topologyNode{ID: nodeID("Pod", pod.Namespace, pod.Name), Kind: "Pod", Namespace: pod.Namespace, Name: pod.Name, Status: podRollupStatus(&pod)}
 		addNode(pn)
 		uidIndex[pod.UID] = pn
 		for _, ref := range pod.OwnerReferences {

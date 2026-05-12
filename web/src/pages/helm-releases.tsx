@@ -3,7 +3,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import type { HelmReleaseDetail, HelmReleaseSummary } from "../lib/api";
 import { api, ApiError } from "../lib/api";
-import { accessCheckFromSettled, accessStatusMessage, isAccessBlocked, type AccessCheck } from "../lib/access";
+import {
+  accessCheckFromSettled,
+  accessStatusMessage,
+  idleAccessCheck,
+  isAccessBlocked,
+  pendingAccessCheck,
+  type AccessCheck
+} from "../lib/access";
 import { Button } from "../components/ui/button";
 import { ConfirmDialog } from "../components/ui/confirm-dialog";
 import { StatusBadge } from "../components/ui/status-badge";
@@ -21,8 +28,6 @@ function ageOf(updated: string) {
   const days = Math.floor(hours / 24);
   return `${days}d`;
 }
-
-const idleAccess: AccessCheck = { checking: false, response: null, error: "" };
 
 function statusKind(status: string) {
   const s = status.toLowerCase();
@@ -45,8 +50,8 @@ export function HelmReleasesPage() {
   const [actionMessage, setActionMessage] = useState("");
   const [confirmUninstall, setConfirmUninstall] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [rollbackAccess, setRollbackAccess] = useState<AccessCheck>(idleAccess);
-  const [uninstallAccess, setUninstallAccess] = useState<AccessCheck>(idleAccess);
+  const [rollbackAccess, setRollbackAccess] = useState<AccessCheck>(idleAccessCheck);
+  const [uninstallAccess, setUninstallAccess] = useState<AccessCheck>(idleAccessCheck);
 
   useEffect(() => {
     if (!clusterId) return;
@@ -77,14 +82,14 @@ export function HelmReleasesPage() {
     if (!selected) {
       setDetail(null);
       setHistory([]);
-      setRollbackAccess(idleAccess);
-      setUninstallAccess(idleAccess);
+      setRollbackAccess(idleAccessCheck);
+      setUninstallAccess(idleAccessCheck);
       return;
     }
     let cancelled = false;
     setDetailLoading(true);
-    setRollbackAccess({ checking: true, response: null, error: "" });
-    setUninstallAccess({ checking: true, response: null, error: "" });
+    setRollbackAccess(pendingAccessCheck);
+    setUninstallAccess(pendingAccessCheck);
     Promise.all([
       api.helmRelease(clusterId, selected.namespace, selected.name),
       api.helmReleaseHistory(clusterId, selected.namespace, selected.name)

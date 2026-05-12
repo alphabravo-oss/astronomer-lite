@@ -26,7 +26,9 @@ import {
   accessCheckFromSettled,
   accessDeniedMessage,
   accessStatusMessage,
+  idleAccessCheck,
   isAccessBlocked,
+  pendingAccessCheck,
   type AccessCheck
 } from "../lib/access";
 import { useFavorites } from "../lib/favorites";
@@ -110,7 +112,7 @@ export function ResourceListPage({ resourceId, discoveredResource, selectedNames
   const [createState, setCreateState] = useState<"idle" | "dry-running" | "applying">("idle");
   const [createError, setCreateError] = useState("");
   const [createResponse, setCreateResponse] = useState<ApplyResponse | null>(null);
-  const [createAccess, setCreateAccess] = useState<AccessCheck>({ checking: false, response: null, error: "" });
+  const [createAccess, setCreateAccess] = useState<AccessCheck>(idleAccessCheck);
 
   const loadResources = useCallback(async () => {
     if (!clusterId || !activeResource) return;
@@ -141,11 +143,11 @@ export function ResourceListPage({ resourceId, discoveredResource, selectedNames
 
   useEffect(() => {
     if (!clusterId || !activeResource) {
-      setCreateAccess({ checking: false, response: null, error: "" });
+      setCreateAccess(idleAccessCheck);
       return;
     }
     let cancelled = false;
-    setCreateAccess({ checking: true, response: null, error: "" });
+    setCreateAccess(pendingAccessCheck);
     void api
       .canI(clusterId, accessReviewForResource(activeResource.watchDescriptor, "create", activeResource.namespaced ? selectedNamespaces[0] || "default" : undefined))
       .then((response) => {
@@ -665,9 +667,9 @@ function ResourceDrawer({
   const [objectEvents, setObjectEvents] = useState<ClusterEvent[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
   const [eventsError, setEventsError] = useState("");
-  const [updateAccess, setUpdateAccess] = useState<AccessCheck>({ checking: false, response: null, error: "" });
-  const [deleteAccess, setDeleteAccess] = useState<AccessCheck>({ checking: false, response: null, error: "" });
-  const [scaleAccess, setScaleAccess] = useState<AccessCheck>({ checking: false, response: null, error: "" });
+  const [updateAccess, setUpdateAccess] = useState<AccessCheck>(idleAccessCheck);
+  const [deleteAccess, setDeleteAccess] = useState<AccessCheck>(idleAccessCheck);
+  const [scaleAccess, setScaleAccess] = useState<AccessCheck>(idleAccessCheck);
   const cleanedDetail = useMemo(() => (detail ? stripManagedFields(detail) : null), [detail]);
   const yaml = useMemo(() => (cleanedDetail ? dump(cleanedDetail, { lineWidth: -1, noRefs: true }) : ""), [cleanedDetail]);
   const json = useMemo(() => (cleanedDetail ? JSON.stringify(cleanedDetail, null, 2) : ""), [cleanedDetail]);
@@ -730,9 +732,9 @@ function ResourceDrawer({
     const updateRequest = accessReviewForResource(descriptor, "patch", namespace, item.name);
     const deleteRequest = accessReviewForResource(descriptor, "delete", namespace, item.name);
     const scaleRequest = scalable ? accessReviewForResource(descriptor, "patch", namespace, item.name, "scale") : null;
-    setUpdateAccess({ checking: true, response: null, error: "" });
-    setDeleteAccess({ checking: true, response: null, error: "" });
-    setScaleAccess(scaleRequest ? { checking: true, response: null, error: "" } : { checking: false, response: null, error: "" });
+    setUpdateAccess(pendingAccessCheck);
+    setDeleteAccess(pendingAccessCheck);
+    setScaleAccess(scaleRequest ? pendingAccessCheck : idleAccessCheck);
     void Promise.allSettled([
       api.canI(clusterId, updateRequest),
       api.canI(clusterId, deleteRequest),

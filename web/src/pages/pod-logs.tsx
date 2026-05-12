@@ -7,7 +7,6 @@ import { logActivityId, useActivities } from "../lib/activities-context";
 import type { PodDetail } from "../lib/api";
 import { api } from "../lib/api";
 import {
-  getLogStreamSnapshot,
   logStreamId,
   startLogStream,
   stopLogStream,
@@ -34,6 +33,13 @@ export function PodLogsPage() {
   const dockId = logActivityId({ clusterId, namespace: decodedNamespace, pod: decodedName });
   const pinned = hasActivity(dockId);
   const pinnedActivity = pinned ? getActivity(dockId) : undefined;
+  // Read pinned via a ref inside the effect's cleanup so toggling pin
+  // does NOT re-run the effect (which would otherwise stop+restart the
+  // WS and lose the buffer).
+  const pinnedRef = useRef(pinned);
+  useEffect(() => {
+    pinnedRef.current = pinned;
+  }, [pinned]);
   // When pinned, the dock owns the active container; locking the dropdown
   // avoids fighting the buffer.
   const activeContainer = pinnedActivity?.logStream?.container ?? container;
@@ -89,20 +95,16 @@ export function PodLogsPage() {
       tailLines,
       follow
     });
-    const initial = getLogStreamSnapshot(streamKey);
-    if (initial) applySnapshot(initial);
-    const unsubscribe = subscribeLogStream(streamKey, applySnapshot);
-    return () => {
-      unsubscribe();
-      if (!pinned) stopLogStream(streamKey);
-    };
-
-    function applySnapshot(snap: LogStreamSnapshot) {
+    const unsubscribe = subscribeLogStream(streamKey, (snap: LogStreamSnapshot) => {
       setStatus(snap.status);
       setError(snap.error);
       setLines(snap.entries.map((entry) => entry.message));
-    }
-  }, [activeContainer, clusterId, decodedName, decodedNamespace, follow, pinned, restartKey, streamKey, tailLines]);
+    });
+    return () => {
+      unsubscribe();
+      if (!pinnedRef.current) stopLogStream(streamKey);
+    };
+  }, [activeContainer, clusterId, decodedName, decodedNamespace, follow, restartKey, streamKey, tailLines]);
 
   useEffect(() => {
     const viewport = viewportRef.current;

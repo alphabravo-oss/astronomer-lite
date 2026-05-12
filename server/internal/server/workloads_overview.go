@@ -87,38 +87,38 @@ func (s *Server) handleWorkloadsOverview(w http.ResponseWriter, r *http.Request,
 			out.Deployments.Healthy++
 		}
 	}
-	for _, ss := range statefulSets {
+	for _, sts := range statefulSets {
 		out.StatefulSets.Total++
-		switch replicaStatus(ss.Status.ReadyReplicas, deploymentDesired(ss.Spec.Replicas)) {
+		switch replicaStatus(sts.Status.ReadyReplicas, deploymentDesired(sts.Spec.Replicas)) {
 		case statusFailing:
 			out.StatefulSets.Failing++
-			out.Failing = appendFailing(out.Failing, "StatefulSet", ss.Namespace, ss.Name, "no ready replicas")
+			out.Failing = appendFailing(out.Failing, "StatefulSet", sts.Namespace, sts.Name, "no ready replicas")
 		case statusDegraded:
 			out.StatefulSets.Degraded++
 		default:
 			out.StatefulSets.Healthy++
 		}
 	}
-	for _, ds := range daemonSets {
+	for _, daemon := range daemonSets {
 		out.DaemonSets.Total++
-		switch replicaStatus(ds.Status.NumberReady, ds.Status.DesiredNumberScheduled) {
+		switch replicaStatus(daemon.Status.NumberReady, daemon.Status.DesiredNumberScheduled) {
 		case statusFailing:
 			out.DaemonSets.Failing++
-			out.Failing = appendFailing(out.Failing, "DaemonSet", ds.Namespace, ds.Name, "no ready pods")
+			out.Failing = appendFailing(out.Failing, "DaemonSet", daemon.Namespace, daemon.Name, "no ready pods")
 		case statusDegraded:
 			out.DaemonSets.Degraded++
 		default:
 			out.DaemonSets.Healthy++
 		}
 	}
-	for _, j := range jobs {
+	for _, job := range jobs {
 		out.Jobs.Total++
 		switch {
-		case j.Status.Succeeded > 0:
+		case job.Status.Succeeded > 0:
 			out.Jobs.Succeeded++
-		case j.Status.Failed > 0:
+		case job.Status.Failed > 0:
 			out.Jobs.Failing++
-			out.Failing = appendFailing(out.Failing, "Job", j.Namespace, j.Name, "job has failures")
+			out.Failing = appendFailing(out.Failing, "Job", job.Namespace, job.Name, "job has failures")
 		default:
 			out.Jobs.Healthy++
 		}
@@ -137,79 +137,68 @@ func (s *Server) handleWorkloadsOverview(w http.ResponseWriter, r *http.Request,
 	writeJSON(w, http.StatusOK, out)
 }
 
-// materializeWorkloads returns value-slices of pods, deployments, statefulsets,
-// daemonsets, and jobs. Prefers informer caches when synced; otherwise fans
-// out parallel List calls so callers don't pay 5 sequential round-trips.
+// materializeWorkloads returns pointer-slices of pods, deployments,
+// statefulsets, daemonsets, and jobs. Prefers informer caches when synced;
+// otherwise fans out parallel List calls so callers don't pay 5 sequential
+// round-trips. Returning []*T (rather than []T) avoids an O(n) per-pod copy
+// on the informer path, where shared listers already hand back pointers.
 func materializeWorkloads(ctx context.Context, set *cache.InformerSet, client *kubernetes.Clientset) (
-	pods []corev1.Pod,
-	deps []appsv1.Deployment,
-	ss []appsv1.StatefulSet,
-	ds []appsv1.DaemonSet,
-	jobs []batchv1.Job,
+	pods []*corev1.Pod,
+	deps []*appsv1.Deployment,
+	ss []*appsv1.StatefulSet,
+	ds []*appsv1.DaemonSet,
+	jobs []*batchv1.Job,
 ) {
 	if set.WaitForSync(ctx) {
-		p, _ := set.Pods.List(labels.Everything())
-		d, _ := set.Deployments.List(labels.Everything())
-		s, _ := set.StatefulSets.List(labels.Everything())
-		ds2, _ := set.DaemonSets.List(labels.Everything())
-		j, _ := set.Jobs.List(labels.Everything())
-		pods = make([]corev1.Pod, len(p))
-		for i, x := range p {
-			pods[i] = *x
-		}
-		deps = make([]appsv1.Deployment, len(d))
-		for i, x := range d {
-			deps[i] = *x
-		}
-		ss = make([]appsv1.StatefulSet, len(s))
-		for i, x := range s {
-			ss[i] = *x
-		}
-		ds = make([]appsv1.DaemonSet, len(ds2))
-		for i, x := range ds2 {
-			ds[i] = *x
-		}
-		jobs = make([]batchv1.Job, len(j))
-		for i, x := range j {
-			jobs[i] = *x
-		}
+		pods, _ = set.Pods.List(labels.Everything())
+		deps, _ = set.Deployments.List(labels.Everything())
+		ss, _ = set.StatefulSets.List(labels.Everything())
+		ds, _ = set.DaemonSets.List(labels.Everything())
+		jobs, _ = set.Jobs.List(labels.Everything())
 		return
 	}
-	// Fallback: parallel direct lists against the apiserver.
 	var wg sync.WaitGroup
 	wg.Add(5)
 	go func() {
 		defer wg.Done()
 		if pl, err := client.CoreV1().Pods("").List(ctx, metav1.ListOptions{Limit: 1000}); err == nil {
-			pods = pl.Items
+			pods = pointerSlice(pl.Items)
 		}
 	}()
 	go func() {
 		defer wg.Done()
 		if dl, err := client.AppsV1().Deployments("").List(ctx, metav1.ListOptions{Limit: 500}); err == nil {
-			deps = dl.Items
+			deps = pointerSlice(dl.Items)
 		}
 	}()
 	go func() {
 		defer wg.Done()
 		if sl, err := client.AppsV1().StatefulSets("").List(ctx, metav1.ListOptions{Limit: 500}); err == nil {
-			ss = sl.Items
+			ss = pointerSlice(sl.Items)
 		}
 	}()
 	go func() {
 		defer wg.Done()
 		if dl, err := client.AppsV1().DaemonSets("").List(ctx, metav1.ListOptions{Limit: 500}); err == nil {
-			ds = dl.Items
+			ds = pointerSlice(dl.Items)
 		}
 	}()
 	go func() {
 		defer wg.Done()
 		if jl, err := client.BatchV1().Jobs("").List(ctx, metav1.ListOptions{Limit: 500}); err == nil {
-			jobs = jl.Items
+			jobs = pointerSlice(jl.Items)
 		}
 	}()
 	wg.Wait()
 	return
+}
+
+func pointerSlice[T any](items []T) []*T {
+	out := make([]*T, len(items))
+	for i := range items {
+		out[i] = &items[i]
+	}
+	return out
 }
 
 func deploymentDesired(replicas *int32) int32 {
@@ -239,7 +228,7 @@ func appendFailing(rows []failingWorkloadEntry, kind, namespace, name, reason st
 	return append(rows, failingWorkloadEntry{Kind: kind, Namespace: namespace, Name: name, Reason: reason})
 }
 
-func podRollupStatus(pod corev1.Pod) string {
+func podRollupStatus(pod *corev1.Pod) string {
 	switch pod.Status.Phase {
 	case corev1.PodSucceeded:
 		return statusSucceeded
@@ -260,7 +249,7 @@ func podRollupStatus(pod corev1.Pod) string {
 	}
 }
 
-func failingPodReason(pod corev1.Pod) string {
+func failingPodReason(pod *corev1.Pod) string {
 	if pod.Status.Phase == corev1.PodFailed {
 		return string(pod.Status.Phase)
 	}
