@@ -1,8 +1,9 @@
-import { ArrowLeft, Download, RefreshCcw } from "lucide-react";
+import { ArrowLeft, Download, Pin, PinOff, RefreshCcw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import { useActivities } from "../lib/activities-context";
 import type { LogFrame, PodDetail } from "../lib/api";
 import { api } from "../lib/api";
 import { cn } from "../lib/utils";
@@ -22,6 +23,24 @@ export function PodLogsPage() {
   const viewportRef = useRef<HTMLPreElement | null>(null);
   const latestTimestampRef = useRef("");
   const seenLogFramesRef = useRef<Set<string>>(new Set());
+  const location = useLocation();
+  const { pin, unpin, hasActivity } = useActivities();
+  const dockId = `logs:${clusterId}:${decodedNamespace}:${decodedName}`;
+  const pinned = hasActivity(dockId);
+
+  function toggleDock() {
+    if (pinned) {
+      unpin(dockId);
+      return;
+    }
+    pin({
+      id: dockId,
+      kind: "logs",
+      label: decodedName,
+      detail: `Logs · ${decodedNamespace}`,
+      href: `${location.pathname}${location.search}`
+    });
+  }
 
   useEffect(() => {
     if (!clusterId || !decodedNamespace || !decodedName) return;
@@ -135,6 +154,10 @@ export function PodLogsPage() {
           <Button variant="secondary" onClick={downloadLogs} disabled={lines.length === 0}>
             <Download className="h-4 w-4" />
             Download
+          </Button>
+          <Button variant="secondary" onClick={toggleDock} aria-pressed={pinned}>
+            {pinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
+            {pinned ? "Unpin" : "Pin to dock"}
           </Button>
         </div>
       </div>

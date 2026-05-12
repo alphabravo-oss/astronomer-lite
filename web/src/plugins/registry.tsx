@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Activity, BarChart3, Container, Gauge, Package, Puzzle, Wrench, type LucideIcon } from "lucide-react";
+import { Activity, BarChart3, Container, Gauge, Network, Package, Puzzle, Wrench, type LucideIcon } from "lucide-react";
 import { ClusterDashboard } from "../pages/cluster-dashboard";
 import { PodsPage } from "../pages/pods";
 import type { Cluster } from "../lib/api";
@@ -9,6 +9,7 @@ import { GenericResourceBrowser } from "../pages/generic-resource-browser";
 import { MetricsPage } from "../pages/metrics";
 import { ResourceListPage } from "../pages/resource-list";
 import { HelmReleasesPage } from "../pages/helm-releases";
+import { TopologyPage } from "../pages/topology";
 
 export type NavItemPlugin = {
   id: string;
@@ -61,6 +62,13 @@ const internalPagePlugins = [
     icon: Activity
   },
   {
+    id: "topology",
+    label: "Topology",
+    route: "topology",
+    group: "Cluster",
+    icon: Network
+  },
+  {
     id: "pods",
     label: "Pods",
     route: "pods",
@@ -104,31 +112,19 @@ export function navPlugins(): NavItemPlugin[] {
 }
 
 export function resourcePlugins(clusters: Cluster[], selectedNamespaces: string[]): ResourcePagePlugin[] {
+  const pageElement: Record<string, ReactNode> = {
+    dashboard: <ClusterDashboard clusters={clusters} />,
+    "api-resources": <GenericResourceBrowser selectedNamespaces={selectedNamespaces} />,
+    metrics: <MetricsPage />,
+    events: <EventsPage selectedNamespaces={selectedNamespaces} />,
+    topology: <TopologyPage />,
+    pods: <PodsPage selectedNamespaces={selectedNamespaces} />,
+    "helm-releases": <HelmReleasesPage />
+  };
   return [
-    {
-      ...internalPagePlugins[0],
-      element: <ClusterDashboard clusters={clusters} />
-    },
-    {
-      ...internalPagePlugins[1],
-      element: <GenericResourceBrowser selectedNamespaces={selectedNamespaces} />
-    },
-    {
-      ...internalPagePlugins[2],
-      element: <MetricsPage />
-    },
-    {
-      ...internalPagePlugins[3],
-      element: <EventsPage selectedNamespaces={selectedNamespaces} />
-    },
-    {
-      ...internalPagePlugins[4],
-      element: <PodsPage selectedNamespaces={selectedNamespaces} />
-    },
-    {
-      ...internalPagePlugins[5],
-      element: <HelmReleasesPage />
-    },
+    ...internalPagePlugins
+      .filter((page) => pageElement[page.id])
+      .map((page) => ({ ...page, element: pageElement[page.id] })),
     ...resourceConfigs.filter((resource) => resource.id !== "events").map((resource) => ({
       id: resource.id,
       label: resource.label,

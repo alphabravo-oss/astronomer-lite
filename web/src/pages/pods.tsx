@@ -1,4 +1,4 @@
-import { ArrowDownUp, ChevronLeft, ChevronRight, FileCode2, Plug, PlugZap, RefreshCcw, ScrollText, TerminalSquare, X } from "lucide-react";
+import { ArrowDownUp, ChevronLeft, ChevronRight, FileCode2, Plug, PlugZap, RefreshCcw, ScrollText, Star, TerminalSquare, X } from "lucide-react";
 import { dump } from "js-yaml";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -8,6 +8,7 @@ import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { StatusBadge } from "../components/ui/status-badge";
 import { YamlViewDialog } from "../components/ui/yaml-view-dialog";
+import { useFavorites } from "../lib/favorites";
 import { useWatch } from "../hooks/use-watch";
 import type { ClusterEvent, MetricsRow, Pod, PodContainer, PodDetail, PodToleration, PodVolume, WatchFrame } from "../lib/api";
 import { api } from "../lib/api";
@@ -259,6 +260,8 @@ function PodDrawer({
   onClose: () => void;
 }) {
   const labels = Object.entries(detail?.labels ?? {});
+  const { isFavorite, toggleFavorite } = useFavorites(clusterId);
+  const pinned = isFavorite({ kind: "Pod", resource: "pods", namespace: pod.namespace, name: pod.name });
   const [metric, setMetric] = useState<MetricsRow | null>(null);
   const [metricError, setMetricError] = useState("");
   const [events, setEvents] = useState<ClusterEvent[]>([]);
@@ -393,6 +396,16 @@ function PodDrawer({
                 }
               ]}
             />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => toggleFavorite({ kind: "Pod", resource: "pods", namespace: pod.namespace, name: pod.name, route: "pods" })}
+              aria-label={pinned ? `Unpin ${pod.name}` : `Pin ${pod.name}`}
+              aria-pressed={pinned}
+              title={pinned ? "Unpin from sidebar" : "Pin to sidebar"}
+            >
+              <Star className={cn("h-4 w-4", pinned ? "fill-yellow-400 text-yellow-400" : "")} />
+            </Button>
             <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close pod detail">
               <X className="h-4 w-4" />
             </Button>

@@ -1,5 +1,5 @@
 import { dump, load, YAMLException } from "js-yaml";
-import { ArrowDownUp, Check, ChevronLeft, ChevronRight, Copy, Eye, EyeOff, FileCode2, Plug, Plus, RefreshCcw, Scale, Search, Trash2, X } from "lucide-react";
+import { ArrowDownUp, Check, ChevronLeft, ChevronRight, Copy, Eye, EyeOff, FileCode2, Plug, Plus, RefreshCcw, Scale, Search, Star, Trash2, X } from "lucide-react";
 import type { ReactNode } from "react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
@@ -23,6 +23,7 @@ import type {
   WatchFrame
 } from "../lib/api";
 import { ApiError, api } from "../lib/api";
+import { useFavorites } from "../lib/favorites";
 import { lookupFieldDoc, useOpenAPIDoc, type OpenAPIDocument } from "../lib/openapi";
 import { resourceByRoute, resourceConfigs } from "../lib/resources";
 import { cn } from "../lib/utils";
@@ -623,6 +624,8 @@ function ResourceDrawer({
   const [actionState, setActionState] = useState<"idle" | "scaling" | "deleting" | "cordoning" | "draining" | "rolling-back">("idle");
   const [rollbackRevision, setRollbackRevision] = useState<number | null>(null);
   const openApiDoc = useOpenAPIDoc(clusterId);
+  const { isFavorite, toggleFavorite } = useFavorites(clusterId);
+  const pinned = isFavorite({ kind: item.kind, resource: activeResource.id, namespace: item.namespace, name: item.name });
   const [actionMessage, setActionMessage] = useState("");
   const [replicas, setReplicas] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState("");
@@ -1280,9 +1283,21 @@ function ResourceDrawer({
             </div>
             <h2 className="truncate text-lg font-semibold">{item.name}</h2>
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close resource detail">
-            <X className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => toggleFavorite({ kind: item.kind, resource: activeResource.id, namespace: item.namespace, name: item.name, route: activeResource.id })}
+              aria-label={pinned ? `Unpin ${item.name}` : `Pin ${item.name}`}
+              aria-pressed={pinned}
+              title={pinned ? "Unpin from sidebar" : "Pin to sidebar"}
+            >
+              <Star className={cn("h-4 w-4", pinned ? "fill-yellow-400 text-yellow-400" : "")} />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close resource detail">
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
         <div className="space-y-4 p-5">
           <div className="flex w-fit rounded-md bg-muted p-0.5">

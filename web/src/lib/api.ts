@@ -1,6 +1,11 @@
 export const DISPLAY_PALETTE = ["blue", "violet", "emerald", "amber", "rose", "cyan", "fuchsia", "indigo"] as const;
 export type DisplayColor = (typeof DISPLAY_PALETTE)[number];
 
+export type ClusterLink = {
+  label: string;
+  url: string;
+};
+
 export type Cluster = {
   id: string;
   name: string;
@@ -13,6 +18,7 @@ export type Cluster = {
   error?: string;
   displayColor: DisplayColor;
   displayInitials: string;
+  links: ClusterLink[];
 };
 
 export type KubeconfigContextPreview = {
@@ -35,6 +41,76 @@ export type Dashboard = {
   namespaceCount: number;
   serverVersion: string;
   conditions: Record<string, number>;
+};
+
+export type WorkloadCounts = {
+  healthy: number;
+  degraded: number;
+  failing: number;
+  succeeded?: number;
+  total: number;
+};
+
+export type FailingWorkloadEntry = {
+  kind: string;
+  namespace: string;
+  name: string;
+  reason: string;
+};
+
+export type WorkloadsOverview = {
+  pods: WorkloadCounts;
+  deployments: WorkloadCounts;
+  statefulsets: WorkloadCounts;
+  daemonsets: WorkloadCounts;
+  jobs: WorkloadCounts;
+  failing: FailingWorkloadEntry[];
+};
+
+export type TopologyNode = {
+  id: string;
+  kind: string;
+  name: string;
+  namespace?: string;
+  status?: string;
+};
+
+export type TopologyEdge = {
+  from: string;
+  to: string;
+  kind: "owns" | "selects" | "mounts";
+};
+
+export type TopologyGraph = {
+  namespace: string;
+  nodes: TopologyNode[];
+  edges: TopologyEdge[];
+};
+
+export type PromTarget = {
+  namespace: string;
+  service: string;
+  port: number;
+  source: string;
+};
+
+export type PromDetection = {
+  available: boolean;
+  target?: PromTarget;
+  reason?: string;
+  checkedAt: string;
+};
+
+export type PromRangeResponse = {
+  status: "success" | "error";
+  data?: {
+    resultType: string;
+    result: Array<{
+      metric: Record<string, string>;
+      values: Array<[number, string]>;
+    }>;
+  };
+  error?: string;
 };
 
 export type Pod = {
@@ -349,7 +425,25 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     }),
+  updateClusterLinks: (id: string, links: ClusterLink[]) =>
+    request<Cluster>(`/api/clusters/${id}/links`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ links })
+    }),
   dashboard: (id: string) => request<Dashboard>(`/api/clusters/${id}/dashboard`),
+  workloadsOverview: (id: string) => request<WorkloadsOverview>(`/api/clusters/${id}/workloads-overview`),
+  topology: (id: string, namespace: string) =>
+    request<TopologyGraph>(`/api/clusters/${id}/topology?namespace=${encodeURIComponent(namespace)}`),
+  promDetect: (id: string) =>
+    request<PromDetection>(`/api/clusters/${id}/prom/detect`),
+  promQueryRange: (id: string, query: string, start?: string, end?: string, step?: string) => {
+    const params = new URLSearchParams({ query });
+    if (start) params.set("start", start);
+    if (end) params.set("end", end);
+    if (step) params.set("step", step);
+    return request<PromRangeResponse>(`/api/clusters/${id}/prom/query_range?${params.toString()}`);
+  },
   canI: (id: string, review: AccessReviewRequest) =>
     request<AccessReviewResponse>(`/api/clusters/${id}/can-i`, {
       method: "POST",

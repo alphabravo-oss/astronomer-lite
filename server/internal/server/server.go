@@ -173,6 +173,22 @@ func (s *Server) handleCluster(w http.ResponseWriter, r *http.Request) {
 		s.handleClusterDisplay(w, r, id)
 		return
 	}
+	if len(parts) == 2 && parts[1] == "links" && (r.Method == http.MethodPatch || r.Method == http.MethodPut) {
+		s.handleClusterLinks(w, r, id)
+		return
+	}
+	if len(parts) == 2 && parts[1] == "workloads-overview" && r.Method == http.MethodGet {
+		s.handleWorkloadsOverview(w, r, id)
+		return
+	}
+	if len(parts) == 2 && parts[1] == "topology" && r.Method == http.MethodGet {
+		s.handleTopology(w, r, id)
+		return
+	}
+	if len(parts) >= 2 && parts[1] == "prom" {
+		s.handleProm(w, r, id, parts[2:])
+		return
+	}
 	if len(parts) == 2 && parts[1] == "dashboard" && r.Method == http.MethodGet {
 		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		defer cancel()
@@ -511,6 +527,26 @@ func (s *Server) handleClusterDisplay(w http.ResponseWriter, r *http.Request, id
 		return
 	}
 	cluster, err := s.registry.SetDisplay(id, payload.Color, payload.Initials)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			writeError(w, http.StatusNotFound, err)
+			return
+		}
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, cluster)
+}
+
+func (s *Server) handleClusterLinks(w http.ResponseWriter, r *http.Request, id string) {
+	var payload struct {
+		Links []kubeconfig.ClusterLink `json:"links"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 16<<10)).Decode(&payload); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	cluster, err := s.registry.SetLinks(id, payload.Links)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			writeError(w, http.StatusNotFound, err)

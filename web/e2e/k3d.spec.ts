@@ -933,6 +933,80 @@ test("uninstalls a Helm release from the UI", async ({ page, request }) => {
   await expect(page.getByText(helmReleaseUninstallName)).toHaveCount(0, { timeout: 30_000 });
 });
 
+test("lists clusters with workload-overview rollup tiles", async ({ page, request }) => {
+  const cluster = await reachableCluster(request);
+  cleanupContext = cluster.context;
+  const response = await request.get(`/api/clusters/${cluster.id}/workloads-overview`);
+  expect(response.ok()).toBe(true);
+  const overview = (await response.json()) as { pods: { total: number }; failing: unknown[] };
+  expect(overview.pods.total).toBeGreaterThan(0);
+  expect(Array.isArray(overview.failing)).toBe(true);
+  await page.goto(`/clusters/${cluster.id}`);
+  await expect(page.getByRole("heading", { name: "Workload health" })).toBeVisible({ timeout: 15_000 });
+});
+
+test("topology endpoint returns a graph and the page renders nodes", async ({ page, request }) => {
+  const cluster = await reachableCluster(request);
+  cleanupContext = cluster.context;
+  const response = await request.get(`/api/clusters/${cluster.id}/topology?namespace=kube-system`);
+  expect(response.ok()).toBe(true);
+  const graph = (await response.json()) as { nodes: unknown[]; edges: unknown[] };
+  expect(graph.nodes.length).toBeGreaterThan(0);
+  await page.goto(`/clusters/${cluster.id}/topology`);
+  await expect(page.getByRole("heading", { name: "Topology" })).toBeVisible();
+  await page.getByLabel("Namespace").fill("kube-system");
+  await expect(page.getByText(/\d+ nodes · \d+ edges/)).toBeVisible({ timeout: 15_000 });
+});
+
+test("prometheus detect endpoint reports a result", async ({ request }) => {
+  const cluster = await reachableCluster(request);
+  const response = await request.get(`/api/clusters/${cluster.id}/prom/detect`);
+  expect(response.ok()).toBe(true);
+  const result = (await response.json()) as { available: boolean; reason?: string };
+  // Stock k3d doesn't have Prometheus, but the endpoint must still answer.
+  expect(typeof result.available).toBe("boolean");
+});
+
+test("cluster links round-trip through the PATCH endpoint", async ({ request }) => {
+  const cluster = await reachableCluster(request);
+  const setResponse = await request.patch(`/api/clusters/${cluster.id}/links`, {
+    data: { links: [{ label: "Grafana", url: "https://grafana.example.com" }] }
+  });
+  expect(setResponse.ok()).toBe(true);
+  const updated = (await setResponse.json()) as { links: Array<{ label: string }> };
+  expect(updated.links.map((link) => link.label)).toContain("Grafana");
+  // Reset to keep state clean for subsequent tests.
+  const resetResponse = await request.patch(`/api/clusters/${cluster.id}/links`, { data: { links: [] } });
+  expect(resetResponse.ok()).toBe(true);
+});
+
+test("favorites star toggle in the resource drawer adds a sidebar pin", async ({ page, request }) => {
+  const cluster = await reachableCluster(request);
+  cleanupContext = cluster.context;
+  await page.goto(`/clusters/${cluster.id}/pods`);
+  await expect(page.getByRole("heading", { name: "Pods" })).toBeVisible();
+  // Click the first pod row to open the drawer.
+  await page.getByRole("row").nth(1).click();
+  const pinButton = page.getByRole("button", { name: /Pin [^"]+/ }).first();
+  await pinButton.click();
+  await expect(page.getByRole("complementary").getByText("Pinned").first()).toBeVisible({ timeout: 5_000 });
+});
+
+test("pod logs Pin-to-dock button adds and removes a dock entry", async ({ page, request }) => {
+  const cluster = await reachableCluster(request);
+  cleanupContext = cluster.context;
+  // Use the already-existing coredns pod from kube-system for a known target.
+  const podsResponse = await request.get(`/api/clusters/${cluster.id}/pods`);
+  const pods = (await podsResponse.json()) as Array<{ name: string; namespace: string }>;
+  const coredns = pods.find((p) => p.namespace === "kube-system" && p.name.startsWith("coredns"));
+  expect(coredns, "expected a coredns pod to exist on k3d").toBeTruthy();
+  await page.goto(`/clusters/${cluster.id}/pods/${encodeURIComponent(coredns!.namespace)}/${encodeURIComponent(coredns!.name)}/logs`);
+  await expect(page.getByRole("heading", { name: coredns!.name })).toBeVisible();
+  await page.getByRole("button", { name: "Pin to dock" }).click();
+  await expect(page.getByText("Dock")).toBeVisible({ timeout: 5_000 });
+  await page.getByRole("button", { name: "Unpin" }).click();
+});
+
 function writeTinyHelmChart(dir: string, releaseName: string) {
   execFileSync("rm", ["-rf", dir]);
   execFileSync("mkdir", ["-p", `${dir}/templates`]);

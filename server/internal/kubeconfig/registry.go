@@ -43,20 +43,28 @@ const (
 )
 
 type Cluster struct {
-	ID              string `json:"id"`
-	Name            string `json:"name"`
-	Context         string `json:"context"`
-	Server          string `json:"server"`
-	Source          Source `json:"source"`
-	Reachable       bool   `json:"reachable"`
-	Status          string `json:"status"`
-	Version         string `json:"version,omitempty"`
-	Error           string `json:"error,omitempty"`
-	DisplayColor    string `json:"displayColor"`
-	DisplayInitials string `json:"displayInitials"`
+	ID              string        `json:"id"`
+	Name            string        `json:"name"`
+	Context         string        `json:"context"`
+	Server          string        `json:"server"`
+	Source          Source        `json:"source"`
+	Reachable       bool          `json:"reachable"`
+	Status          string        `json:"status"`
+	Version         string        `json:"version,omitempty"`
+	Error           string        `json:"error,omitempty"`
+	DisplayColor    string        `json:"displayColor"`
+	DisplayInitials string        `json:"displayInitials"`
+	Links           []ClusterLink `json:"links"`
 
 	filePath string
 	raw      []byte
+}
+
+// ClusterLink is an admin-attached out-of-cluster URL — e.g. a Grafana
+// dashboard or runbook — shown alongside the cluster in the UI.
+type ClusterLink struct {
+	Label string `json:"label"`
+	URL   string `json:"url"`
 }
 
 // DisplayPalette lists the chip background colors the UI exposes. Index 0 is
@@ -74,8 +82,9 @@ var DisplayPalette = []string{
 }
 
 type displayOverride struct {
-	Color    string `json:"color,omitempty"`
-	Initials string `json:"initials,omitempty"`
+	Color    string        `json:"color,omitempty"`
+	Initials string        `json:"initials,omitempty"`
+	Links    []ClusterLink `json:"links,omitempty"`
 }
 
 type ContextPreview struct {
@@ -166,6 +175,7 @@ func (r *Registry) applyDisplay(c Cluster) Cluster {
 	} else {
 		c.DisplayInitials = defaultDisplayInitials(c.Name)
 	}
+	c.Links = append([]ClusterLink{}, override.Links...)
 	return c
 }
 
@@ -207,7 +217,8 @@ func isValidDisplayColor(c string) bool {
 }
 
 // SetDisplay updates the persisted color/initials override for a cluster.
-// Empty values reset that field back to the deterministic default.
+// Empty values reset color/initials back to the deterministic defaults;
+// existing links are preserved.
 func (r *Registry) SetDisplay(id, color, initials string) (Cluster, error) {
 	color = strings.TrimSpace(color)
 	initials = strings.TrimSpace(initials)
@@ -223,10 +234,53 @@ func (r *Registry) SetDisplay(id, color, initials string) (Cluster, error) {
 	if !ok {
 		return Cluster{}, os.ErrNotExist
 	}
-	if color == "" && initials == "" {
+	existing := r.displays[id]
+	existing.Color = color
+	existing.Initials = strings.ToUpper(initials)
+	if existing.Color == "" && existing.Initials == "" && len(existing.Links) == 0 {
 		delete(r.displays, id)
 	} else {
-		r.displays[id] = displayOverride{Color: color, Initials: strings.ToUpper(initials)}
+		r.displays[id] = existing
+	}
+	if err := r.writeDisplays(); err != nil {
+		return Cluster{}, err
+	}
+	cluster = r.applyDisplay(cluster)
+	cluster.filePath = ""
+	cluster.raw = nil
+	return cluster, nil
+}
+
+// SetLinks replaces the persisted weblinks for a cluster. URLs must be
+// http(s) and labels non-empty.
+func (r *Registry) SetLinks(id string, links []ClusterLink) (Cluster, error) {
+	clean := make([]ClusterLink, 0, len(links))
+	for _, link := range links {
+		label := strings.TrimSpace(link.Label)
+		urlStr := strings.TrimSpace(link.URL)
+		if label == "" || urlStr == "" {
+			continue
+		}
+		if !strings.HasPrefix(urlStr, "http://") && !strings.HasPrefix(urlStr, "https://") {
+			return Cluster{}, fmt.Errorf("link %q must start with http:// or https://", label)
+		}
+		clean = append(clean, ClusterLink{Label: label, URL: urlStr})
+	}
+	if len(clean) > 16 {
+		return Cluster{}, fmt.Errorf("too many links (max 16)")
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	cluster, ok := r.clusters[id]
+	if !ok {
+		return Cluster{}, os.ErrNotExist
+	}
+	existing := r.displays[id]
+	existing.Links = clean
+	if existing.Color == "" && existing.Initials == "" && len(existing.Links) == 0 {
+		delete(r.displays, id)
+	} else {
+		r.displays[id] = existing
 	}
 	if err := r.writeDisplays(); err != nil {
 		return Cluster{}, err

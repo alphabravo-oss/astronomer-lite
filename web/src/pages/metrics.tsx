@@ -6,7 +6,7 @@ import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { DataTable, type Column } from "../components/ui/data-table";
 import { MetricCard } from "../components/ui/metric-card";
-import type { ClusterMetrics, MetricsRow } from "../lib/api";
+import type { ClusterMetrics, MetricsRow, PromDetection } from "../lib/api";
 import { api } from "../lib/api";
 import { cn } from "../lib/utils";
 
@@ -17,6 +17,23 @@ export function MetricsPage() {
   const [metrics, setMetrics] = useState<ClusterMetrics | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [prom, setProm] = useState<PromDetection | null>(null);
+
+  useEffect(() => {
+    if (!clusterId) return;
+    let cancelled = false;
+    api
+      .promDetect(clusterId)
+      .then((data) => {
+        if (!cancelled) setProm(data);
+      })
+      .catch(() => {
+        if (!cancelled) setProm(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [clusterId]);
 
   const loadMetrics = useCallback(async () => {
     if (!clusterId) return;
@@ -47,8 +64,15 @@ export function MetricsPage() {
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
-          <div className="mb-2 flex items-center gap-2">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
             <Badge tone={metrics?.available ? "success" : "warning"}>{metrics?.available ? "metrics-server" : "optional"}</Badge>
+            {prom ? (
+              <Badge tone={prom.available ? "success" : "muted"}>
+                {prom.available && prom.target
+                  ? `Prometheus: ${prom.target.source}`
+                  : "No Prometheus"}
+              </Badge>
+            ) : null}
           </div>
           <h1 className="text-2xl font-semibold tracking-tight">Metrics</h1>
           <p className="mt-1 text-sm text-muted-foreground">CPU and memory from the Kubernetes metrics API.</p>

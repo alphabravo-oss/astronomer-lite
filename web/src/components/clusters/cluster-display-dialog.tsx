@@ -1,5 +1,6 @@
+import { Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import type { Cluster, DisplayColor } from "../../lib/api";
+import type { Cluster, ClusterLink, DisplayColor } from "../../lib/api";
 import { DISPLAY_PALETTE, api } from "../../lib/api";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
@@ -15,6 +16,7 @@ type Props = {
 export function ClusterDisplayDialog({ cluster, onClose, onSaved }: Props) {
   const [color, setColor] = useState<string>(cluster?.displayColor ?? "blue");
   const [initials, setInitials] = useState<string>(cluster?.displayInitials ?? "");
+  const [links, setLinks] = useState<ClusterLink[]>(cluster?.links ?? []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -22,6 +24,7 @@ export function ClusterDisplayDialog({ cluster, onClose, onSaved }: Props) {
     if (cluster) {
       setColor(cluster.displayColor);
       setInitials(cluster.displayInitials);
+      setLinks(cluster.links ?? []);
       setError("");
     }
   }, [cluster]);
@@ -41,7 +44,14 @@ export function ClusterDisplayDialog({ cluster, onClose, onSaved }: Props) {
     setBusy(true);
     setError("");
     try {
-      const updated = await api.updateClusterDisplay(cluster!.id, payload);
+      let updated = await api.updateClusterDisplay(cluster!.id, payload);
+      const cleanLinks = links
+        .map((link) => ({ label: link.label.trim(), url: link.url.trim() }))
+        .filter((link) => link.label && link.url);
+      const originalLinks = JSON.stringify(cluster!.links ?? []);
+      if (JSON.stringify(cleanLinks) !== originalLinks) {
+        updated = await api.updateClusterLinks(cluster!.id, cleanLinks);
+      }
       onSaved(updated);
       onClose();
     } catch (err) {
@@ -49,6 +59,10 @@ export function ClusterDisplayDialog({ cluster, onClose, onSaved }: Props) {
     } finally {
       setBusy(false);
     }
+  }
+
+  function setLink(index: number, patch: Partial<ClusterLink>) {
+    setLinks((current) => current.map((link, i) => (i === index ? { ...link, ...patch } : link)));
   }
 
   const trimmedInitials = initials.toUpperCase().slice(0, 3);
@@ -97,6 +111,50 @@ export function ClusterDisplayDialog({ cluster, onClose, onSaved }: Props) {
                   title={option}
                 />
               ))}
+            </div>
+          </div>
+
+          <div className="mt-5">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Links</p>
+              <button
+                type="button"
+                onClick={() => setLinks((current) => [...current, { label: "", url: "" }])}
+                className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                aria-label="Add link"
+              >
+                <Plus className="h-3 w-3" /> Add
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">Out-of-cluster URLs (Grafana, runbook, etc) shown in the sidebar.</p>
+            <div className="mt-2 space-y-2">
+              {links.map((link, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={link.label}
+                    onChange={(event) => setLink(index, { label: event.target.value })}
+                    placeholder="Label"
+                    className="h-8 w-1/3 rounded-md border border-input bg-background px-2 text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                  <input
+                    type="url"
+                    value={link.url}
+                    onChange={(event) => setLink(index, { url: event.target.value })}
+                    placeholder="https://..."
+                    className="h-8 flex-1 rounded-md border border-input bg-background px-2 font-mono text-xs shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setLinks((current) => current.filter((_, i) => i !== index))}
+                    aria-label={`Remove link ${link.label || index + 1}`}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ))}
+              {links.length === 0 ? <p className="text-xs text-muted-foreground/60">No links yet.</p> : null}
             </div>
           </div>
 

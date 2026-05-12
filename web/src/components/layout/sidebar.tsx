@@ -1,8 +1,9 @@
-import { ArrowLeft, BookOpen, ChevronDown, ChevronLeft, ChevronRight, Orbit, Server, X } from "lucide-react";
+import { ArrowLeft, BookOpen, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Orbit, Server, Star, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, NavLink, useLocation, useParams } from "react-router-dom";
 import { api } from "../../lib/api";
 import type { Cluster } from "../../lib/api";
+import { useFavorites } from "../../lib/favorites";
 import { resourceConfigs } from "../../lib/resources";
 import { cn } from "../../lib/utils";
 import { navPlugins, type NavItemPlugin } from "../../plugins/registry";
@@ -103,6 +104,7 @@ function SidebarContent({
   const groups = useMemo(() => sidebarGroups(clusterId, availableResourceIds), [availableResourceIds, clusterId]);
   const activeCluster = clusters.find((cluster) => cluster.id === clusterId);
   const [openGroup, setOpenGroup] = useState(clusterId ? "Cluster" : "Platform");
+  const { favorites } = useFavorites(clusterId);
 
   useEffect(() => {
     if (!clusterId) {
@@ -180,6 +182,23 @@ function SidebarContent({
               </div>
             </div>
           ) : null}
+          {!collapsed && activeCluster && activeCluster.links && activeCluster.links.length > 0 ? (
+            <div className="mt-2 space-y-0.5 px-2">
+              {activeCluster.links.map((link) => (
+                <a
+                  key={`${link.label}/${link.url}`}
+                  href={link.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-1.5 truncate rounded-md px-2 py-1 text-xs text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  title={link.url}
+                >
+                  <ExternalLink className="h-3 w-3 shrink-0" />
+                  <span className="truncate">{link.label}</span>
+                </a>
+              ))}
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -195,6 +214,34 @@ function SidebarContent({
             onNavigate={onNavigate}
           />
         ))}
+        {clusterId && favorites.length > 0 && !collapsed ? (
+          <div className="mb-1 mt-2">
+            <div className="flex h-8 w-full items-center px-3 text-xs font-semibold text-sidebar-foreground/75">
+              <span className="inline-flex items-center gap-1.5"><Star className="h-3 w-3" /> Pinned</span>
+            </div>
+            <div className="mt-1 space-y-1">
+              {favorites.map((fav) => {
+                const route = fav.route ?? "resources";
+                const target = fav.namespace
+                  ? `/clusters/${clusterId}/${route}?q=${encodeURIComponent(fav.name)}`
+                  : `/clusters/${clusterId}/${route}`;
+                return (
+                  <NavLink
+                    key={`${fav.kind}/${fav.namespace ?? ""}/${fav.name}`}
+                    to={target}
+                    title={`${fav.kind} · ${fav.namespace ?? ""}/${fav.name}`}
+                    onClick={onNavigate}
+                    className={({ isActive }) => cn("nav-item h-9", isActive ? "active" : "text-sidebar-foreground")}
+                  >
+                    <Star className="h-3.5 w-3.5 shrink-0 text-yellow-400" />
+                    <span className="truncate">{fav.name}</span>
+                    <span className="ml-auto truncate text-[10px] text-sidebar-foreground/60">{fav.kind}</span>
+                  </NavLink>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
         {!clusterId ? <ClusterListGroup clusters={clusters} collapsed={collapsed} onNavigate={onNavigate} /> : null}
       </nav>
 
