@@ -127,8 +127,8 @@ export function MetricsPage() {
   );
 
   const refreshProm = useCallback(
-    (signal: AbortSignal) => {
-      void Promise.all((Object.keys(PROM_QUERIES) as PromQueryKey[]).map((key) => loadPromQuery(key, signal)));
+    async (signal: AbortSignal) => {
+      await Promise.all((Object.keys(PROM_QUERIES) as PromQueryKey[]).map((key) => loadPromQuery(key, signal)));
     },
     [loadPromQuery]
   );
@@ -136,8 +136,18 @@ export function MetricsPage() {
   useEffect(() => {
     if (!clusterId || !promAvailable) return;
     const controller = new AbortController();
-    refreshProm(controller.signal);
-    const timer = window.setInterval(() => refreshProm(controller.signal), 30_000);
+    let inFlight = false;
+    const tick = async () => {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        await refreshProm(controller.signal);
+      } finally {
+        inFlight = false;
+      }
+    };
+    void tick();
+    const timer = window.setInterval(() => void tick(), 30_000);
     return () => {
       controller.abort();
       window.clearInterval(timer);

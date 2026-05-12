@@ -46,8 +46,13 @@ function ensureLogStream(activity: Activity) {
 export function ActivityProvider({ children }: { children: ReactNode }) {
   const [activities, setActivities] = useState<Activity[]>(() => readStored());
   const rehydratedRef = useRef(false);
+  const mountedRef = useRef(false);
 
   useEffect(() => {
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      return;
+    }
     writeStored(activities);
   }, [activities]);
 

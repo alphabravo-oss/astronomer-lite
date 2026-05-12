@@ -1,8 +1,9 @@
 import { Anchor, History, Package, RefreshCcw, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import type { AccessReviewResponse, HelmReleaseDetail, HelmReleaseSummary } from "../lib/api";
+import type { HelmReleaseDetail, HelmReleaseSummary } from "../lib/api";
 import { api, ApiError } from "../lib/api";
+import { accessCheckFromSettled, accessStatusMessage, isAccessBlocked, type AccessCheck } from "../lib/access";
 import { Button } from "../components/ui/button";
 import { ConfirmDialog } from "../components/ui/confirm-dialog";
 import { StatusBadge } from "../components/ui/status-badge";
@@ -21,12 +22,7 @@ function ageOf(updated: string) {
   return `${days}d`;
 }
 
-function accessDeniedReason(response: AccessReviewResponse | null, label: string) {
-  if (!response) return `Cannot ${label} in this namespace.`;
-  if (response.allowed && !response.denied) return "";
-  const reason = response.reason?.trim();
-  return reason ? `Cannot ${label}: ${reason}` : `Cannot ${label} in this namespace.`;
-}
+const idleAccess: AccessCheck = { checking: false, response: null, error: "" };
 
 function statusKind(status: string) {
   const s = status.toLowerCase();
@@ -49,9 +45,8 @@ export function HelmReleasesPage() {
   const [actionMessage, setActionMessage] = useState("");
   const [confirmUninstall, setConfirmUninstall] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [rollbackAccess, setRollbackAccess] = useState<AccessReviewResponse | null>(null);
-  const [uninstallAccess, setUninstallAccess] = useState<AccessReviewResponse | null>(null);
-  const [accessChecking, setAccessChecking] = useState(false);
+  const [rollbackAccess, setRollbackAccess] = useState<AccessCheck>(idleAccess);
+  const [uninstallAccess, setUninstallAccess] = useState<AccessCheck>(idleAccess);
 
   useEffect(() => {
     if (!clusterId) return;
@@ -82,12 +77,14 @@ export function HelmReleasesPage() {
     if (!selected) {
       setDetail(null);
       setHistory([]);
-      setRollbackAccess(null);
-      setUninstallAccess(null);
+      setRollbackAccess(idleAccess);
+      setUninstallAccess(idleAccess);
       return;
     }
     let cancelled = false;
     setDetailLoading(true);
+    setRollbackAccess({ checking: true, response: null, error: "" });
+    setUninstallAccess({ checking: true, response: null, error: "" });
     Promise.all([
       api.helmRelease(clusterId, selected.namespace, selected.name),
       api.helmReleaseHistory(clusterId, selected.namespace, selected.name)
@@ -103,29 +100,13 @@ export function HelmReleasesPage() {
       .finally(() => {
         if (!cancelled) setDetailLoading(false);
       });
-    return () => {
-      cancelled = true;
-    };
-  }, [clusterId, selected]);
-
-  useEffect(() => {
-    if (!selected) {
-      setRollbackAccess(null);
-      setUninstallAccess(null);
-      return;
-    }
-    let cancelled = false;
-    setAccessChecking(true);
-    setRollbackAccess(null);
-    setUninstallAccess(null);
     void Promise.allSettled([
       api.canI(clusterId, { verb: "patch", group: "", resource: "secrets", namespace: selected.namespace }),
       api.canI(clusterId, { verb: "delete", group: "", resource: "secrets", namespace: selected.namespace })
     ]).then(([patchResult, deleteResult]) => {
       if (cancelled) return;
-      setRollbackAccess(patchResult.status === "fulfilled" ? patchResult.value : null);
-      setUninstallAccess(deleteResult.status === "fulfilled" ? deleteResult.value : null);
-      setAccessChecking(false);
+      setRollbackAccess(accessCheckFromSettled(patchResult));
+      setUninstallAccess(accessCheckFromSettled(deleteResult));
     });
     return () => {
       cancelled = true;
@@ -182,10 +163,10 @@ export function HelmReleasesPage() {
     }
   }, [detail]);
 
-  const canRollback = rollbackAccess?.allowed === true && rollbackAccess?.denied !== true;
-  const canUninstall = uninstallAccess?.allowed === true && uninstallAccess?.denied !== true;
-  const rollbackDeniedReason = accessDeniedReason(rollbackAccess, "patch secrets");
-  const uninstallDeniedReason = accessDeniedReason(uninstallAccess, "delete secrets");
+  const canRollback = !isAccessBlocked(rollbackAccess);
+  const canUninstall = !isAccessBlocked(uninstallAccess);
+  const rollbackDeniedReason = accessStatusMessage(rollbackAccess);
+  const uninstallDeniedReason = accessStatusMessage(uninstallAccess);
 
   return (
     <div className="space-y-5">
@@ -264,14 +245,8 @@ export function HelmReleasesPage() {
                 variant="ghost"
                 size="sm"
                 onClick={() => setConfirmUninstall(true)}
-                disabled={actionState !== "idle" || accessChecking || !canUninstall}
-                title={
-                  accessChecking
-                    ? "Checking Kubernetes authorization..."
-                    : !canUninstall
-                      ? uninstallDeniedReason
-                      : undefined
-                }
+                disabled={actionState !== "idle" || !canUninstall}
+                title={uninstallDeniedReason || undefined}
               >
                 <Trash2 className="h-4 w-4" />
                 Uninstall
@@ -324,14 +299,8 @@ export function HelmReleasesPage() {
                                 variant="secondary"
                                 size="sm"
                                 onClick={() => void rollback(row.revision)}
-                                disabled={actionState !== "idle" || accessChecking || !canRollback}
-                                title={
-                                  accessChecking
-                                    ? "Checking Kubernetes authorization..."
-                                    : !canRollback
-                                      ? rollbackDeniedReason
-                                      : undefined
-                                }
+                                disabled={actionState !== "idle" || !canRollback}
+                                title={rollbackDeniedReason || undefined}
                               >
                                 {actionState === "rolling-back" ? "Rolling back..." : "Roll back"}
                               </Button>

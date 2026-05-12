@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/alphabravo/astronomer-lite/server/internal/cache"
@@ -93,21 +94,35 @@ func (s *Server) promDetect(w http.ResponseWriter, r *http.Request, id string, w
 	ctx, cancel := context.WithTimeout(r.Context(), 6*time.Second)
 	defer cancel()
 
-	var found *promTarget
-	for _, candidate := range promCandidates {
-		svc, err := client.CoreV1().Services(candidate.Namespace).Get(ctx, candidate.Service, metav1.GetOptions{})
-		if err != nil || svc == nil {
-			continue
-		}
-		port := candidate.Port
-		for _, p := range svc.Spec.Ports {
-			if p.Name == "web" || p.Name == "http-web" || p.Name == "http" {
-				port = int(p.Port)
-				break
+	// Probe candidates in parallel and pick the lowest-indexed match.
+	results := make([]*promTarget, len(promCandidates))
+	var wg sync.WaitGroup
+	for i, candidate := range promCandidates {
+		i, candidate := i, candidate
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			svc, err := client.CoreV1().Services(candidate.Namespace).Get(ctx, candidate.Service, metav1.GetOptions{})
+			if err != nil || svc == nil {
+				return
 			}
+			port := candidate.Port
+			for _, p := range svc.Spec.Ports {
+				if p.Name == "web" || p.Name == "http-web" || p.Name == "http" {
+					port = int(p.Port)
+					break
+				}
+			}
+			results[i] = &promTarget{Namespace: candidate.Namespace, Service: candidate.Service, Port: port, Source: candidate.Source}
+		}()
+	}
+	wg.Wait()
+	var found *promTarget
+	for _, r := range results {
+		if r != nil {
+			found = r
+			break
 		}
-		found = &promTarget{Namespace: candidate.Namespace, Service: candidate.Service, Port: port, Source: candidate.Source}
-		break
 	}
 
 	result := promDetectionResult{Available: found != nil, Target: found, CheckedAt: time.Now().UTC().Format(time.RFC3339)}

@@ -616,11 +616,6 @@ type accessReviewResponse struct {
 }
 
 func (s *Server) handleAccessReview(w http.ResponseWriter, r *http.Request, id string) {
-	client, err := s.registry.Client(id)
-	if err != nil {
-		writeError(w, http.StatusBadGateway, err)
-		return
-	}
 	var body accessReviewRequest
 	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&body); err != nil {
 		writeError(w, http.StatusBadRequest, err)
@@ -641,27 +636,23 @@ func (s *Server) handleAccessReview(w http.ResponseWriter, r *http.Request, id s
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
-	review, err := client.AuthorizationV1().SelfSubjectAccessReviews().Create(ctx, &authorizationv1.SelfSubjectAccessReview{
-		Spec: authorizationv1.SelfSubjectAccessReviewSpec{
-			ResourceAttributes: &authorizationv1.ResourceAttributes{
-				Namespace:   body.Namespace,
-				Verb:        body.Verb,
-				Group:       body.Group,
-				Resource:    body.Resource,
-				Subresource: body.Subresource,
-				Name:        body.Name,
-			},
-		},
-	}, metav1.CreateOptions{})
+	status, err := s.selfSubjectAccessReview(ctx, id, authorizationv1.ResourceAttributes{
+		Namespace:   body.Namespace,
+		Verb:        body.Verb,
+		Group:       body.Group,
+		Resource:    body.Resource,
+		Subresource: body.Subresource,
+		Name:        body.Name,
+	})
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, accessReviewResponse{
-		Allowed:         review.Status.Allowed,
-		Denied:          review.Status.Denied,
-		Reason:          review.Status.Reason,
-		EvaluationError: review.Status.EvaluationError,
+		Allowed:         status.Allowed,
+		Denied:          status.Denied,
+		Reason:          status.Reason,
+		EvaluationError: status.EvaluationError,
 	})
 }
 
@@ -3267,32 +3258,41 @@ func writeError(w http.ResponseWriter, status int, err error) {
 	writeJSON(w, status, map[string]string{"error": err.Error()})
 }
 
-// authorize performs a SelfSubjectAccessReview against the cluster's typed
-// client and returns errForbidden if the action is not allowed. Any failure to
-// reach the authorization API is returned as a wrapped error (callers should
-// propagate it via writeError; it becomes 502 BadGateway).
-func (s *Server) authorize(ctx context.Context, id string, attrs authorizationv1.ResourceAttributes) error {
+// selfSubjectAccessReview is the shared SSAR primitive used by both the
+// /can-i endpoint and the server-side authorize() guard.
+func (s *Server) selfSubjectAccessReview(ctx context.Context, id string, attrs authorizationv1.ResourceAttributes) (authorizationv1.SubjectAccessReviewStatus, error) {
 	client, err := s.registry.Client(id)
 	if err != nil {
-		return err
+		return authorizationv1.SubjectAccessReviewStatus{}, err
 	}
 	review, err := client.AuthorizationV1().SelfSubjectAccessReviews().Create(ctx, &authorizationv1.SelfSubjectAccessReview{
 		Spec: authorizationv1.SelfSubjectAccessReviewSpec{ResourceAttributes: &attrs},
 	}, metav1.CreateOptions{})
 	if err != nil {
+		return authorizationv1.SubjectAccessReviewStatus{}, err
+	}
+	return review.Status, nil
+}
+
+// authorize returns errForbidden when the SSAR for attrs is not allowed.
+// Failures to reach the authorization API are returned as wrapped errors
+// (callers propagate via writeError -> 502 BadGateway).
+func (s *Server) authorize(ctx context.Context, id string, attrs authorizationv1.ResourceAttributes) error {
+	status, err := s.selfSubjectAccessReview(ctx, id, attrs)
+	if err != nil {
 		return fmt.Errorf("authorize %s %s/%s: %w", attrs.Verb, attrs.Group, attrs.Resource, err)
 	}
-	if !review.Status.Allowed || review.Status.Denied {
-		reason := strings.TrimSpace(review.Status.Reason)
-		if reason == "" {
-			reason = review.Status.EvaluationError
-		}
-		if reason != "" {
-			return fmt.Errorf("%w: %s %s/%s in %q: %s", errForbidden, attrs.Verb, attrs.Group, attrs.Resource, attrs.Namespace, reason)
-		}
-		return fmt.Errorf("%w: %s %s/%s in %q", errForbidden, attrs.Verb, attrs.Group, attrs.Resource, attrs.Namespace)
+	if status.Allowed && !status.Denied {
+		return nil
 	}
-	return nil
+	reason := strings.TrimSpace(status.Reason)
+	if reason == "" {
+		reason = status.EvaluationError
+	}
+	if reason != "" {
+		return fmt.Errorf("%w: %s %s/%s in %q: %s", errForbidden, attrs.Verb, attrs.Group, attrs.Resource, attrs.Namespace, reason)
+	}
+	return fmt.Errorf("%w: %s %s/%s in %q", errForbidden, attrs.Verb, attrs.Group, attrs.Resource, attrs.Namespace)
 }
 
 func logRequests(logger *slog.Logger, next http.Handler) http.Handler {

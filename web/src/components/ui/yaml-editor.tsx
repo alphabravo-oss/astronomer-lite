@@ -41,12 +41,7 @@ function parseKeyLine(line: string): { indent: number; key: string; isListMarker
   const listMarker = match[2];
   const key = (match[3] ?? "").trim();
   if (!key) return null;
-  // Columns; treat tabs as a single column (Monaco reports tabSize-aware
-  // columns but for path computation we only care about relative ordering).
-  let indent = 0;
-  for (const ch of indentText) {
-    indent += ch === "\t" ? 1 : 1;
-  }
+  const indent = indentText.length;
   // If a list marker is present, the key effectively sits at indent + 2
   // (`- key:`) — but we use the indent column of the marker itself so it
   // counts as a sibling under the same parent list as other `- key:` entries.

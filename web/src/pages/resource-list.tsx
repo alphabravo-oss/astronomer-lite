@@ -11,7 +11,6 @@ import { YamlViewDialog } from "../components/ui/yaml-view-dialog";
 import { useWatch } from "../hooks/use-watch";
 import type {
   AccessReviewRequest,
-  AccessReviewResponse,
   ApplyResponse,
   ClusterEvent,
   DiscoveredResource,
@@ -23,6 +22,13 @@ import type {
   WatchFrame
 } from "../lib/api";
 import { ApiError, api } from "../lib/api";
+import {
+  accessCheckFromSettled,
+  accessDeniedMessage,
+  accessStatusMessage,
+  isAccessBlocked,
+  type AccessCheck
+} from "../lib/access";
 import { useFavorites } from "../lib/favorites";
 import { lookupFieldDoc, useOpenAPIDoc, type OpenAPIDocument } from "../lib/openapi";
 import { resourceByRoute, resourceConfigs } from "../lib/resources";
@@ -58,11 +64,6 @@ type ServiceEndpointRow = {
   age: string;
 };
 
-type AccessCheck = {
-  checking: boolean;
-  response: AccessReviewResponse | null;
-  error: string;
-};
 
 export function ResourceListPage({ resourceId, discoveredResource, selectedNamespaces, refreshSignal = 0 }: ResourceListPageProps) {
   const { clusterId = "", resource = "" } = useParams();
@@ -1882,35 +1883,6 @@ function accessReviewForResource(gvr: GVRDescriptor, verb: string, namespace?: s
     name,
     subresource
   };
-}
-
-function accessCheckFromSettled(result: PromiseSettledResult<AccessReviewResponse | null>): AccessCheck {
-  if (result.status === "fulfilled") {
-    return { checking: false, response: result.value, error: "" };
-  }
-  return {
-    checking: false,
-    response: null,
-    error: result.reason instanceof Error ? result.reason.message : "Authorization check unavailable"
-  };
-}
-
-function isAccessDenied(check: AccessCheck) {
-  return check.response?.allowed === false || check.response?.denied === true;
-}
-
-function isAccessBlocked(check: AccessCheck) {
-  return check.checking || isAccessDenied(check);
-}
-
-function accessDeniedMessage(check: AccessCheck) {
-  if (!isAccessDenied(check)) return "";
-  return check.response?.reason || "Not allowed by Kubernetes RBAC.";
-}
-
-function accessStatusMessage(check: AccessCheck) {
-  if (check.checking) return "Checking Kubernetes authorization...";
-  return accessDeniedMessage(check) || (check.error ? `Authorization check unavailable: ${check.error}` : "");
 }
 
 function resourceUnavailableMessage(resource: ActiveResource) {
