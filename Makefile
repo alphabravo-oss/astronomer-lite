@@ -1,4 +1,4 @@
-.PHONY: dev build web-build server-build test lint vet verify-local e2e k3d-e2e fmt image image-size clean
+.PHONY: dev build web-build server-build test web-test lint vet verify-local e2e k3d-e2e fmt image image-size clean
 
 BIN ?= server/bin/astronomer-lite
 IMAGE ?= astronomer-lite:dev
@@ -25,13 +25,16 @@ build: web-build server-build
 test:
 	cd server && go test ./...
 
+web-test:
+	cd web && npm test
+
 vet:
 	cd server && go vet ./...
 
 lint:
 	cd web && npm run lint
 
-verify-local: test vet lint build
+verify-local: test web-test vet lint build
 	cd web && npx playwright test --list
 	bash -n scripts/run-k3d-e2e.sh
 
