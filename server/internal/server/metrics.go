@@ -13,12 +13,12 @@ import (
 )
 
 func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request, id string) {
-	dynamicClient, err := s.registry.Dynamic(id)
+	dynamicClient, err := s.dynamicClientFor(id)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
 		return
 	}
-	typedClient, err := s.registry.Client(id)
+	typedClient, err := s.kubeClientFor(id)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
 		return

@@ -45,7 +45,7 @@ func (s *Server) handleTopology(w http.ResponseWriter, r *http.Request, id strin
 		writeError(w, http.StatusBadRequest, errMissingNamespace)
 		return
 	}
-	client, err := s.registry.Client(id)
+	client, err := s.kubeClientFor(id)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
 		return

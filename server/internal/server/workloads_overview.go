@@ -48,7 +48,7 @@ type failingWorkloadEntry struct {
 }
 
 func (s *Server) handleWorkloadsOverview(w http.ResponseWriter, r *http.Request, id string) {
-	client, err := s.registry.Client(id)
+	client, err := s.kubeClientFor(id)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
 		return
@@ -142,7 +142,7 @@ func (s *Server) handleWorkloadsOverview(w http.ResponseWriter, r *http.Request,
 // otherwise fans out parallel List calls so callers don't pay 5 sequential
 // round-trips. Returning []*T (rather than []T) avoids an O(n) per-pod copy
 // on the informer path, where shared listers already hand back pointers.
-func materializeWorkloads(ctx context.Context, set *cache.InformerSet, client *kubernetes.Clientset) (
+func materializeWorkloads(ctx context.Context, set *cache.InformerSet, client kubernetes.Interface) (
 	pods []*corev1.Pod,
 	deps []*appsv1.Deployment,
 	ss []*appsv1.StatefulSet,

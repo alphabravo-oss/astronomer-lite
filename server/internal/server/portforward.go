@@ -143,7 +143,7 @@ func (s *Server) startPortForward(ctx context.Context, id string, request portFo
 	}
 	targetPort := request.RemotePort
 	if resourceKind == "service" {
-		client, err := s.registry.Client(id)
+		client, err := s.kubeClientFor(id)
 		if err != nil {
 			return portForwardRow{}, err
 		}
@@ -260,7 +260,7 @@ func (s *Server) startPortForward(ctx context.Context, id string, request portFo
 	}
 }
 
-func resolveServicePortForwardTarget(ctx context.Context, client *kubernetes.Clientset, namespace string, serviceName string, servicePort int) (string, int, error) {
+func resolveServicePortForwardTarget(ctx context.Context, client kubernetes.Interface, namespace string, serviceName string, servicePort int) (string, int, error) {
 	service, err := client.CoreV1().Services(namespace).Get(ctx, serviceName, metav1.GetOptions{})
 	if err != nil {
 		return "", 0, err

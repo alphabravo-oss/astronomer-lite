@@ -49,7 +49,7 @@ func (s *Server) handleResourceRollback(w http.ResponseWriter, r *http.Request, 
 		return
 	}
 	authzCancel()
-	client, err := s.registry.Client(id)
+	client, err := s.kubeClientFor(id)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
 		return
@@ -66,7 +66,7 @@ func (s *Server) handleResourceRollback(w http.ResponseWriter, r *http.Request, 
 	}
 }
 
-func (s *Server) rollbackDeployment(ctx context.Context, w http.ResponseWriter, client *kubernetes.Clientset, namespace, name string, revision int64) {
+func (s *Server) rollbackDeployment(ctx context.Context, w http.ResponseWriter, client kubernetes.Interface, namespace, name string, revision int64) {
 	dep, err := client.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
@@ -115,7 +115,7 @@ func (s *Server) rollbackDeployment(ctx context.Context, w http.ResponseWriter, 
 	writeJSON(w, http.StatusOK, map[string]any{"revision": revision, "name": updated.Name})
 }
 
-func (s *Server) rollbackStatefulSet(ctx context.Context, w http.ResponseWriter, client *kubernetes.Clientset, namespace, name string, revision int64) {
+func (s *Server) rollbackStatefulSet(ctx context.Context, w http.ResponseWriter, client kubernetes.Interface, namespace, name string, revision int64) {
 	ss, err := client.AppsV1().StatefulSets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
@@ -138,7 +138,7 @@ func (s *Server) rollbackStatefulSet(ctx context.Context, w http.ResponseWriter,
 	writeJSON(w, http.StatusOK, map[string]any{"revision": revision, "name": patched.Name})
 }
 
-func (s *Server) rollbackDaemonSet(ctx context.Context, w http.ResponseWriter, client *kubernetes.Clientset, namespace, name string, revision int64) {
+func (s *Server) rollbackDaemonSet(ctx context.Context, w http.ResponseWriter, client kubernetes.Interface, namespace, name string, revision int64) {
 	ds, err := client.AppsV1().DaemonSets(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
@@ -161,7 +161,7 @@ func (s *Server) rollbackDaemonSet(ctx context.Context, w http.ResponseWriter, c
 	writeJSON(w, http.StatusOK, map[string]any{"revision": revision, "name": patched.Name})
 }
 
-func findControllerRevision(ctx context.Context, client *kubernetes.Clientset, namespace string, ownerUID types.UID, revision int64) (*appsv1.ControllerRevision, error) {
+func findControllerRevision(ctx context.Context, client kubernetes.Interface, namespace string, ownerUID types.UID, revision int64) (*appsv1.ControllerRevision, error) {
 	list, err := client.AppsV1().ControllerRevisions(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, err

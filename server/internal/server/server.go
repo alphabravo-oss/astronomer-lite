@@ -17,6 +17,8 @@ import (
 	"github.com/gorilla/websocket"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/discovery"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/restmapper"
 )
 
@@ -36,6 +38,10 @@ type Server struct {
 	informers     *cache.InformerManager
 	helmGetterMu  sync.Mutex
 	helmGetters   map[string]*restClientGetter
+	// Client acquisition is routed through these seams (defaulting to the
+	// registry) so handlers can be exercised against fake clients in tests.
+	dynamicClientFor func(id string) (dynamic.Interface, error)
+	kubeClientFor    func(id string) (kubernetes.Interface, error)
 }
 
 var wsUpgrader = websocket.Upgrader{
@@ -59,6 +65,8 @@ func New(logger *slog.Logger) (*Server, error) {
 	registry.Start(ctx)
 	informerMgr := cache.NewInformerManager()
 	s := &Server{Config: cfg, registry: registry, logger: logger, portForwards: map[string]*portForwardSession{}, informers: informerMgr, helmGetters: map[string]*restClientGetter{}}
+	s.dynamicClientFor = registry.Dynamic
+	s.kubeClientFor = func(id string) (kubernetes.Interface, error) { return registry.Client(id) }
 	// Drop per-cluster cached state (openapi, prom detection, informer
 	// factories, helm getters) when a kubeconfig disappears or is reloaded
 	// so the next request rebuilds from scratch.

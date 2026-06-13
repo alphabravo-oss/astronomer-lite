@@ -100,7 +100,7 @@ func (s *Server) handleResourceList(w http.ResponseWriter, r *http.Request, id s
 		writeError(w, http.StatusNotFound, fmt.Errorf("unknown resource %q", resource))
 		return
 	}
-	client, err := s.registry.Dynamic(id)
+	client, err := s.dynamicClientFor(id)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
 		return
@@ -206,7 +206,7 @@ func (s *Server) handleGVRScale(w http.ResponseWriter, r *http.Request, id strin
 }
 
 func (s *Server) handleDynamicResourceList(w http.ResponseWriter, r *http.Request, id string, def resourceDefinition, resource string) {
-	client, err := s.registry.Dynamic(id)
+	client, err := s.dynamicClientFor(id)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
 		return
@@ -315,7 +315,7 @@ func (s *Server) handleResourceScale(w http.ResponseWriter, r *http.Request, id 
 }
 
 func (s *Server) handleDynamicResourceDetail(w http.ResponseWriter, r *http.Request, id string, def resourceDefinition, namespace string, name string, resource string) {
-	client, err := s.registry.Dynamic(id)
+	client, err := s.dynamicClientFor(id)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
 		return
@@ -357,7 +357,7 @@ func (s *Server) handleDynamicResourceApply(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	authzCancel()
-	client, err := s.registry.Dynamic(id)
+	client, err := s.dynamicClientFor(id)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
 		return
@@ -411,7 +411,7 @@ func (s *Server) handleDynamicResourceApply(w http.ResponseWriter, r *http.Reque
 }
 
 func (s *Server) handleApply(w http.ResponseWriter, r *http.Request, id string) {
-	client, err := s.registry.Dynamic(id)
+	client, err := s.dynamicClientFor(id)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
 		return
@@ -546,7 +546,7 @@ func (s *Server) handleDynamicResourceDelete(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	authzCancel()
-	client, err := s.registry.Dynamic(id)
+	client, err := s.dynamicClientFor(id)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
 		return
@@ -600,7 +600,7 @@ func (s *Server) handleDynamicResourceScale(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	authzCancel()
-	client, err := s.registry.Dynamic(id)
+	client, err := s.dynamicClientFor(id)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
 		return

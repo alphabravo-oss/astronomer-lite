@@ -410,7 +410,7 @@ func (s *Server) handleClusterLinks(w http.ResponseWriter, r *http.Request, id s
 }
 
 func (s *Server) handleNamespaces(w http.ResponseWriter, r *http.Request, id string) {
-	client, err := s.registry.Client(id)
+	client, err := s.kubeClientFor(id)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
 		return

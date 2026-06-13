@@ -21,7 +21,7 @@ type logFrame struct {
 }
 
 func (s *Server) handlePodLogsWS(w http.ResponseWriter, r *http.Request, id string) {
-	client, err := s.registry.Client(id)
+	client, err := s.kubeClientFor(id)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
 		return

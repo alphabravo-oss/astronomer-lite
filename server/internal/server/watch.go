@@ -26,7 +26,7 @@ func (s *Server) handleWatchWS(w http.ResponseWriter, r *http.Request, id string
 		writeError(w, http.StatusBadRequest, err)
 		return
 	}
-	client, err := s.registry.Dynamic(id)
+	client, err := s.dynamicClientFor(id)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
 		return

@@ -10,7 +10,7 @@ import (
 )
 
 func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request, id string) {
-	client, err := s.registry.Dynamic(id)
+	client, err := s.dynamicClientFor(id)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
 		return

@@ -83,7 +83,7 @@ func (s *Server) promDetect(w http.ResponseWriter, r *http.Request, id string, w
 		return cached
 	}
 
-	client, err := s.registry.Client(id)
+	client, err := s.kubeClientFor(id)
 	if err != nil {
 		result := promDetectionResult{Available: false, Reason: err.Error(), CheckedAt: time.Now().UTC().Format(time.RFC3339)}
 		if write {
@@ -161,7 +161,7 @@ func (s *Server) promQueryRange(w http.ResponseWriter, r *http.Request, id strin
 	if step == "" {
 		step = "30s"
 	}
-	client, err := s.registry.Client(id)
+	client, err := s.kubeClientFor(id)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
 		return

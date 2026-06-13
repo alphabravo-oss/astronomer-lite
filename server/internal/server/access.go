@@ -80,7 +80,7 @@ var errForbidden = errors.New("forbidden by Kubernetes RBAC")
 // selfSubjectAccessReview is the shared SSAR primitive used by both the
 // /can-i endpoint and the server-side authorize() guard.
 func (s *Server) selfSubjectAccessReview(ctx context.Context, id string, attrs authorizationv1.ResourceAttributes) (authorizationv1.SubjectAccessReviewStatus, error) {
-	client, err := s.registry.Client(id)
+	client, err := s.kubeClientFor(id)
 	if err != nil {
 		return authorizationv1.SubjectAccessReviewStatus{}, err
 	}

@@ -38,11 +38,11 @@ func (s *Server) handleOpenAPI(w http.ResponseWriter, r *http.Request, id string
 
 func (s *Server) fetchOpenAPIv2(ctx context.Context, id string) ([]byte, error) {
 	return openAPICache.Do(id, func() ([]byte, error) {
-		client, err := s.registry.Client(id)
+		client, err := s.kubeClientFor(id)
 		if err != nil {
 			return nil, err
 		}
-		req := client.RESTClient().Get().AbsPath("/openapi/v2")
+		req := client.Discovery().RESTClient().Get().AbsPath("/openapi/v2")
 		body, err := req.Do(ctx).Raw()
 		if err != nil {
 			return nil, fmt.Errorf("openapi v2: %w", err)

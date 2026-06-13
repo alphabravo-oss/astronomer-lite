@@ -40,7 +40,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request, id string)
 		writeJSON(w, http.StatusOK, []searchHit{})
 		return
 	}
-	dyn, err := s.registry.Dynamic(id)
+	dyn, err := s.dynamicClientFor(id)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
 		return
