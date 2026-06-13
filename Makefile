@@ -16,6 +16,7 @@ web-build:
 	rm -rf server/internal/server/static/dist
 	mkdir -p server/internal/server/static/dist
 	cp -R web/dist/. server/internal/server/static/dist/
+	touch server/internal/server/static/dist/.gitkeep
 
 server-build:
 	cd server && go build -ldflags "$(LDFLAGS)" -o bin/astronomer-lite ./cmd/astronomer-lite
@@ -61,3 +62,5 @@ image-size:
 
 clean:
 	rm -rf server/bin web/dist server/internal/server/static/dist
+	mkdir -p server/internal/server/static/dist
+	touch server/internal/server/static/dist/.gitkeep

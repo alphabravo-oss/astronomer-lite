@@ -20,7 +20,11 @@ import (
 	"k8s.io/client-go/restmapper"
 )
 
-//go:embed static/dist
+// The web bundle is a build artifact, not committed to the repo (only the
+// .gitkeep placeholder is). `all:` includes that dotfile so the package still
+// compiles before `make web-build` populates static/dist.
+//
+//go:embed all:static/dist
 var embeddedDist embed.FS
 
 type Server struct {
