@@ -320,7 +320,7 @@ func freeLocalPort() (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer listener.Close()
+	defer func() { _ = listener.Close() }()
 	address, ok := listener.Addr().(*net.TCPAddr)
 	if !ok {
 		return 0, fmt.Errorf("unexpected listener address %s", listener.Addr().String())

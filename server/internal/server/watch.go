@@ -35,7 +35,7 @@ func (s *Server) handleWatchWS(w http.ResponseWriter, r *http.Request, id string
 	if err != nil {
 		return
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()

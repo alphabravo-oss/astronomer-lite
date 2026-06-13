@@ -460,6 +460,7 @@ func validateExecPlugin(cfg *clientcmdapi.Config, contextDef *clientcmdapi.Conte
 	}
 	command := strings.TrimSpace(authInfo.Exec.Command)
 	if _, err := exec.LookPath(command); err != nil {
+		//nolint:staticcheck // ST1005: intentional user-facing message, asserted in tests and documented in README
 		return fmt.Errorf("Exec plugin `%s` not found on PATH", command)
 	}
 	return nil

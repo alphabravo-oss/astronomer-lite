@@ -48,7 +48,7 @@ func (s *Server) handlePodExecWS(w http.ResponseWriter, r *http.Request, id stri
 	if err != nil {
 		return
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
@@ -114,7 +114,7 @@ func (s *Server) handlePodAttachWS(w http.ResponseWriter, r *http.Request, id st
 	if err != nil {
 		return
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()

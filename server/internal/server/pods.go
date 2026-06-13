@@ -202,7 +202,7 @@ func (s *Server) handlePodDetail(w http.ResponseWriter, r *http.Request, id stri
 		"ready":              strconvPair(ready, len(pod.Spec.Containers)),
 		"restarts":           restarts,
 		"age":                time.Since(pod.CreationTimestamp.Time).Round(time.Second).String(),
-		"createdAt":          pod.CreationTimestamp.Time.Format(time.RFC3339),
+		"createdAt":          pod.CreationTimestamp.Format(time.RFC3339),
 		"node":               pod.Spec.NodeName,
 		"podIP":              pod.Status.PodIP,
 		"podIPs":             podIPs,

@@ -66,7 +66,7 @@ func (s *Server) handlePodLogsWS(w http.ResponseWriter, r *http.Request, id stri
 	if err != nil {
 		return
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
@@ -84,7 +84,7 @@ func (s *Server) handlePodLogsWS(w http.ResponseWriter, r *http.Request, id stri
 		_ = conn.WriteJSON(logFrame{Type: "error", Message: err.Error()})
 		return
 	}
-	defer stream.Close()
+	defer func() { _ = stream.Close() }()
 
 	scanner := bufio.NewScanner(stream)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
