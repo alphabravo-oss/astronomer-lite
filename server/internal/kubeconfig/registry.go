@@ -227,7 +227,7 @@ func (r *Registry) SetDisplay(id, color, initials string) (Cluster, error) {
 	color = strings.TrimSpace(color)
 	initials = strings.TrimSpace(initials)
 	if color != "" && !isValidDisplayColor(color) {
-		return Cluster{}, fmt.Errorf("unknown color %q", color)
+		return Cluster{}, fmt.Errorf("unknown color %q; must be one of: %s", color, strings.Join(DisplayPalette, ", "))
 	}
 	if l := len([]rune(initials)); l > 3 {
 		return Cluster{}, fmt.Errorf("initials must be 1-3 characters")

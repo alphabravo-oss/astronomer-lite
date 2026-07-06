@@ -478,6 +478,9 @@ export async function loadRevisionHistory(clusterId: string, namespace: string, 
 
   if (kind === "DaemonSet" || kind === "StatefulSet") {
     const selector = workloadLabelSelector(detail);
+    // "controllerrevisions" (apps/v1) is intentionally not in resourceConfigs
+    // (it has no user-facing list page); it is served by the backend's
+    // resourceDefinitions map and fetched here only to build revision history.
     const response = await api.resources(clusterId, "controllerrevisions", [namespace], selector);
     const ownerUID = text(record(detail.metadata).uid);
     const owned = response.items.filter((row) => hasOwner(row, kind, name, ownerUID));

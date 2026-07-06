@@ -547,6 +547,9 @@ export const api = {
     const query = params.toString();
     return request<K8sResourceList>(`/api/clusters/${id}/resources/${resource}${query ? `?${query}` : ""}`);
   },
+  // Cluster-scoped resources have no namespace; the server contract encodes an
+  // empty namespace as the literal path sentinel "_" (see the resources/gvr
+  // handlers in server/internal/server). Keep this consistent on both sides.
   resourceDetail: (id: string, resource: string, namespace: string, name: string) =>
     request<Record<string, unknown>>(
       `/api/clusters/${id}/resources/${resource}/${encodeURIComponent(namespace || "_")}/${encodeURIComponent(name)}`

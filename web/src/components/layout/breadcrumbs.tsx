@@ -17,7 +17,11 @@ const routeLabels: Record<string, string> = {
   pods: "Pods",
   logs: "Logs",
   exec: "Exec",
+  attach: "Attach",
   "port-forward": "Port Forward",
+  endpointslices: "EndpointSlices",
+  verticalpodautoscalers: "VPAs",
+  jobsets: "JobSets",
   deployments: "Deployments",
   replicasets: "ReplicaSets",
   daemonsets: "DaemonSets",
@@ -69,8 +73,8 @@ export function Breadcrumbs({ clusters }: BreadcrumbsProps) {
         return (
           <div key={`${crumb.href}-${index}`} className="flex min-w-0 items-center gap-1.5">
             {index > 0 ? <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" /> : null}
-            {isLast ? (
-              <span className="truncate font-medium text-foreground">{crumb.label}</span>
+            {isLast || !crumb.navigable ? (
+              <span className={cn("truncate", isLast ? "font-medium text-foreground" : "text-muted-foreground")}>{crumb.label}</span>
             ) : (
               <Link className={cn("truncate text-muted-foreground transition-colors hover:text-foreground")} to={crumb.href}>
                 {crumb.label}
@@ -86,10 +90,10 @@ export function Breadcrumbs({ clusters }: BreadcrumbsProps) {
 function buildBreadcrumbs(pathname: string, clusters: Cluster[]) {
   const segments = pathname.split("/").filter(Boolean);
   const clusterMap = new Map(clusters.map((cluster) => [cluster.id, cluster.name]));
-  const crumbs: { label: string; href: string }[] = [{ label: "Dashboard", href: "/" }];
+  const crumbs: { label: string; href: string; navigable: boolean }[] = [{ label: "Dashboard", href: "/", navigable: true }];
 
   if (segments.length === 0) {
-    crumbs.push({ label: "Clusters", href: "/" });
+    crumbs.push({ label: "Clusters", href: "/", navigable: true });
     return crumbs;
   }
 
@@ -99,13 +103,21 @@ function buildBreadcrumbs(pathname: string, clusters: Cluster[]) {
     href += `/${segment}`;
     if (segment === "clusters") continue;
 
+    // The cluster id and known page routes are real routes; raw data segments
+    // (namespace, resource name in deep pod paths) are not — render them as
+    // plain text so clicking them doesn't fall through to the catch-all redirect.
+    const isCluster = segments[index - 1] === "clusters";
     let label: string;
-    if (segments[index - 1] === "clusters") {
+    let navigable: boolean;
+    if (isCluster) {
       label = clusterMap.get(segment) ?? decodeURIComponent(segment);
+      navigable = true;
     } else {
-      label = routeLabels[segment] ?? decodeURIComponent(segment);
+      const known = routeLabels[segment];
+      label = known ?? decodeURIComponent(segment);
+      navigable = known !== undefined;
     }
-    crumbs.push({ label, href });
+    crumbs.push({ label, href, navigable });
   }
 
   return crumbs;

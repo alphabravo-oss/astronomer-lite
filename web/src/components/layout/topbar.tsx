@@ -116,10 +116,8 @@ export function Topbar({ clusters, onRefresh, selectedNamespaces, onSelectedName
       }
     }
     function handleKeyDown(event: KeyboardEvent) {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        searchRef.current?.focus();
-      }
+      // Cmd/Ctrl+K is owned by the command palette (see command-palette.tsx);
+      // the topbar only handles Escape to close its popovers.
       if (event.key === "Escape") {
         setClusterOpen(false);
         setNamespaceOpen(false);
@@ -199,11 +197,7 @@ export function Topbar({ clusters, onRefresh, selectedNamespaces, onSelectedName
             className="h-8 w-full rounded-md border border-border bg-muted/40 pl-9 pr-16 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:bg-background focus:ring-2 focus:ring-ring"
             placeholder="Search resources"
             aria-label="Search resources"
-            aria-keyshortcuts="Control+K Meta+K"
           />
-          <kbd className="pointer-events-none absolute right-2 top-1.5 rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground">
-            Ctrl K
-          </kbd>
         </div>
       </div>
       <div className="flex min-w-0 items-center gap-2">

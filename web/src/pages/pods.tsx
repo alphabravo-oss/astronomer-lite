@@ -270,6 +270,9 @@ function PodDrawer({
   const [eventsError, setEventsError] = useState("");
   const [yamlDialogOpen, setYamlDialogOpen] = useState(false);
   const [resourceYaml, setResourceYaml] = useState("");
+  // The Pods page shows YAML read-only (allowEdit={false} below); editing a Pod
+  // is done through the generic resource drawer. editedYaml/editMode satisfy the
+  // dialog's required props but stay inert here by design.
   const [editedYaml, setEditedYaml] = useState("");
   const [yamlLoading, setYamlLoading] = useState(false);
   const [yamlError, setYamlError] = useState("");

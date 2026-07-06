@@ -5,8 +5,9 @@ import { ArrowLeft, PlugZap, RefreshCcw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { Button } from "../components/ui/button";
-import type { ExecFrame, PodDetail } from "../lib/api";
+import type { AccessReviewRequest, ExecFrame, PodDetail } from "../lib/api";
 import { api } from "../lib/api";
+import { accessCheckFromSettled, accessStatusMessage, idleAccessCheck, isAccessBlocked, isAccessDenied, pendingAccessCheck, type AccessCheck } from "../lib/access";
 import { cn } from "../lib/utils";
 
 const defaultCommand = "/bin/sh";
@@ -29,6 +30,30 @@ export function PodExecPage() {
   const [status, setStatus] = useState<"idle" | "connecting" | "connected" | "closed" | "error">("idle");
   const [error, setError] = useState("");
   const [sessionKey, setSessionKey] = useState(0);
+  const [access, setAccess] = useState<AccessCheck>(idleAccessCheck);
+  const accessBlocked = isAccessBlocked(access);
+
+  // Preflight the exec/attach (a pods/exec or pods/attach create) so a caller
+  // without RBAC sees a clear message instead of a socket that opens and dies.
+  useEffect(() => {
+    if (!clusterId || !decodedNamespace || !decodedName) return;
+    let cancelled = false;
+    setAccess(pendingAccessCheck);
+    const review: AccessReviewRequest = {
+      verb: "create",
+      group: "",
+      resource: "pods",
+      subresource: attachMode ? "attach" : "exec",
+      namespace: decodedNamespace,
+      name: decodedName
+    };
+    Promise.allSettled([api.canI(clusterId, review)]).then(([result]) => {
+      if (!cancelled) setAccess(accessCheckFromSettled(result));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [attachMode, clusterId, decodedName, decodedNamespace]);
 
   useEffect(() => {
     if (!clusterId || !decodedNamespace || !decodedName) return;
@@ -135,9 +160,9 @@ export function PodExecPage() {
   }, [attachMode, clusterId, command, container, decodedName, decodedNamespace, modeLabel]);
 
   useEffect(() => {
-    if (!container) return;
+    if (!container || accessBlocked) return;
     return connect();
-  }, [connect, container, sessionKey]);
+  }, [accessBlocked, connect, container, sessionKey]);
 
   return (
     <div className="space-y-5">
@@ -150,11 +175,17 @@ export function PodExecPage() {
           <h1 className="truncate text-2xl font-semibold tracking-tight">{decodedName}</h1>
           <p className="mt-1 font-mono text-sm text-muted-foreground">{decodedNamespace}</p>
         </div>
-        <Button variant="secondary" onClick={() => setSessionKey((value) => value + 1)}>
+        <Button variant="secondary" disabled={accessBlocked} onClick={() => setSessionKey((value) => value + 1)}>
           <RefreshCcw className={cn("h-4 w-4", status === "connecting" && "animate-spin")} />
           Reconnect
         </Button>
       </div>
+
+      {isAccessDenied(access) ? (
+        <div className="rounded-lg border border-destructive/35 bg-destructive/10 p-4 text-sm text-destructive">
+          {modeLabel} is not allowed by Kubernetes RBAC: {accessStatusMessage(access)}
+        </div>
+      ) : null}
 
       {error ? <div className="rounded-lg border border-destructive/35 bg-destructive/10 p-4 text-sm text-destructive">{error}</div> : null}
 
@@ -183,7 +214,7 @@ export function PodExecPage() {
             />
           </label>
         ) : null}
-        <Button variant="secondary" onClick={() => setSessionKey((value) => value + 1)}>
+        <Button variant="secondary" disabled={accessBlocked} onClick={() => setSessionKey((value) => value + 1)}>
           <PlugZap className="h-4 w-4" />
           {attachMode ? "Attach" : "Connect"}
         </Button>

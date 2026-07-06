@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ApiError } from "./api";
 import type { ActiveResource } from "./resource-detail";
 import {
   accessReviewForResource,
@@ -10,8 +11,14 @@ import {
   defaultKindForResource,
   formatNodeDrainMessage,
   gatewayBackendRefsSummary,
+  gatewayMatchesSummary,
   gatewayParentRefRows,
+  gatewayRouteRuleRows,
+  gatewayTargetRefRows,
   hasOwner,
+  isApplyConflictError,
+  podTemplateImages,
+  workloadLabelSelector,
   hpaMetricName,
   hpaMetricTarget,
   ingressBackendSummary,
@@ -394,5 +401,67 @@ describe("stripManagedFields", () => {
     expect(stripManagedFields({ metadata: { name: "x", managedFields: [1] } })).toEqual({ metadata: { name: "x" } });
     const clean = { metadata: { name: "x" } };
     expect(stripManagedFields(clean)).toBe(clean);
+  });
+});
+
+describe("gateway route helpers (P2-7)", () => {
+  it("gatewayTargetRefRows maps refs with defaults", () => {
+    expect(gatewayTargetRefRows([{ group: "g", kind: "K", name: "n", sectionName: "s" }, {}])).toEqual([
+      ["g", "K", "n", "s"],
+      ["-", "Service", "-", "-"]
+    ]);
+    expect(gatewayTargetRefRows(null)).toEqual([]);
+  });
+
+  it("gatewayMatchesSummary summarizes HTTP and gRPC matches", () => {
+    expect(gatewayMatchesSummary([], "httproutes")).toBe("-");
+    expect(
+      gatewayMatchesSummary([{ path: { type: "PathPrefix", value: "/api" }, method: "GET", headers: [{}, {}], queryParams: [{}] }], "httproutes")
+    ).toBe("GET, PathPrefix /api, 2 headers, 1 query params");
+    expect(gatewayMatchesSummary([{ method: { service: "svc", method: "m" } }], "grpcroutes")).toBe("svc/m");
+  });
+
+  it("gatewayRouteRuleRows builds rule table rows", () => {
+    expect(
+      gatewayRouteRuleRows(
+        {
+          spec: {
+            rules: [
+              {
+                name: "r1",
+                matches: [{ path: { type: "Exact", value: "/x" } }],
+                backendRefs: [{ kind: "Service", name: "b", port: 80 }],
+                filters: [{ type: "RequestRedirect" }]
+              }
+            ]
+          }
+        },
+        "httproutes"
+      )
+    ).toEqual([["r1", "Exact /x", "Service:b:80", "RequestRedirect"]]);
+  });
+
+  it("gatewayRouteRuleRows names unnamed rules by index", () => {
+    const rows = gatewayRouteRuleRows({ spec: { rules: [{}] } }, "httproutes");
+    expect(rows[0][0]).toBe("rule-1");
+  });
+});
+
+describe("workload + apply helpers (P2-7)", () => {
+  it("podTemplateImages collects non-empty container images", () => {
+    expect(podTemplateImages({ spec: { containers: [{ image: "nginx" }, { image: "" }, { image: "redis" }] } })).toEqual(["nginx", "redis"]);
+    expect(podTemplateImages({})).toEqual([]);
+  });
+
+  it("workloadLabelSelector builds a label query from matchLabels", () => {
+    expect(workloadLabelSelector({ spec: { selector: { matchLabels: { app: "web", tier: "fe" } } } })).toBe("app=web,tier=fe");
+    expect(workloadLabelSelector({})).toBe("");
+  });
+
+  it("isApplyConflictError detects 409 ApiError and conflict messages", () => {
+    expect(isApplyConflictError(new ApiError(409, "boom"), "")).toBe(true);
+    expect(isApplyConflictError(new ApiError(500, "boom"), "")).toBe(false);
+    expect(isApplyConflictError(new Error("boom"), "apply conflict detected")).toBe(true);
+    expect(isApplyConflictError(new Error("boom"), "all good")).toBe(false);
   });
 });
