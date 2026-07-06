@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
@@ -9,7 +10,22 @@ import (
 	"k8s.io/client-go/rest"
 )
 
+// readOnlyProxyMethods are the HTTP verbs the raw /k8s/* passthrough accepts.
+// The proxy is an unauthenticated-at-this-layer escape hatch (RBAC is enforced
+// upstream by the API server using the cluster credential), and it currently
+// has no first-party consumer. Restricting it to read verbs removes an ungated
+// mutating surface; all writes must go through the typed handlers, which
+// preflight a SelfSubjectAccessReview.
+var readOnlyProxyMethods = map[string]bool{
+	http.MethodGet:  true,
+	http.MethodHead: true,
+}
+
 func (s *Server) handleKubernetesProxy(w http.ResponseWriter, r *http.Request, id string, suffix string) {
+	if !readOnlyProxyMethods[r.Method] {
+		writeError(w, http.StatusMethodNotAllowed, fmt.Errorf("the /k8s proxy is read-only; use the typed resource endpoints for writes"))
+		return
+	}
 	cfg, err := s.registry.RESTConfig(id)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)

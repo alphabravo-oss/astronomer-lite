@@ -14,6 +14,7 @@ import (
 	"github.com/alphabravo/astronomer-lite/server/internal/config"
 	"github.com/alphabravo/astronomer-lite/server/internal/kubeconfig"
 	"github.com/alphabravo/astronomer-lite/server/internal/plugins"
+	"github.com/alphabravo/astronomer-lite/server/internal/version"
 	"github.com/gorilla/websocket"
 	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/client-go/discovery"
@@ -114,6 +115,7 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/api/healthz", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
+	mux.HandleFunc("/api/version", s.handleVersion)
 	mux.HandleFunc("/api/clusters/preview", s.handleKubeconfigPreview)
 	mux.HandleFunc("/api/clusters", s.handleClusters)
 	mux.HandleFunc("/api/clusters/", s.handleCluster)
@@ -124,6 +126,15 @@ func (s *Server) Routes() http.Handler {
 
 func (s *Server) handlePluginNav(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, plugins.DefaultRegistry().NavItems())
+}
+
+// handleVersion reports the build-stamped version and the Kubernetes client
+// User-Agent. No auth or cluster context is required.
+func (s *Server) handleVersion(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]string{
+		"version":   version.Version,
+		"userAgent": version.UserAgent(),
+	})
 }
 
 func (s *Server) spaHandler() http.Handler {

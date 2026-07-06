@@ -396,22 +396,3 @@ func helmStatusForError(err error) int {
 	}
 	return http.StatusBadGateway
 }
-
-// HasHelm returns true if the cluster has at least one release recorded in
-// any namespace. Used by callers (e.g. the UI sidebar) to gate the Helm
-// entry; not used internally yet.
-func (s *Server) HasHelm(ctx context.Context, id string) bool {
-	cfg, err := s.helmActionConfig(id, "")
-	if err != nil {
-		return false
-	}
-	_ = ctx
-	list := action.NewList(cfg)
-	list.AllNamespaces = true
-	list.Limit = 1
-	releases, err := list.Run()
-	if err != nil {
-		return false
-	}
-	return len(releases) > 0
-}

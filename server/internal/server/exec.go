@@ -8,8 +8,10 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
+	authorizationv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -28,11 +30,6 @@ type execControlFrame struct {
 }
 
 func (s *Server) handlePodExecWS(w http.ResponseWriter, r *http.Request, id string) {
-	cfg, err := s.registry.RESTConfig(id)
-	if err != nil {
-		writeError(w, http.StatusBadGateway, err)
-		return
-	}
 	query := r.URL.Query()
 	namespace := strings.TrimSpace(query.Get("ns"))
 	pod := strings.TrimSpace(query.Get("pod"))
@@ -43,6 +40,27 @@ func (s *Server) handlePodExecWS(w http.ResponseWriter, r *http.Request, id stri
 	command := splitCommand(query["command"])
 	if len(command) == 0 {
 		command = []string{"/bin/sh"}
+	}
+	// Gate the exec (a pods/exec create) with an SSAR before doing any work,
+	// so a denied caller gets a clean 403 instead of a half-open socket.
+	authzCtx, authzCancel := context.WithTimeout(r.Context(), 10*time.Second)
+	err := s.authorize(authzCtx, id, authorizationv1.ResourceAttributes{
+		Verb:        "create",
+		Group:       "",
+		Resource:    "pods",
+		Subresource: "exec",
+		Namespace:   namespace,
+		Name:        pod,
+	})
+	authzCancel()
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err)
+		return
+	}
+	cfg, err := s.registry.RESTConfig(id)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err)
+		return
 	}
 	conn, err := wsUpgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -98,16 +116,31 @@ func (s *Server) handlePodExecWS(w http.ResponseWriter, r *http.Request, id stri
 }
 
 func (s *Server) handlePodAttachWS(w http.ResponseWriter, r *http.Request, id string) {
-	cfg, err := s.registry.RESTConfig(id)
-	if err != nil {
-		writeError(w, http.StatusBadGateway, err)
-		return
-	}
 	query := r.URL.Query()
 	namespace := strings.TrimSpace(query.Get("ns"))
 	pod := strings.TrimSpace(query.Get("pod"))
 	if namespace == "" || pod == "" {
 		writeError(w, http.StatusBadRequest, fmt.Errorf("ns and pod query parameters are required"))
+		return
+	}
+	// Gate the attach (a pods/attach create) with an SSAR before upgrading.
+	authzCtx, authzCancel := context.WithTimeout(r.Context(), 10*time.Second)
+	err := s.authorize(authzCtx, id, authorizationv1.ResourceAttributes{
+		Verb:        "create",
+		Group:       "",
+		Resource:    "pods",
+		Subresource: "attach",
+		Namespace:   namespace,
+		Name:        pod,
+	})
+	authzCancel()
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err)
+		return
+	}
+	cfg, err := s.registry.RESTConfig(id)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err)
 		return
 	}
 	conn, err := wsUpgrader.Upgrade(w, r, nil)

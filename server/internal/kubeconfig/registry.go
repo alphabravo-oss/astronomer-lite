@@ -480,7 +480,7 @@ func restConfigFromAPI(cfg *clientcmdapi.Config, contextName string) (*rest.Conf
 func (r *Registry) Preview(raw []byte) ([]ContextPreview, error) {
 	cfg, err := clientcmd.Load(raw)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not parse kubeconfig YAML: %w", err)
 	}
 	r.mu.RLock()
 	existing := map[string]bool{}
@@ -517,7 +517,7 @@ func (r *Registry) Preview(raw []byte) ([]ContextPreview, error) {
 func (r *Registry) AddManaged(raw []byte, selectedContexts []string) ([]Cluster, error) {
 	cfg, err := clientcmd.Load(raw)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not parse kubeconfig YAML: %w", err)
 	}
 	if len(selectedContexts) > 0 {
 		cfg, err = filterConfigContexts(cfg, selectedContexts)

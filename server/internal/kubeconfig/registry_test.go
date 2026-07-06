@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -124,6 +125,27 @@ func assertUserAgent(t *testing.T, r *http.Request) {
 	t.Helper()
 	if got := r.Header.Get("User-Agent"); got != version.UserAgent() {
 		t.Fatalf("%s User-Agent = %q, want %q", r.URL.Path, got, version.UserAgent())
+	}
+}
+
+// P3-12: a malformed kubeconfig body yields a clear, prefixed error rather
+// than a raw client-go unmarshal message.
+func TestPreviewAndAddManagedRejectMalformedKubeconfig(t *testing.T) {
+	dir := t.TempDir()
+	managedDir := filepath.Join(dir, "clusters.d")
+	if err := os.MkdirAll(managedDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	registry := NewRegistry(nil, managedDir, "", slog.New(slog.NewTextHandler(io.Discard, nil)))
+	bad := []byte("this: [is not, a valid : kubeconfig")
+
+	_, err := registry.Preview(bad)
+	if err == nil || !strings.Contains(err.Error(), "could not parse kubeconfig YAML") {
+		t.Fatalf("Preview error = %v, want it to mention 'could not parse kubeconfig YAML'", err)
+	}
+	_, err = registry.AddManaged(bad, nil)
+	if err == nil || !strings.Contains(err.Error(), "could not parse kubeconfig YAML") {
+		t.Fatalf("AddManaged error = %v, want it to mention 'could not parse kubeconfig YAML'", err)
 	}
 }
 
