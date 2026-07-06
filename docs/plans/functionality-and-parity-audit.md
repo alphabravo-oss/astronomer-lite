@@ -6,6 +6,52 @@
 
 ---
 
+## ✅ Implementation status (updated 2026-07-06)
+
+This plan has since been implemented. Summary of what landed:
+
+- **P0-1** ✅ `/api/version` added (+ unit test, README accurate, live-verified).
+- **P1-1** ✅ exec/attach RBAC-gated server-side (403 before upgrade) + frontend
+  can-i preflight banner; handler tests.
+- **P1-2** ✅ decision taken — raw `/k8s/*` proxy restricted to read verbs
+  (GET/HEAD), mutating verbs 405; handler test; documented in STATUS.md.
+- **P1-3** ✅ port-forward TTL teardown extracted to `armPortForwardTTL` + unit
+  tests (stop-on-TTL, yield-on-done, stop idempotency).
+- **P1-4** ✅ Events e2e (`audit.spec.ts`).
+- **P1-5** ⚠️ partial — `isApplyConflictError` 409 branch unit-tested (P2-7); the
+  full UI conflict/force e2e is **deferred** (setting up a real cross-manager
+  409 through the drawer is selector-heavy and flake-prone).
+- **P1-6** ✅ node drain handler tests (cordon/evict/skip/RBAC-deny).
+- **P1-7** ✅ same-origin/root-path + no-auth requirements documented in README.
+- **P2-1** ✅ k3d e2e workflow re-enabled, gated on dispatch/`e2e` label. (A
+  recorded green run still needs a Docker/k3d runner — CI-only.)
+- **P2-2** ✅ test-count corrected (now 45) in verification.md + progress.txt.
+- **P2-3/P2-4/P2-5/P2-6** ✅ new e2e in `web/e2e/audit.spec.ts` (add-cluster,
+  secret reveal, favorites persistence, exec terminal UI).
+- **P2-7** ✅ unit tests for the 7 uncovered helpers (vitest 47).
+- **P2-8** (Prometheus render) / **P2-9** (workload recompute) ⚠️ **deferred** —
+  need a Prometheus-equipped cluster / are timing-sensitive; beyond spec MVP.
+- **P3-1/P3-2** ✅ `docs/STATUS.md` authoritative status; FEATURES marked
+  superseded; plugin-nav documented.
+- **P3-3/P3-4** ✅ decision — kept as documented FR-23 plugin seams (removing
+  them would break the spec); clarified in STATUS.md.
+- **P3-5** ✅ documented intentional read-only Pod YAML.
+- **P3-6** ✅ removed dead `HasHelm` (StatusDot left; harmless unused component).
+- **P3-7** ✅ breadcrumbs no longer link data segments; missing labels added.
+- **P3-8** ✅ single Cmd/Ctrl+K owner (command palette); topbar hint removed.
+- **P3-9/P3-10** ✅ documented `_` namespace sentinel + backend-only
+  controllerrevisions.
+- **P3-11** ✅ Monaco console warning documented as upstream/cosmetic in STATUS.
+- **P3-12** ✅ kubeconfig parse errors wrapped with a clear 400 message + test.
+- **P3-13** ✅ invalid-color error now lists allowed palette names.
+
+Deferred (explicitly): P1-5 UI e2e, P2-8, P2-9, and the StatusDot component
+removal. Rationale recorded above / in STATUS.md.
+
+The original analysis follows unchanged for reference.
+
+---
+
 ## 0. How to read this document
 
 This plan is deliberately verbose. Every finding carries: **what** the issue is, **evidence** (file:line or a reproduced command), **why it matters**, and a **task** with acceptance criteria. Tasks are grouped by priority tier and each has a stable ID (`P0-1`, `P1-3`, …) so the implementation session can check them off. Nothing here has been fixed yet — this is analysis + plan only.

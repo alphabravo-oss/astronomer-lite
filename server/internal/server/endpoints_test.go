@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/alphabravo/astronomer-lite/server/internal/version"
 	authorizationv1 "k8s.io/api/authorization/v1"
@@ -166,3 +167,42 @@ func TestHandleNodeDrainDeniedByRBAC(t *testing.T) {
 }
 
 func boolPtr(b bool) *bool { return &b }
+
+// P1-3: a port-forward session is torn down once its TTL elapses, and
+// stopForward is idempotent (safe to call from the TTL timer and the forwarder
+// goroutine).
+func TestArmPortForwardTTLStopsSession(t *testing.T) {
+	session := &portForwardSession{stop: make(chan struct{}), done: make(chan struct{})}
+	go armPortForwardTTL(session, 20*time.Millisecond)
+
+	select {
+	case <-session.stop:
+		// stopped by TTL as expected
+	case <-time.After(2 * time.Second):
+		t.Fatal("session was not stopped after its TTL elapsed")
+	}
+	// Idempotent: a second stop (e.g. from the forwarder exiting) must not panic.
+	session.stopForward()
+}
+
+func TestArmPortForwardTTLYieldsWhenDone(t *testing.T) {
+	session := &portForwardSession{stop: make(chan struct{}), done: make(chan struct{})}
+	finished := make(chan struct{})
+	go func() {
+		armPortForwardTTL(session, time.Hour)
+		close(finished)
+	}()
+	close(session.done) // forward ended before the TTL
+
+	select {
+	case <-finished:
+		// TTL goroutine returned without stopping the (already-done) session
+	case <-time.After(2 * time.Second):
+		t.Fatal("armPortForwardTTL did not return when the session finished")
+	}
+	select {
+	case <-session.stop:
+		t.Fatal("session.stop should not be closed when the forward finished before its TTL")
+	default:
+	}
+}

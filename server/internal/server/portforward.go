@@ -63,6 +63,19 @@ func (session *portForwardSession) stopForward() {
 	})
 }
 
+// armPortForwardTTL stops the session once ttl elapses, unless the forward has
+// already finished (session.done). This bounds a forward's lifetime so it can't
+// outlive its usefulness (US-14 idle timeout).
+func armPortForwardTTL(session *portForwardSession, ttl time.Duration) {
+	timer := time.NewTimer(ttl)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		session.stopForward()
+	case <-session.done:
+	}
+}
+
 func (s *Server) handlePortForwards(w http.ResponseWriter, r *http.Request, id string) {
 	switch r.Method {
 	case http.MethodGet:
@@ -237,15 +250,7 @@ func (s *Server) startPortForward(ctx context.Context, id string, request portFo
 		s.portForwards[sessionID] = session
 		s.portForwardMu.Unlock()
 		if s.Config.PortForwardTTL > 0 {
-			go func() {
-				timer := time.NewTimer(s.Config.PortForwardTTL)
-				defer timer.Stop()
-				select {
-				case <-timer.C:
-					session.stopForward()
-				case <-session.done:
-				}
-			}()
+			go armPortForwardTTL(session, s.Config.PortForwardTTL)
 		}
 		return row, nil
 	case err := <-errChan:
