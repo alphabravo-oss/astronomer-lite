@@ -1,5 +1,11 @@
 # Feature Backlog — 2026-05-11
 
+> **SUPERSEDED (historical planning snapshot).** Most Tier 1–3.1 items in this
+> file have since shipped; the unchecked `[ ]` boxes below no longer reflect
+> reality. For the current, authoritative state of what is built, verified, and
+> out of scope, see [`docs/STATUS.md`](STATUS.md). This file is kept only for
+> historical context.
+
 Comparative feature audit against Freelens (`./freelens/`) and Headlamp
 (`./headlamp/`). Each item below is something one or both of those projects
 ship that Astronomer-Lite does not have yet but plausibly should. Items are

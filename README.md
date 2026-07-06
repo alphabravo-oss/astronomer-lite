@@ -2,7 +2,7 @@
 
 A Headlamp-style, single-container Kubernetes UI. Add kubeconfigs, manage multiple remote clusters, get the full astronomer look in a small-footprint app.
 
-> **Status:** Alpha — Tier 1–3.1 features are in place (cluster management, all standard workload/networking/storage/RBAC pages, Helm, VPA/JobSet, topology, metrics, exec/logs/port-forward, generic resource browser, YAML edit + apply with server-side dry-run). Three simplify passes have landed since the initial spec.
+> **Status:** Alpha — Tier 1–3.1 features are in place (cluster management, all standard workload/networking/storage/RBAC pages, Helm, VPA/JobSet, topology, metrics, exec/logs/port-forward, generic resource browser, YAML edit + apply with server-side dry-run). See [`docs/STATUS.md`](docs/STATUS.md) for the authoritative, current status (built / verified / out of scope).
 > **Spec:** [`docs/specs/i-want-to-make-a-headlamp-style-single-container--process-ui.md`](docs/specs/i-want-to-make-a-headlamp-style-single-container--process-ui.md)
 
 ## What it is
@@ -71,6 +71,22 @@ The runtime image runs as the unprivileged `astronomer` user and only needs writ
 | `ASTRONOMER_LITE_CONFIG_DIR` | `$HOME/.config/astronomer-lite` | Where managed kubeconfigs and display overrides are persisted. |
 | `ASTRONOMER_LITE_PORT_FORWARD_TTL` | `60m` | Max lifetime of a port-forward session. Port-forwards bind to `127.0.0.1` inside the container. |
 | `KUBECONFIG` | _(unset → `~/.kube/config`)_ | System kubeconfig path(s); colon-separated like kubectl. |
+
+### Deployment notes
+
+- **Serve the UI and API from the same origin, at the root path.** The frontend
+  calls the API with root-absolute paths (`/api/...`) and opens WebSockets
+  (logs / exec / attach / watch) against `window.location.host`. Putting the
+  container behind a reverse proxy that serves it under a sub-path
+  (e.g. `/astronomer/`) or splits the API onto a different host will break the
+  live streams and API calls. Front it with a host-based route (or a path that
+  is stripped before it reaches the container), not a retained path prefix.
+- **No built-in authentication.** This is a single-user, direct-access console
+  that uses your kubeconfig credentials; it has no login. Do not expose it on an
+  untrusted network — put it behind your own authenticating proxy or a private
+  network. (A multi-user server mode is a separate, future spec.)
+- **Version check:** `GET /api/version` returns the build-stamped version and
+  the Kubernetes client User-Agent (`astronomer-lite/<version>`).
 
 ## Features
 

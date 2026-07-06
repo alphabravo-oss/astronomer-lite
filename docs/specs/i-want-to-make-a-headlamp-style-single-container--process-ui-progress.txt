@@ -254,7 +254,7 @@ DEFINITION OF DONE
 [PARTIAL] e2e suite green against k3d in CI
   - Added `.github/workflows/e2e.yml`, `web/playwright.config.ts`, and `web/e2e/k3d.spec.ts`.
   - Added `make k3d-e2e`, backed by `scripts/run-k3d-e2e.sh`, and wired the GitHub Actions e2e job through the same script so local Linux and CI use the same real k3d cluster plus fake unreachable kubeconfig context path.
-  - `cd web && npx playwright test --list` parses the k3d suite and lists 19 Chromium tests from `web/e2e/k3d.spec.ts`.
+  - `cd web && npx playwright test --list` parses the suites and lists 45 Chromium tests (40 in `web/e2e/k3d.spec.ts`, 5 in `web/e2e/audit.spec.ts`).
   - Full local Playwright run against rancher-desktop passed: cluster discovery/watch update, deployment scale/delete, port-forward tray stop, multi-document dry-run/apply, and live logs.
   - Local environment lacks `k3d`; the k3d workflow has not been run to green here.
 [DONE] Visual parity review vs astronomer/frontend

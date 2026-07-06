@@ -1,14 +1,20 @@
 name: e2e
 
+# The k3d Playwright suite is heavy (spins up a real cluster), so it does not
+# run on every push. Trigger it manually via the Actions tab (workflow_dispatch)
+# or by adding the "e2e" label to a pull request.
 on:
   pull_request:
-  push:
-    branches:
-      - main
+    types: [labeled, opened, synchronize, reopened]
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   k3d:
+    # Only run for manual dispatch or PRs carrying the "e2e" label.
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.pull_request.labels.*.name, 'e2e')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
