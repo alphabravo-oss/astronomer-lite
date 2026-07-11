@@ -9,6 +9,7 @@ import { Button } from "../components/ui/button";
 import { ConfirmDialog } from "../components/ui/confirm-dialog";
 import { Textarea } from "../components/ui/input";
 import { MetricCard } from "../components/ui/metric-card";
+import { PageHeader, PageShell } from "../components/ui/page";
 
 type ClusterListProps = {
   clusters: Cluster[];
@@ -93,19 +94,17 @@ export function ClusterList({ clusters, onRefresh }: ClusterListProps) {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-5">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
-        <div>
-          <h1 className="text-2xl font-semibold">Clusters</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Kubeconfig contexts available to this single-container console.
-          </p>
-        </div>
-        <Button onClick={() => setAddOpen(true)}>
-          <Plus className="h-4 w-4" />
-          Add kubeconfig
-        </Button>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Clusters"
+        description="Kubeconfig contexts available to this single-container console."
+        actions={
+          <Button onClick={() => setAddOpen(true)}>
+            <Plus className="h-4 w-4" />
+            Add kubeconfig
+          </Button>
+        }
+      />
 
       {pageError ? <div className="rounded-lg border border-destructive/35 bg-destructive/10 p-4 text-sm text-destructive">{pageError}</div> : null}
 
@@ -181,7 +180,7 @@ export function ClusterList({ clusters, onRefresh }: ClusterListProps) {
       />
 
       <ClusterDisplayDialog cluster={customizeTarget} onClose={() => setCustomizeTarget(null)} onSaved={() => void onRefresh()} />
-    </div>
+    </PageShell>
   );
 }
 

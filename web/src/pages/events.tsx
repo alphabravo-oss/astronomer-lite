@@ -4,6 +4,7 @@ import { useParams } from "react-router-dom";
 import { Badge } from "../components/ui/badge";
 import { BottomPanel } from "../components/ui/bottom-panel";
 import { Button } from "../components/ui/button";
+import { PageHeader, PageShell } from "../components/ui/page";
 import { SortableHeader, type SortDirection } from "../components/ui/sortable-header";
 import { useWatch } from "../hooks/use-watch";
 import type { ClusterEvent, WatchFrame } from "../lib/api";
@@ -109,21 +110,21 @@ export function EventsPage({ selectedNamespaces }: EventsPageProps) {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Events</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {selectedNamespaces.length === 0
-              ? "Newest Kubernetes events across all namespaces."
-              : `Newest Kubernetes events filtered to ${selectedNamespaces.join(", ")}.`}
-          </p>
-        </div>
-        <Button variant="secondary" onClick={() => void loadEvents()} disabled={loading}>
-          <RefreshCcw className={cn("h-4 w-4", loading && "animate-spin")} />
-          Refresh
-        </Button>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Events"
+        description={
+          selectedNamespaces.length === 0
+            ? "Newest Kubernetes events across all namespaces."
+            : `Newest Kubernetes events filtered to ${selectedNamespaces.join(", ")}.`
+        }
+        actions={
+          <Button variant="secondary" onClick={() => void loadEvents()} disabled={loading}>
+            <RefreshCcw className={cn("h-4 w-4", loading && "animate-spin")} />
+            Refresh
+          </Button>
+        }
+      />
 
       {error ? <div className="rounded-lg border border-destructive/35 bg-destructive/10 p-4 text-sm text-destructive">{error}</div> : null}
 
@@ -225,7 +226,7 @@ export function EventsPage({ selectedNamespaces }: EventsPageProps) {
       </section>
 
       {selectedEvent ? <EventDrawer event={selectedEvent} onClose={() => setSelectedEvent(null)} /> : null}
-    </div>
+    </PageShell>
   );
 }
 

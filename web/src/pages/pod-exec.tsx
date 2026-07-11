@@ -5,6 +5,7 @@ import { ArrowLeft, PlugZap, RefreshCcw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { Button } from "../components/ui/button";
+import { PageHeader, PageShell } from "../components/ui/page";
 import type { AccessReviewRequest, ExecFrame, PodDetail } from "../lib/api";
 import { api } from "../lib/api";
 import { accessCheckFromSettled, accessStatusMessage, idleAccessCheck, isAccessBlocked, isAccessDenied, pendingAccessCheck, type AccessCheck } from "../lib/access";
@@ -165,21 +166,23 @@ export function PodExecPage() {
   }, [accessBlocked, connect, container, sessionKey]);
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-        <div className="min-w-0">
-          <Link to={`/clusters/${clusterId}/pods`} className="mb-3 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+    <PageShell className="space-y-5">
+      <PageHeader
+        eyebrow={
+          <Link to={`/clusters/${clusterId}/pods`} className="inline-flex items-center gap-2 normal-case tracking-normal text-sm text-muted-foreground hover:text-foreground">
             <ArrowLeft className="h-4 w-4" />
             Pods
           </Link>
-          <h1 className="truncate text-2xl font-semibold tracking-tight">{decodedName}</h1>
-          <p className="mt-1 font-mono text-sm text-muted-foreground">{decodedNamespace}</p>
-        </div>
-        <Button variant="secondary" disabled={accessBlocked} onClick={() => setSessionKey((value) => value + 1)}>
-          <RefreshCcw className={cn("h-4 w-4", status === "connecting" && "animate-spin")} />
-          Reconnect
-        </Button>
-      </div>
+        }
+        title={decodedName}
+        description={<span className="font-mono">{decodedNamespace}</span>}
+        actions={
+          <Button variant="secondary" disabled={accessBlocked} onClick={() => setSessionKey((value) => value + 1)}>
+            <RefreshCcw className={cn("h-4 w-4", status === "connecting" && "animate-spin")} />
+            Reconnect
+          </Button>
+        }
+      />
 
       {isAccessDenied(access) ? (
         <div className="rounded-lg border border-destructive/35 bg-destructive/10 p-4 text-sm text-destructive">
@@ -222,7 +225,7 @@ export function PodExecPage() {
       </section>
 
       <div ref={terminalRef} className="h-[calc(100vh-20rem)] min-h-96 overflow-hidden rounded-lg border border-border bg-[#0a0a0f] p-2" />
-    </div>
+    </PageShell>
   );
 }
 

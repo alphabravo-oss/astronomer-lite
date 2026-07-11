@@ -1,5 +1,5 @@
 import { Check, ChevronDown, Copy, ExternalLink, Menu, Moon, Plug, RefreshCcw, Search, Server, Square, Sun } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import type { Cluster, Namespace, PortForward } from "../../lib/api";
 import { api } from "../../lib/api";
@@ -10,6 +10,7 @@ import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
 import { StatusBadge } from "../ui/status-badge";
 import { ClusterChip } from "../clusters/cluster-chip";
+import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Breadcrumbs } from "./breadcrumbs";
 
 type TopbarProps = {
@@ -18,26 +19,19 @@ type TopbarProps = {
   selectedNamespaces: string[];
   onSelectedNamespacesChange: (namespaces: string[]) => void;
   onOpenMobileNav: () => void;
+  onOpenCommandPalette: () => void;
 };
 
-export function Topbar({ clusters, onRefresh, selectedNamespaces, onSelectedNamespacesChange, onOpenMobileNav }: TopbarProps) {
+export function Topbar({ clusters, onRefresh, selectedNamespaces, onSelectedNamespacesChange, onOpenMobileNav, onOpenCommandPalette }: TopbarProps) {
   const { clusterId } = useParams();
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
-  const [namespaceOpen, setNamespaceOpen] = useState(false);
   const [namespaces, setNamespaces] = useState<Namespace[]>([]);
   const [namespaceError, setNamespaceError] = useState("");
-  const [portForwardOpen, setPortForwardOpen] = useState(false);
   const [portForwards, setPortForwards] = useState<PortForward[]>([]);
   const [portForwardError, setPortForwardError] = useState("");
   const [copiedPortForwardId, setCopiedPortForwardId] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [clusterOpen, setClusterOpen] = useState(false);
   const [clusterQuery, setClusterQuery] = useState("");
-  const clusterRef = useRef<HTMLDivElement>(null);
-  const namespaceRef = useRef<HTMLDivElement>(null);
-  const portForwardRef = useRef<HTMLDivElement>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
   const availableNamespaceNames = useMemo(() => namespaces.map((namespace) => namespace.name), [namespaces]);
   const activeCluster = useMemo(() => clusters.find((cluster) => cluster.id === clusterId) ?? null, [clusterId, clusters]);
   const filteredClusters = useMemo(() => {
@@ -65,7 +59,6 @@ export function Topbar({ clusters, onRefresh, selectedNamespaces, onSelectedName
   useEffect(() => {
     setNamespaces([]);
     setNamespaceError("");
-    setNamespaceOpen(false);
     if (!clusterId) {
       return;
     }
@@ -96,41 +89,11 @@ export function Topbar({ clusters, onRefresh, selectedNamespaces, onSelectedName
   useEffect(() => {
     setPortForwards([]);
     setPortForwardError("");
-    setPortForwardOpen(false);
     if (!clusterId) return;
     void loadPortForwards();
     const timer = window.setInterval(() => void loadPortForwards(), 5_000);
     return () => window.clearInterval(timer);
   }, [clusterId, loadPortForwards]);
-
-  useEffect(() => {
-    function handlePointerDown(event: MouseEvent) {
-      if (!clusterRef.current?.contains(event.target as Node)) {
-        setClusterOpen(false);
-      }
-      if (!namespaceRef.current?.contains(event.target as Node)) {
-        setNamespaceOpen(false);
-      }
-      if (!portForwardRef.current?.contains(event.target as Node)) {
-        setPortForwardOpen(false);
-      }
-    }
-    function handleKeyDown(event: KeyboardEvent) {
-      // Cmd/Ctrl+K is owned by the command palette (see command-palette.tsx);
-      // the topbar only handles Escape to close its popovers.
-      if (event.key === "Escape") {
-        setClusterOpen(false);
-        setNamespaceOpen(false);
-        setPortForwardOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, []);
 
   function toggleNamespace(namespace: string) {
     if (selectedNamespaces.includes(namespace)) {
@@ -162,14 +125,7 @@ export function Topbar({ clusters, onRefresh, selectedNamespaces, onSelectedName
     }
   }
 
-  function submitSearch() {
-    const query = searchQuery.trim();
-    if (!clusterId || !query) return;
-    navigate(`/clusters/${clusterId}/resources?q=${encodeURIComponent(query)}`);
-  }
-
   function selectCluster(nextClusterId: string) {
-    setClusterOpen(false);
     setClusterQuery("");
     navigate(nextClusterId ? `/clusters/${nextClusterId}` : "/");
   }
@@ -183,93 +139,87 @@ export function Topbar({ clusters, onRefresh, selectedNamespaces, onSelectedName
         <Breadcrumbs clusters={clusters} />
       </div>
       <div className="hidden flex-1 justify-center px-6 md:flex">
-        <div className="relative w-full max-w-md">
-          <Search className="pointer-events-none absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-          <input
-            ref={searchRef}
-            id="topbar-resource-search"
-            name="resource-search"
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") submitSearch();
-            }}
-            className="h-8 w-full rounded-md border border-border bg-muted/40 pl-9 pr-16 text-sm outline-none transition-colors placeholder:text-muted-foreground focus:bg-background focus:ring-2 focus:ring-ring"
-            placeholder="Search resources"
-            aria-label="Search resources"
-          />
-        </div>
+        <button
+          type="button"
+          onClick={onOpenCommandPalette}
+          className="flex h-8 w-full max-w-md items-center gap-2 rounded-md border border-border bg-muted/40 px-3 text-sm text-muted-foreground transition-colors hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          aria-label="Open command palette"
+          aria-keyshortcuts="Control+K Meta+K"
+        >
+          <Search className="h-3.5 w-3.5 shrink-0" />
+          <span className="flex-1 text-left">Search pages, clusters, actions...</span>
+          <kbd className="shrink-0 rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[10px]">Ctrl K</kbd>
+        </button>
       </div>
       <div className="flex min-w-0 items-center gap-2">
         {clusterId ? (
-          <div ref={namespaceRef} className="relative">
-            <button
-              type="button"
-              className="inline-flex h-8 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-              onClick={() => setNamespaceOpen((value) => !value)}
-              title={namespaceError || "Namespace filter"}
-            >
-              <span>{selectedNamespaces.length === 0 ? "All namespaces" : `${selectedNamespaces.length} namespaces`}</span>
-            </button>
-            {namespaceOpen ? (
-              <div className="absolute right-0 top-full z-50 mt-1 w-72 overflow-hidden rounded-lg border border-border bg-popover shadow-xl">
-                <div className="flex items-center justify-between border-b border-border p-2">
-                  <span className="text-xs font-medium uppercase text-muted-foreground">Namespaces</span>
-                  <button
-                    type="button"
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                    onClick={() => onSelectedNamespacesChange([])}
-                  >
-                    Clear
-                  </button>
-                </div>
-                <div className="max-h-72 overflow-y-auto p-2">
-                  {namespaces.map((namespace) => (
-                    <label
-                      key={namespace.name}
-                      className="flex cursor-pointer items-center justify-between rounded-md px-2 py-1.5 text-sm hover:bg-accent"
-                    >
-                      <span className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          name="namespace-filter"
-                          className="rounded border-border bg-background text-primary focus:ring-ring"
-                          checked={selectedNamespaces.includes(namespace.name)}
-                          onChange={() => toggleNamespace(namespace.name)}
-                        />
-                        <span>{namespace.name}</span>
-                      </span>
-                      <Badge tone={namespace.status === "Active" ? "success" : "warning"}>{namespace.status}</Badge>
-                    </label>
-                  ))}
-                  {namespaces.length === 0 ? (
-                    <div className="px-2 py-6 text-center text-sm text-muted-foreground">
-                      {namespaceError || "No namespaces loaded."}
-                    </div>
-                  ) : null}
-                </div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className="inline-flex h-8 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                title={namespaceError || "Namespace filter"}
+              >
+                <span>{selectedNamespaces.length === 0 ? "All namespaces" : `${selectedNamespaces.length} namespaces`}</span>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-72">
+              <div className="flex items-center justify-between border-b border-border p-2">
+                <span className="text-xs font-medium uppercase text-muted-foreground">Namespaces</span>
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground hover:text-foreground"
+                  onClick={() => onSelectedNamespacesChange([])}
+                >
+                  Clear
+                </button>
               </div>
-            ) : null}
-          </div>
+              <div className="max-h-72 overflow-y-auto p-2">
+                {namespaces.map((namespace) => (
+                  <label
+                    key={namespace.name}
+                    className="flex cursor-pointer items-center justify-between rounded-md px-2 py-1.5 text-sm hover:bg-accent"
+                  >
+                    <span className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        name="namespace-filter"
+                        className="rounded border-border bg-background text-primary focus:ring-ring"
+                        checked={selectedNamespaces.includes(namespace.name)}
+                        onChange={() => toggleNamespace(namespace.name)}
+                      />
+                      <span>{namespace.name}</span>
+                    </span>
+                    <Badge tone={namespace.status === "Active" ? "success" : "warning"}>{namespace.status}</Badge>
+                  </label>
+                ))}
+                {namespaces.length === 0 ? (
+                  <div className="px-2 py-6 text-center text-sm text-muted-foreground">
+                    {namespaceError || "No namespaces loaded."}
+                  </div>
+                ) : null}
+              </div>
+            </PopoverContent>
+          </Popover>
         ) : null}
         {clusterId ? (
-          <div ref={portForwardRef} className="relative">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setPortForwardOpen((value) => !value)}
-              aria-label="Active port-forwards"
-              title={portForwardError || "Active port-forwards"}
-            >
-              <Plug className="h-4 w-4" />
-              {portForwards.length > 0 ? (
-                <span className="absolute -right-0.5 -top-0.5 grid min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-4 text-primary-foreground">
-                  {portForwards.length}
-                </span>
-              ) : null}
-            </Button>
-            {portForwardOpen ? (
-              <div className="absolute right-0 top-full z-50 mt-1 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-border bg-popover shadow-xl">
+          <Popover>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className="relative inline-flex h-9 w-9 items-center justify-center gap-2 rounded-md border border-transparent bg-transparent text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label="Active port-forwards"
+                title={portForwardError || "Active port-forwards"}
+              >
+                <Plug className="h-4 w-4" />
+                {portForwards.length > 0 ? (
+                  <span className="absolute -right-0.5 -top-0.5 grid min-w-4 place-items-center rounded-full bg-primary px-1 text-[10px] font-semibold leading-4 text-primary-foreground">
+                    {portForwards.length}
+                  </span>
+                ) : null}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[min(24rem,calc(100vw-2rem))]">
                 <div className="flex items-center justify-between border-b border-border p-3">
                   <div>
                     <h2 className="text-sm font-semibold text-foreground">Port-forwards</h2>
@@ -346,26 +296,22 @@ export function Topbar({ clusters, onRefresh, selectedNamespaces, onSelectedName
                     </div>
                   ) : null}
                 </div>
-              </div>
-            ) : null}
-          </div>
+            </PopoverContent>
+          </Popover>
         ) : null}
-        <div ref={clusterRef} className="relative">
-          <button
-            type="button"
-            onClick={() => setClusterOpen((value) => !value)}
-            className="inline-flex h-8 max-w-[13rem] items-center gap-2 rounded-md border border-border bg-background px-3 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            aria-haspopup="listbox"
-            aria-expanded={clusterOpen}
-            aria-label="Select cluster"
-          >
-            {activeCluster ? <ClusterChip cluster={activeCluster} size="sm" /> : <Server className="h-3.5 w-3.5 shrink-0" />}
-            <span className="truncate">{activeCluster?.name ?? "All Clusters"}</span>
-            <ChevronDown className="h-3.5 w-3.5 shrink-0" />
-          </button>
-
-          {clusterOpen ? (
-            <div className="absolute right-0 top-full z-50 mt-1 w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-lg border border-border bg-popover shadow-xl">
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className="inline-flex h-8 max-w-[13rem] items-center gap-2 rounded-md border border-border bg-background px-3 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              aria-label="Select cluster"
+            >
+              {activeCluster ? <ClusterChip cluster={activeCluster} size="sm" /> : <Server className="h-3.5 w-3.5 shrink-0" />}
+              <span className="truncate">{activeCluster?.name ?? "All Clusters"}</span>
+              <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+            </button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[min(20rem,calc(100vw-2rem))]">
               <div className="border-b border-border p-2">
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
@@ -382,50 +328,52 @@ export function Topbar({ clusters, onRefresh, selectedNamespaces, onSelectedName
                 </div>
               </div>
               <div className="max-h-72 overflow-y-auto p-1" role="listbox" aria-label="Clusters">
-                <button
-                  type="button"
-                  onClick={() => selectCluster("")}
-                  className={cn(
-                    "flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors",
-                    !activeCluster ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                  )}
-                  role="option"
-                  aria-selected={!activeCluster}
-                >
-                  <Server className="h-4 w-4 shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium">All Clusters</p>
-                    <p className="truncate text-2xs text-muted-foreground">Cluster inventory</p>
-                  </div>
-                  {!activeCluster ? <Check className="h-4 w-4" /> : null}
-                </button>
-                {filteredClusters.map((cluster) => (
+                <PopoverClose asChild>
                   <button
-                    key={cluster.id}
                     type="button"
-                    onClick={() => selectCluster(cluster.id)}
+                    onClick={() => selectCluster("")}
                     className={cn(
                       "flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors",
-                      activeCluster?.id === cluster.id ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                      !activeCluster ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"
                     )}
                     role="option"
-                    aria-selected={activeCluster?.id === cluster.id}
+                    aria-selected={!activeCluster}
                   >
-                    <ClusterChip cluster={cluster} size="md" />
+                    <Server className="h-4 w-4 shrink-0" />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">{cluster.name}</p>
-                      <p className="truncate text-2xs text-muted-foreground">{cluster.context || cluster.server}</p>
+                      <p className="truncate font-medium">All Clusters</p>
+                      <p className="truncate text-2xs text-muted-foreground">Cluster inventory</p>
                     </div>
-                    <StatusBadge status={clusterStatus(cluster)} size="sm" label={cluster.status ?? (cluster.reachable ? "Reachable" : "Unreachable")} pulse={false} />
+                    {!activeCluster ? <Check className="h-4 w-4" /> : null}
                   </button>
+                </PopoverClose>
+                {filteredClusters.map((cluster) => (
+                  <PopoverClose asChild key={cluster.id}>
+                    <button
+                      type="button"
+                      onClick={() => selectCluster(cluster.id)}
+                      className={cn(
+                        "flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors",
+                        activeCluster?.id === cluster.id ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                      )}
+                      role="option"
+                      aria-selected={activeCluster?.id === cluster.id}
+                    >
+                      <Server className="h-4 w-4 shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium">{cluster.name}</p>
+                        <p className="truncate text-2xs text-muted-foreground">{cluster.context || cluster.server}</p>
+                      </div>
+                      <StatusBadge status={cluster.status ?? (cluster.reachable ? "reachable" : "unreachable")} size="sm" label={cluster.status ?? (cluster.reachable ? "Reachable" : "Unreachable")} pulse={false} />
+                    </button>
+                  </PopoverClose>
                 ))}
                 {filteredClusters.length === 0 ? (
                   <div className="px-3 py-8 text-center text-sm text-muted-foreground">No clusters match.</div>
                 ) : null}
               </div>
-            </div>
-          ) : null}
-        </div>
+          </PopoverContent>
+        </Popover>
         <Button variant="ghost" size="icon" onClick={onRefresh} aria-label="Refresh clusters">
           <RefreshCcw className="h-4 w-4" />
         </Button>

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import { PageHeader, PageShell } from "../components/ui/page";
 import type { ApplyResponse, DiscoveredResource } from "../lib/api";
 import { api } from "../lib/api";
 import { cn } from "../lib/utils";
@@ -129,11 +130,8 @@ export function GenericResourceBrowser({ selectedNamespaces }: GenericResourceBr
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">API Resources</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Discovery-backed browser for any listable Kubernetes GVR.</p>
-      </div>
+    <PageShell>
+      <PageHeader title="API Resources" description="Discovery-backed browser for any listable Kubernetes GVR." />
 
       {error ? <div className="rounded-lg border border-destructive/35 bg-destructive/10 p-4 text-sm text-destructive">{error}</div> : null}
 
@@ -238,6 +236,6 @@ export function GenericResourceBrowser({ selectedNamespaces }: GenericResourceBr
           )}
         </div>
       </section>
-    </div>
+    </PageShell>
   );
 }

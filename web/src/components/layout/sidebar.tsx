@@ -1,4 +1,4 @@
-import { ArrowLeft, BookOpen, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Orbit, Server, Star, X } from "lucide-react";
+import { ArrowLeft, BookOpen, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Orbit, Server, Star } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, NavLink, useLocation, useParams } from "react-router-dom";
 import { api } from "../../lib/api";
@@ -9,6 +9,7 @@ import { resourceConfigs } from "../../lib/resources";
 import { cn } from "../../lib/utils";
 import { navPlugins, type NavItemPlugin } from "../../plugins/registry";
 import { ClusterChip } from "../clusters/cluster-chip";
+import { Dialog, DialogContent, DialogTitle } from "../ui/dialog";
 
 type SidebarGroup = {
   label: string;
@@ -57,32 +58,20 @@ export function Sidebar({ clusters }: { clusters: Cluster[] }) {
 }
 
 export function MobileSidebarDrawer({ clusters, open, onClose }: { clusters: Cluster[]; open: boolean; onClose: () => void }) {
-  useEffect(() => {
-    if (!open) return;
-    function handleKey(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [onClose, open]);
-
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-50 lg:hidden">
-      <button className="absolute inset-0 bg-background/70 backdrop-blur-sm" onClick={onClose} aria-label="Close navigation" />
-      <aside className="relative flex h-full w-[min(18rem,calc(100vw-3rem))] flex-col border-r border-sidebar-border bg-sidebar shadow-2xl">
-        <button
-          type="button"
-          className="absolute right-2 top-2 inline-flex h-9 w-9 items-center justify-center rounded-md text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-          onClick={onClose}
-          aria-label="Close navigation"
-        >
-          <X className="h-4 w-4" />
-        </button>
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) onClose();
+      }}
+    >
+      <DialogContent
+        className="left-0 top-0 flex h-full w-[min(18rem,calc(100vw-3rem))] max-w-xs translate-x-0 translate-y-0 flex-col gap-0 rounded-none border-y-0 border-l-0 border-r border-sidebar-border bg-sidebar p-0 shadow-2xl data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left lg:hidden"
+      >
+        <DialogTitle className="sr-only">Navigation</DialogTitle>
         <SidebarContent clusters={clusters} collapsed={false} onNavigate={onClose} mobile />
-      </aside>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
