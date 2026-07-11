@@ -1,11 +1,11 @@
-import { Outlet, useParams } from "react-router-dom";
-import { useState } from "react";
+import { Outlet } from "react-router-dom";
+import { useEffect, useState } from "react";
 import type { Cluster } from "../../lib/api";
 import { ActivityProvider } from "../../lib/activities";
 import { ActivityDock } from "../activity/activity-dock";
+import { CommandPalette } from "../command-palette";
 import { MobileSidebarDrawer, Sidebar } from "./sidebar";
 import { Topbar } from "./topbar";
-import { CommandPalette } from "../palette/command-palette";
 
 type AppShellProps = {
   clusters: Cluster[];
@@ -16,7 +16,19 @@ type AppShellProps = {
 
 export function AppShell({ clusters, onRefresh, selectedNamespaces, onSelectedNamespacesChange }: AppShellProps) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const { clusterId } = useParams();
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+
+  // ⌘K / Ctrl+K toggles the palette from anywhere in the shell.
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setCommandPaletteOpen((value) => !value);
+      }
+    }
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   return (
     <ActivityProvider>
@@ -30,6 +42,7 @@ export function AppShell({ clusters, onRefresh, selectedNamespaces, onSelectedNa
             selectedNamespaces={selectedNamespaces}
             onSelectedNamespacesChange={onSelectedNamespacesChange}
             onOpenMobileNav={() => setMobileSidebarOpen(true)}
+            onOpenCommandPalette={() => setCommandPaletteOpen(true)}
           />
           <main className="min-h-0 flex-1 overflow-y-auto">
             <div className="mx-auto max-w-[1600px] animate-fade-in p-4 md:p-6">
@@ -39,7 +52,7 @@ export function AppShell({ clusters, onRefresh, selectedNamespaces, onSelectedNa
           <ActivityDock />
           <div id="bottom-panel-root" className="shrink-0" />
         </div>
-        <CommandPalette clusters={clusters} activeClusterId={clusterId} />
+        <CommandPalette open={commandPaletteOpen} onOpenChange={setCommandPaletteOpen} clusters={clusters} />
       </div>
     </ActivityProvider>
   );

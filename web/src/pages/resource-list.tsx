@@ -5,6 +5,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { MetricSummary } from "../components/metrics/metric-summary";
 import { Button } from "../components/ui/button";
 import { CodeBlock } from "../components/ui/code-block";
+import { PageHeader, PageShell } from "../components/ui/page";
 import { SortableHeader, type SortDirection } from "../components/ui/sortable-header";
 import { StatusBadge } from "../components/ui/status-badge";
 import { YamlViewDialog } from "../components/ui/yaml-view-dialog";
@@ -328,35 +329,37 @@ export function ResourceListPage({ resourceId, discoveredResource, selectedNames
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{activeResource.label}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+    <PageShell>
+      <PageHeader
+        title={activeResource.label}
+        description={
+          <>
             {activeResource.apiVersion ? <span className="mr-2 font-mono text-xs">{activeResource.apiVersion}/{activeResource.id}</span> : null}
             {activeResource.namespaced && selectedNamespaces.length > 0
               ? `Filtered to ${selectedNamespaces.join(", ")}.`
               : activeResource.namespaced
                 ? "All namespaces in the active cluster."
                 : "Cluster-scoped Kubernetes resources."}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="secondary"
-            onClick={openCreateDialog}
-            disabled={isAccessBlocked(createAccess)}
-            title={accessStatusMessage(createAccess) || undefined}
-          >
-            <Plus className="h-4 w-4" />
-            Create YAML
-          </Button>
-          <Button variant="secondary" onClick={() => void loadResources()} disabled={loading}>
-            <RefreshCcw className={cn("h-4 w-4", loading && "animate-spin")} />
-            Refresh
-          </Button>
-        </div>
-      </div>
+          </>
+        }
+        actions={
+          <>
+            <Button
+              variant="secondary"
+              onClick={openCreateDialog}
+              disabled={isAccessBlocked(createAccess)}
+              title={accessStatusMessage(createAccess) || undefined}
+            >
+              <Plus className="h-4 w-4" />
+              Create YAML
+            </Button>
+            <Button variant="secondary" onClick={() => void loadResources()} disabled={loading}>
+              <RefreshCcw className={cn("h-4 w-4", loading && "animate-spin")} />
+              Refresh
+            </Button>
+          </>
+        }
+      />
 
       <div className="text-xs uppercase text-muted-foreground">Watch: {watchStatus}</div>
 
@@ -482,7 +485,7 @@ export function ResourceListPage({ resourceId, discoveredResource, selectedNames
         onApply={() => void applyCreateYaml()}
         onClose={() => setCreateOpen(false)}
       />
-    </div>
+    </PageShell>
   );
 }
 

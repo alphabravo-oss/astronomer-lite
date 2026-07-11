@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import { PageHeader, PageShell } from "../components/ui/page";
 import { logActivityId, useActivities } from "../lib/activities-context";
 import type { PodDetail } from "../lib/api";
 import { api } from "../lib/api";
@@ -132,31 +133,33 @@ export function PodLogsPage() {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-        <div className="min-w-0">
-          <Link to={`/clusters/${clusterId}/pods`} className="mb-3 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+    <PageShell className="space-y-5">
+      <PageHeader
+        eyebrow={
+          <Link to={`/clusters/${clusterId}/pods`} className="inline-flex items-center gap-2 normal-case tracking-normal text-sm text-muted-foreground hover:text-foreground">
             <ArrowLeft className="h-4 w-4" />
             Pods
           </Link>
-          <h1 className="truncate text-2xl font-semibold tracking-tight">{decodedName}</h1>
-          <p className="mt-1 font-mono text-sm text-muted-foreground">{decodedNamespace}</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="secondary" onClick={reconnect}>
-            <RefreshCcw className={cn("h-4 w-4", status === "connecting" && "animate-spin")} />
-            Reconnect
-          </Button>
-          <Button variant="secondary" onClick={downloadLogs} disabled={lines.length === 0}>
-            <Download className="h-4 w-4" />
-            Download
-          </Button>
-          <Button variant="secondary" onClick={toggleDock} aria-pressed={pinned}>
-            {pinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
-            {pinned ? "Unpin" : "Pin to dock"}
-          </Button>
-        </div>
-      </div>
+        }
+        title={decodedName}
+        description={<span className="font-mono">{decodedNamespace}</span>}
+        actions={
+          <>
+            <Button variant="secondary" onClick={reconnect}>
+              <RefreshCcw className={cn("h-4 w-4", status === "connecting" && "animate-spin")} />
+              Reconnect
+            </Button>
+            <Button variant="secondary" onClick={downloadLogs} disabled={lines.length === 0}>
+              <Download className="h-4 w-4" />
+              Download
+            </Button>
+            <Button variant="secondary" onClick={toggleDock} aria-pressed={pinned}>
+              {pinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
+              {pinned ? "Unpin" : "Pin to dock"}
+            </Button>
+          </>
+        }
+      />
 
       {error ? <div className="rounded-lg border border-destructive/35 bg-destructive/10 p-4 text-sm text-destructive">{error}</div> : null}
 
@@ -199,6 +202,6 @@ export function PodLogsPage() {
       >
         {logText || (status === "connecting" ? "Connecting to log stream..." : "No log lines.")}
       </pre>
-    </div>
+    </PageShell>
   );
 }

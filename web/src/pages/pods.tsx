@@ -6,6 +6,7 @@ import { MetricSummary } from "../components/metrics/metric-summary";
 import { ActionMenu } from "../components/ui/action-menu";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
+import { PageHeader, PageShell } from "../components/ui/page";
 import { SortableHeader, type SortDirection } from "../components/ui/sortable-header";
 import { StatusBadge } from "../components/ui/status-badge";
 import { YamlViewDialog } from "../components/ui/yaml-view-dialog";
@@ -135,21 +136,21 @@ export function PodsPage({ selectedNamespaces }: PodsPageProps) {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Pods</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {selectedNamespaces.length === 0
-              ? "All namespaces in the active cluster."
-              : `Filtered to ${selectedNamespaces.join(", ")}.`}
-          </p>
-        </div>
-        <Button variant="secondary" onClick={() => void loadPods()} disabled={loading}>
-          <RefreshCcw className={cn("h-4 w-4", loading && "animate-spin")} />
-          Refresh
-        </Button>
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Pods"
+        description={
+          selectedNamespaces.length === 0
+            ? "All namespaces in the active cluster."
+            : `Filtered to ${selectedNamespaces.join(", ")}.`
+        }
+        actions={
+          <Button variant="secondary" onClick={() => void loadPods()} disabled={loading}>
+            <RefreshCcw className={cn("h-4 w-4", loading && "animate-spin")} />
+            Refresh
+          </Button>
+        }
+      />
 
       {error ? <div className="rounded-lg border border-destructive/35 bg-destructive/10 p-4 text-sm text-destructive">{error}</div> : null}
       <div className="text-xs uppercase text-muted-foreground">Watch: {watchStatus}</div>
@@ -241,7 +242,7 @@ export function PodsPage({ selectedNamespaces }: PodsPageProps) {
           }}
         />
       ) : null}
-    </div>
+    </PageShell>
   );
 }
 

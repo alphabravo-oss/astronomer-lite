@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
-import { lazy, Suspense, useEffect } from "react";
-import { Eye, Loader2, Pencil, X } from "lucide-react";
+import { lazy, Suspense } from "react";
+import { Eye, Loader2, Pencil } from "lucide-react";
+import { Dialog, DialogContent, DialogTitle } from "./dialog";
 import { cn } from "../../lib/utils";
 import type { OpenAPIDocument } from "../../lib/openapi";
 
@@ -43,28 +44,19 @@ export function YamlViewDialog({
   apiVersion,
   openApiDoc
 }: YamlViewDialogProps) {
-  useEffect(() => {
-    if (!open) return;
-
-    function handleKey(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
-  }, [onClose, open]);
-
-  if (!open) return null;
-
   const editable = allowEdit && !readOnly;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <button type="button" className="absolute inset-0 bg-background/70 backdrop-blur-sm" aria-label="Close YAML dialog" onClick={onClose} />
-      <section className="relative flex h-[80vh] w-[90vw] max-w-5xl animate-fade-in flex-col overflow-hidden rounded-lg border border-border bg-card shadow-2xl">
-        <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) onClose();
+      }}
+    >
+      <DialogContent className="flex h-[80vh] w-[90vw] max-w-5xl flex-col gap-0 p-0">
+        <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 pr-12">
           <div className="flex min-w-0 items-center gap-3">
-            <h2 className="truncate text-sm font-semibold">{title}</h2>
+            <DialogTitle className="truncate text-sm font-semibold">{title}</DialogTitle>
             {allowEdit ? (
               <div className="flex items-center rounded bg-muted p-0.5">
                 <button
@@ -93,17 +85,7 @@ export function YamlViewDialog({
               </div>
             ) : null}
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            {actions}
-            <button
-              type="button"
-              onClick={onClose}
-              className="inline-flex h-8 w-8 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label="Close YAML dialog"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
+          <div className="flex shrink-0 items-center gap-2">{actions}</div>
         </div>
         {message ? <div className="border-b border-border px-4 py-3">{message}</div> : null}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -127,7 +109,7 @@ export function YamlViewDialog({
           </Suspense>
           {childrenAfterEditor ? <div className="max-h-[28vh] overflow-auto border-t border-border">{childrenAfterEditor}</div> : null}
         </div>
-      </section>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -6,6 +6,7 @@ import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { DataTable, type Column } from "../components/ui/data-table";
 import { MetricCard } from "../components/ui/metric-card";
+import { PageHeader, PageShell } from "../components/ui/page";
 import type { ClusterMetrics, MetricsRow, PromDetection, PromRangeResponse } from "../lib/api";
 import { api } from "../lib/api";
 import { cn, formatBytes, formatCPU, gaugeColor } from "../lib/utils";
@@ -157,10 +158,10 @@ export function MetricsPage() {
   const topNodes = useMemo(() => [...(metrics?.nodes ?? [])].sort((a, b) => b.cpu - a.cpu), [metrics?.nodes]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-        <div>
-          <div className="mb-2 flex flex-wrap items-center gap-2">
+    <PageShell>
+      <PageHeader
+        eyebrow={
+          <div className="flex flex-wrap items-center gap-2 normal-case tracking-normal">
             <Badge tone={metrics?.available ? "success" : "warning"}>{metrics?.available ? "metrics-server" : "optional"}</Badge>
             {prom ? (
               <Badge tone={prom.available ? "success" : "muted"}>
@@ -170,14 +171,16 @@ export function MetricsPage() {
               </Badge>
             ) : null}
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">Metrics</h1>
-          <p className="mt-1 text-sm text-muted-foreground">CPU and memory from the Kubernetes metrics API.</p>
-        </div>
-        <Button variant="secondary" onClick={() => void loadMetrics()} disabled={loading}>
-          <RefreshCcw className={cn("h-4 w-4", loading && "animate-spin")} />
-          Refresh
-        </Button>
-      </div>
+        }
+        title="Metrics"
+        description="CPU and memory from the Kubernetes metrics API."
+        actions={
+          <Button variant="secondary" onClick={() => void loadMetrics()} disabled={loading}>
+            <RefreshCcw className={cn("h-4 w-4", loading && "animate-spin")} />
+            Refresh
+          </Button>
+        }
+      />
 
       {error ? <div className="rounded-lg border border-destructive/35 bg-destructive/10 p-4 text-sm text-destructive">{error}</div> : null}
 
@@ -264,7 +267,7 @@ export function MetricsPage() {
           </Suspense>
         </section>
       ) : null}
-    </div>
+    </PageShell>
   );
 }
 

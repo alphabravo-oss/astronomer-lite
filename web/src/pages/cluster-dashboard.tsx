@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Badge } from "../components/ui/badge";
 import { MetricCard } from "../components/ui/metric-card";
+import { PageHeader, PageShell } from "../components/ui/page";
 import { StatusBadge } from "../components/ui/status-badge";
 import type { Cluster, Dashboard, WorkloadsOverview } from "../lib/api";
 import { api } from "../lib/api";
@@ -55,23 +56,25 @@ export function ClusterDashboard({ clusters }: { clusters: Cluster[] }) {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
-        <div>
-          <div className="mb-2 flex items-center gap-2">
+    <PageShell>
+      <PageHeader
+        eyebrow={
+          <div className="flex items-center gap-2 normal-case tracking-normal">
             <StatusBadge status={clusterStatus(cluster)} />
             <Badge tone="muted">{cluster.source === "managed" ? "app-managed" : "managed externally"}</Badge>
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight">{cluster.name}</h1>
-          <p className="mt-1 max-w-3xl truncate text-sm text-muted-foreground">{cluster.server}</p>
-        </div>
-        <Link
-          to={`/clusters/${cluster.id}/pods`}
-          className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-transparent bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
-        >
-          View pods
-        </Link>
-      </div>
+        }
+        title={cluster.name}
+        description={<span className="block max-w-3xl truncate">{cluster.server}</span>}
+        actions={
+          <Link
+            to={`/clusters/${cluster.id}/pods`}
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-transparent bg-primary px-4 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+          >
+            View pods
+          </Link>
+        }
+      />
 
       {cluster.error || error ? (
         <div className="flex gap-3 rounded-lg border border-destructive/35 bg-destructive/10 p-4 text-sm text-destructive">
@@ -150,6 +153,6 @@ export function ClusterDashboard({ clusters }: { clusters: Cluster[] }) {
           ) : null}
         </section>
       ) : null}
-    </div>
+    </PageShell>
   );
 }

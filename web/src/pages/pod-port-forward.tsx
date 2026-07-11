@@ -4,6 +4,7 @@ import { Link, useLocation, useParams } from "react-router-dom";
 import { ActionMenu } from "../components/ui/action-menu";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
+import { PageHeader, PageShell } from "../components/ui/page";
 import type { PodDetail, PortForward } from "../lib/api";
 import { api } from "../lib/api";
 import { cn } from "../lib/utils";
@@ -113,21 +114,23 @@ export function PodPortForwardPage() {
   }
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-        <div className="min-w-0">
-          <Link to={`/clusters/${clusterId}/${targetKind === "service" ? "services" : "pods"}`} className="mb-3 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+    <PageShell className="space-y-5">
+      <PageHeader
+        eyebrow={
+          <Link to={`/clusters/${clusterId}/${targetKind === "service" ? "services" : "pods"}`} className="inline-flex items-center gap-2 normal-case tracking-normal text-sm text-muted-foreground hover:text-foreground">
             <ArrowLeft className="h-4 w-4" />
             {targetKind === "service" ? "Services" : "Pods"}
           </Link>
-          <h1 className="truncate text-2xl font-semibold tracking-tight">{decodedName}</h1>
-          <p className="mt-1 font-mono text-sm text-muted-foreground">{decodedNamespace}</p>
-        </div>
-        <Button variant="secondary" onClick={() => void loadSessions()} disabled={loading}>
-          <RefreshCcw className={cn("h-4 w-4", loading && "animate-spin")} />
-          Refresh
-        </Button>
-      </div>
+        }
+        title={decodedName}
+        description={<span className="font-mono">{decodedNamespace}</span>}
+        actions={
+          <Button variant="secondary" onClick={() => void loadSessions()} disabled={loading}>
+            <RefreshCcw className={cn("h-4 w-4", loading && "animate-spin")} />
+            Refresh
+          </Button>
+        }
+      />
 
       {error ? <div className="rounded-lg border border-destructive/35 bg-destructive/10 p-4 text-sm text-destructive">{error}</div> : null}
 
@@ -243,7 +246,7 @@ export function PodPortForwardPage() {
           </tbody>
         </table>
       </section>
-    </div>
+    </PageShell>
   );
 }
 
