@@ -24,7 +24,10 @@ audits reported no known advisories in the web, desktop or compatibility lockfil
 All 70 cluster/browser tests passed on single-node k3d 1.30, including both
 route-layout matrices and the long-name mobile regression; real Kubernetes
 RBAC and cross-user isolation checks passed afterward. Release-specific hosted
-platform and second Kubernetes-version evidence is recorded with the candidate. Unsigned distribution remains intentional;
+platform and second Kubernetes-version evidence is recorded with the candidate.
+The hosted 1.36 run then exposed a drawer/list-response race. A deterministic
+regression reproduced it on the prior build; the fix resets selection only when
+the browsing scope changes. This regression is included in the candidate suite. Unsigned distribution remains intentional;
 Windows 11 and graphical RHEL workstation validation remain pending.
 
 ## Initial release automation (2026-10-12; historical RC.1 preparation)

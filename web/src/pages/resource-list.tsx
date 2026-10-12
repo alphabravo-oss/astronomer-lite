@@ -203,9 +203,21 @@ export function ResourceListPage({
 
   useEffect(() => {
     void loadResources();
+  }, [loadResources, refreshSignal]);
+
+  // A list response can resolve the served API version after a watch has already
+  // populated rows. Reset selection only when the actual browsing scope changes,
+  // not when that response recreates the loader with the same resource identity.
+  useEffect(() => {
     setSelected(null);
     setPage(1);
-  }, [loadResources, refreshSignal]);
+  }, [
+    clusterId,
+    activeResource?.id,
+    activeResource?.apiVersion,
+    selectedNamespaces,
+    refreshSignal,
+  ]);
 
   useEffect(() => {
     if (!clusterId || !activeResource) {

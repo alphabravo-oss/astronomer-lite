@@ -392,3 +392,49 @@ test("long cluster names and unreachable errors fit narrow cards", async ({
   ).toBeVisible();
   await assertLayout(page);
 });
+
+test("late list metadata preserves a drawer opened from a watch row", async ({
+  page,
+  request,
+}) => {
+  const id = await clusterId(request);
+  const listPath = `/api/clusters/${id}/resources/configmaps`;
+  const listing = await request
+    .get(listPath)
+    .then((response) => response.json());
+  const row = listing.items.find(
+    (item: { namespace: string }) => item.namespace === "default",
+  );
+  expect(row).toBeTruthy();
+  const object = await request
+    .get(`${listPath}/${row.namespace}/${row.name}`)
+    .then((response) => response.json());
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let lists = 0;
+  await page.route(`**${listPath}`, async (route) => {
+    await held;
+    lists++;
+    await route.fulfill({ json: listing });
+  });
+  await page.routeWebSocket("**/ws/watch?**", (socket) => {
+    socket.send(JSON.stringify({ type: "ADDED", object }));
+  });
+  try {
+    await page.goto(`/clusters/${id}/configmaps`);
+    await page.getByRole("button", { name: row.name, exact: true }).click();
+    const drawer = page.getByRole("dialog", { name: row.name, exact: true });
+    await expect(drawer).toBeVisible();
+    release();
+    // Resolving metadata recreates the list loader; wait for that second fetch.
+    await expect.poll(() => lists).toBeGreaterThanOrEqual(2);
+    await expect(drawer).toBeVisible();
+    await expect(
+      drawer.getByRole("tab", { name: "Summary", exact: true }),
+    ).toBeVisible();
+  } finally {
+    release();
+  }
+});
