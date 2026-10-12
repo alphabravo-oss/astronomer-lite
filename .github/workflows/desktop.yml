@@ -77,6 +77,7 @@ jobs:
             targets: dmg zip
             arch: arm64
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -171,6 +172,7 @@ jobs:
       - run: npm test
         working-directory: desktop
       - name: Windows installer round trip
+        timeout-minutes: 5
         if: runner.os == 'Windows'
         shell: pwsh
         env:
@@ -192,6 +194,7 @@ jobs:
         shell: bash
         run: ./scripts/verify-mac-signing.sh "$RUNNER_TEMP/lite-installed/Astronomer-Lite.app"
       - name: Packaged application browser test
+        timeout-minutes: 5
         if: runner.os != 'Windows'
         run: npm run e2e:desktop -- --reporter=line,json
         working-directory: web
