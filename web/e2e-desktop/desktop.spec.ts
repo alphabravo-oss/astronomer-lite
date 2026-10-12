@@ -75,7 +75,10 @@ for (const width of [900, 1440]) {
           exact: true,
         });
         await expect(
-          navigation.getByText("Astronomer Lite", { exact: true }),
+          navigation.getByRole("link", {
+            name: "Astronomer Lite home",
+            exact: true,
+          }),
         ).toBeVisible();
         await page.keyboard.press("Escape");
         await expect(navigation).toBeHidden();

@@ -21,8 +21,10 @@ Go tests/vet and race checks, golangci-lint (zero issues), 48 frontend unit test
 6 desktop unit tests, 4 release-tool tests, TypeScript/production build, lint,
 7 account browser tests and the Dex login/refresh browser flow passed. Dependency
 audits reported no known advisories in the web, desktop or compatibility lockfiles.
-Cluster/layout test results and release-specific hosted platform evidence are
-recorded with the candidate release. Unsigned distribution remains intentional;
+All 70 cluster/browser tests passed on single-node k3d 1.30, including both
+route-layout matrices and the long-name mobile regression; real Kubernetes
+RBAC and cross-user isolation checks passed afterward. Release-specific hosted
+platform and second Kubernetes-version evidence is recorded with the candidate. Unsigned distribution remains intentional;
 Windows 11 and graphical RHEL workstation validation remain pending.
 
 ## Initial release automation (2026-10-12; historical RC.1 preparation)
