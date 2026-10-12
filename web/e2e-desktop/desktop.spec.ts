@@ -1,11 +1,11 @@
 import { test, expect, _electron as electron } from "@playwright/test";
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 
 for (const width of [900, 1440]) {
   test(`packaged desktop loads the branded workspace and closes its private server (${width}px)`, async ({ request }, testInfo) => {
-    const profile = await mkdtemp(join(tmpdir(), "lite-desktop-ui-"));
+    const profile = await realpath(await mkdtemp(join(tmpdir(), "lite-desktop-ui-")));
     const paths = {
       linux: "linux-unpacked/astronomer-lite",
       win32: "win-unpacked/Astronomer-Lite.exe",
@@ -19,8 +19,9 @@ for (const width of [900, 1440]) {
     const env = { ...process.env, ASTRONOMER_LITE_PLUGINS_ENABLED: "false", XDG_CONFIG_HOME: profile, APPDATA: profile, KUBECONFIG: join(profile, "empty-kubeconfig") };
     const app = await electron.launch({ executablePath, args, env, timeout: 30_000 });
     let origin = "";
+    let failed = false;
     try {
-      expect(await app.evaluate(({ app }) => app.getPath("userData"))).toBe(profile);
+      expect(await realpath(await app.evaluate(({ app }) => app.getPath("userData")))).toBe(profile);
       const page = await app.firstWindow();
       await page.setViewportSize({ width, height: 800 });
       await expect(page.getByRole("heading", { name: "Clusters", exact: true })).toBeVisible();
@@ -46,7 +47,25 @@ for (const width of [900, 1440]) {
       // The second invocation must focus the first app instead of starting another server.
       await expect(electron.launch({ executablePath, args, env, timeout: 10_000 })).rejects.toThrow();
       await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
-    } finally { await app.close(); await rm(profile, { recursive: true, force: true }); }
+    } catch (error) {
+      failed = true;
+      console.error(error);
+      throw error;
+    } finally {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        await Promise.race([
+          app.close(),
+          new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("Desktop did not exit within 20 seconds")), 20_000); })
+        ]);
+      } catch (error) {
+        app.process().kill("SIGKILL");
+        if (!failed) throw error;
+      } finally {
+        clearTimeout(timer);
+        await rm(profile, { recursive: true, force: true });
+      }
+    }
     await expect.poll(async () => {
       try { await fetch(`${origin}/api/healthz`, { signal: AbortSignal.timeout(1000) }); return false; } catch { return true; }
     }).toBe(true);
