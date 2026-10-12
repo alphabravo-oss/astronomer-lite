@@ -1,0 +1,8 @@
+{
+  "id": "namespace-summary",
+  "name": "Namespace summary",
+  "version": "1.0.0",
+  "description": "An example external plugin that lists namespaces using your cluster permissions.",
+  "entry": "index.html",
+  "permissions": [{ "group": "", "resource": "namespaces", "verbs": ["list"] }]
+}

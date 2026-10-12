@@ -118,7 +118,7 @@ export function BottomPanel({ open, onClose, title, subtitle, tabs, activeTab, o
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
               aria-label="Close bottom panel"
             >
               <X className="h-4 w-4" />

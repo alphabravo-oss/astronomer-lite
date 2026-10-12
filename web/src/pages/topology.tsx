@@ -1,14 +1,19 @@
 import { RefreshCcw } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import ReactFlow, { Background, Controls, MarkerType, ReactFlowProvider, useReactFlow, type Edge, type Node } from "reactflow";
 import "reactflow/dist/style.css";
 import { api } from "../lib/api";
 import type { Namespace, TopologyEdge, TopologyGraph, TopologyNode } from "../lib/api";
 import { Button } from "../components/ui/button";
 import { cn } from "../lib/utils";
+import { resourceLink } from "../lib/resource-link";
 
 const KIND_ORDER = [
+  "Ingress",
+  "CronJob",
+  "Job",
+  "HorizontalPodAutoscaler",
   "Service",
   "Deployment",
   "StatefulSet",
@@ -17,20 +22,23 @@ const KIND_ORDER = [
   "Pod",
   "ConfigMap",
   "Secret",
-  "PersistentVolumeClaim"
+  "PersistentVolumeClaim",
+  "ServiceAccount"
 ] as const;
 
 const KIND_COLORS: Record<string, string> = {
-  Service: "bg-indigo-500/10 border-indigo-500/40 text-indigo-200",
-  Deployment: "bg-blue-500/10 border-blue-500/40 text-blue-200",
-  StatefulSet: "bg-violet-500/10 border-violet-500/40 text-violet-200",
-  DaemonSet: "bg-cyan-500/10 border-cyan-500/40 text-cyan-200",
-  ReplicaSet: "bg-sky-500/10 border-sky-500/40 text-sky-200",
-  Pod: "bg-emerald-500/10 border-emerald-500/40 text-emerald-200",
-  ConfigMap: "bg-amber-500/10 border-amber-500/40 text-amber-200",
-  Secret: "bg-rose-500/10 border-rose-500/40 text-rose-200",
-  PersistentVolumeClaim: "bg-fuchsia-500/10 border-fuchsia-500/40 text-fuchsia-200"
+  Service: "bg-indigo-500/10 border-indigo-500/40 text-indigo-800 dark:text-indigo-200",
+  Deployment: "bg-blue-500/10 border-blue-500/40 text-blue-800 dark:text-blue-200",
+  StatefulSet: "bg-violet-500/10 border-violet-500/40 text-violet-800 dark:text-violet-200",
+  DaemonSet: "bg-cyan-500/10 border-cyan-500/40 text-cyan-800 dark:text-cyan-200",
+  ReplicaSet: "bg-sky-500/10 border-sky-500/40 text-sky-800 dark:text-sky-200",
+  Pod: "bg-emerald-500/10 border-emerald-500/40 text-emerald-800 dark:text-emerald-200",
+  ConfigMap: "bg-amber-500/10 border-amber-500/40 text-amber-800 dark:text-amber-200",
+  Secret: "bg-rose-500/10 border-rose-500/40 text-rose-800 dark:text-rose-200",
+  PersistentVolumeClaim: "bg-fuchsia-500/10 border-fuchsia-500/40 text-fuchsia-800 dark:text-fuchsia-200"
 };
+
+const KIND_RESOURCES: Record<string, string> = { Job: "jobs", CronJob: "cronjobs", Ingress: "ingresses", HorizontalPodAutoscaler: "horizontalpodautoscalers", ServiceAccount: "serviceaccounts", Service: "services", Deployment: "deployments", StatefulSet: "statefulsets", DaemonSet: "daemonsets", ReplicaSet: "replicasets", Pod: "pods", ConfigMap: "configmaps", Secret: "secrets", PersistentVolumeClaim: "persistentvolumeclaims" };
 
 function statusDot(status?: string) {
   if (status === "healthy") return "bg-status-success";
@@ -39,7 +47,7 @@ function statusDot(status?: string) {
   return "bg-muted-foreground/40";
 }
 
-function layout(graph: TopologyGraph): { nodes: Node[]; edges: Edge[] } {
+function layout(graph: TopologyGraph, clusterId: string): { nodes: Node[]; edges: Edge[] } {
   const swimlanes: Record<string, TopologyNode[]> = {};
   for (const node of graph.nodes) {
     if (!swimlanes[node.kind]) swimlanes[node.kind] = [];
@@ -65,7 +73,7 @@ function layout(graph: TopologyGraph): { nodes: Node[]; edges: Edge[] } {
                 <span className={cn("h-2 w-2 rounded-full", statusDot(node.status))} aria-hidden />
                 <span className="truncate text-[10px] uppercase tracking-wide text-muted-foreground">{kind}</span>
               </div>
-              <p className="mt-1 truncate font-mono text-xs">{node.name}</p>
+              {KIND_RESOURCES[kind] ? <Link className="nodrag nowheel mt-1 block truncate font-mono text-xs hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring" to={resourceLink(clusterId, { ...node, resource: KIND_RESOURCES[kind] })}>{node.name}</Link> : <p className="mt-1 truncate font-mono text-xs">{node.name}</p>}
             </div>
           )
         },
@@ -79,13 +87,17 @@ function layout(graph: TopologyGraph): { nodes: Node[]; edges: Edge[] } {
   const edgeStyle: Record<TopologyEdge["kind"], { style: React.CSSProperties; label: string }> = {
     owns: { style: { stroke: "#60a5fa", strokeWidth: 1.5 }, label: "" },
     selects: { style: { stroke: "#a78bfa", strokeWidth: 1.5, strokeDasharray: "5 4" }, label: "" },
-    mounts: { style: { stroke: "#fbbf24", strokeWidth: 1.5, strokeDasharray: "2 4" }, label: "" }
+    mounts: { style: { stroke: "hsl(var(--status-warning))", strokeWidth: 1.5, strokeDasharray: "2 4" }, label: "" },
+    uses: { style: { stroke: "hsl(var(--status-neutral))", strokeWidth: 1.5, strokeDasharray: "2 4" }, label: "uses" },
+    routes: { style: { stroke: "hsl(var(--status-info))", strokeWidth: 1.5 }, label: "routes" },
+    scales: { style: { stroke: "hsl(var(--status-success))", strokeWidth: 1.5 }, label: "scales" }
   };
   const edges: Edge[] = graph.edges.map((edge, index) => ({
     id: `${edge.kind}-${index}-${edge.from}-${edge.to}`,
     source: edge.from,
     target: edge.to,
     type: "default",
+    label: edgeStyle[edge.kind].label,
     animated: edge.kind === "selects",
     style: edgeStyle[edge.kind].style,
     markerEnd: { type: MarkerType.ArrowClosed, color: edgeStyle[edge.kind].style.stroke as string | undefined }
@@ -188,7 +200,7 @@ export function TopologyPage() {
     };
   }, [clusterId, namespace, tick]);
 
-  const flow = useMemo(() => (graph ? layout(graph) : { nodes: [], edges: [] }), [graph]);
+  const flow = useMemo(() => (graph ? layout(graph, clusterId) : { nodes: [], edges: [] }), [graph, clusterId]);
 
   return (
     <div className="flex h-[calc(100vh-7rem)] flex-col gap-3">
@@ -206,7 +218,7 @@ export function TopologyPage() {
             value={namespace}
             onChange={(event) => setNamespace(event.target.value)}
             disabled={namespaces.length === 0}
-            className="h-8 w-56 rounded-md border border-input bg-background px-2 font-mono text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50"
+            className="h-8 w-56 rounded-md border border-input bg-background px-2 font-mono text-sm shadow-xs focus:outline-hidden focus:ring-1 focus:ring-ring disabled:opacity-50"
           >
             {namespaces.length === 0 && !namespacesError ? <option value={namespace}>Loading…</option> : null}
             {namespaces.length === 0 && namespacesError ? <option value={namespace}>{namespace}</option> : null}
@@ -223,6 +235,7 @@ export function TopologyPage() {
         </div>
       </div>
       {error ? <div className="rounded-md border border-destructive/35 bg-destructive/10 p-3 text-sm text-destructive">{error}</div> : null}
+      {!!graph?.warnings?.length && <details className="rounded-md border border-status-warning/30 bg-status-warning/10 p-3 text-sm"><summary>Partial topology — some resources could not be read</summary>{graph.warnings.map((warning, i) => <p key={i}>{warning}</p>)}</details>}
       {namespacesError && !error ? (
         <div className="rounded-md border border-amber-500/35 bg-amber-500/10 p-3 text-xs text-amber-200">Namespace list unavailable: {namespacesError}</div>
       ) : null}

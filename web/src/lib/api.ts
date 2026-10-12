@@ -78,13 +78,14 @@ export type TopologyNode = {
 export type TopologyEdge = {
   from: string;
   to: string;
-  kind: "owns" | "selects" | "mounts";
+  kind: "owns" | "selects" | "mounts" | "uses" | "routes" | "scales";
 };
 
 export type TopologyGraph = {
   namespace: string;
   nodes: TopologyNode[];
   edges: TopologyEdge[];
+  warnings?: string[];
 };
 
 export type PromTarget = {
@@ -186,6 +187,7 @@ export type ClusterMetrics = {
 };
 
 export type PortForward = {
+	 browserUrl?: string;
   id: string;
   clusterId: string;
   namespace: string;
@@ -271,6 +273,7 @@ export type K8sOwnerReference = {
 };
 
 export type K8sResourceList = {
+  apiVersion?: string;
   resource: string;
   label: string;
   namespaced: boolean;
@@ -388,10 +391,13 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
-  const response = await fetch(input, init);
+export async function request<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers);
+  headers.set("X-Astronomer-Lite", "1");
+  const response = await fetch(input, { ...init, headers });
   if (!response.ok) {
     const body = await response.json().catch(() => ({ error: response.statusText }));
+    if (response.status === 401 && body.error === "sign in required") window.dispatchEvent(new Event("session-expired"));
     throw new ApiError(response.status, body.error ?? response.statusText);
   }
   if (response.status === 204) {

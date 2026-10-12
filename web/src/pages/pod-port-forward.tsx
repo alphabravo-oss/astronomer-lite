@@ -200,8 +200,8 @@ export function PodPortForwardPage() {
             {sessions.map((session) => (
               <tr key={session.id} className="border-t border-border">
                 <td className="px-4 py-3 font-mono text-xs">
-                  <a href={session.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-foreground hover:underline">
-                    {session.url}
+                  <a href={session.browserUrl || session.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-foreground hover:underline">
+                    {session.browserUrl ? "Open forwarded app" : session.url}
                     <ExternalLink className="h-3.5 w-3.5" />
                   </a>
                 </td>
@@ -217,12 +217,12 @@ export function PodPortForwardPage() {
                       {
                         label: "Open URL",
                         icon: <ExternalLink className="h-3.5 w-3.5" />,
-                        onClick: () => window.open(session.url, "_blank", "noopener,noreferrer")
+                        onClick: () => window.open(session.browserUrl || session.url, "_blank", "noopener,noreferrer")
                       },
                       {
                         label: "Copy URL",
                         icon: <Copy className="h-3.5 w-3.5" />,
-                        onClick: () => void copyForwardUrl(session.url)
+                        onClick: () => void copyForwardUrl(session.browserUrl ? new URL(session.browserUrl, window.location.origin).href : session.url)
                       },
                       {
                         label: "Stop",

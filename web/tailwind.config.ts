@@ -42,12 +42,12 @@ const config: Config = {
           foreground: "hsl(var(--popover-foreground))"
         },
         status: {
-          success: "#10b981",
-          warning: "#f59e0b",
-          error: "#ef4444",
-          info: "#3b82f6",
-          pending: "#6366f1",
-          neutral: "#6b7280"
+          success: "hsl(var(--status-success) / <alpha-value>)",
+          warning: "hsl(var(--status-warning) / <alpha-value>)",
+          error: "hsl(var(--status-error) / <alpha-value>)",
+          info: "hsl(var(--status-info) / <alpha-value>)",
+          pending: "hsl(var(--status-pending) / <alpha-value>)",
+          neutral: "hsl(var(--status-neutral) / <alpha-value>)"
         },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar))",

@@ -1,0 +1,15 @@
+Astronomer-Lite
+Copyright 2026 AlphaBravo and Astronomer-Lite contributors
+https://github.com/alphabravo-oss/astronomer-lite
+
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+This project includes UI code and assets from AlphaBravo's Astronomer project.
+AlphaBravo confirmed control of the necessary copyrights and authorized their
+inclusion under Apache-2.0 in Astronomer-Lite on October 11, 2026.
+This authorization applies to AlphaBravo-controlled material; third-party
+components retain their respective copyrights and licenses.
+
+Dependency license texts are distributed in THIRD-PARTY-NOTICES.txt.
+Electron distributions also include Electron and Chromium license notices.
+The optional upstream Headlamp example retains its own LICENSE and NOTICE.

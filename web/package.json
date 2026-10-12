@@ -1,25 +1,30 @@
 {
   "name": "astronomer-lite-web",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.2.0-rc.1",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc --noEmit && vite build",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings 0 && npm run lint:tools",
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "playwright test",
+    "e2e:server": "playwright test --config playwright.server.config.ts",
     "e2e:headed": "playwright test --headed",
-    "preview": "vite preview --host 0.0.0.0"
+    "preview": "vite preview --host 0.0.0.0",
+    "e2e:oidc": "playwright test --config playwright.oidc.config.ts",
+    "e2e:desktop": "node ../scripts/run-desktop-e2e.mjs",
+    "lint:tools": "node lint-tools.mjs"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "5.3.0",
+    "@fontsource-variable/jetbrains-mono": "5.3.0",
     "@monaco-editor/react": "^4.7.0",
     "@radix-ui/react-alert-dialog": "^1.1.19",
     "@radix-ui/react-dialog": "^1.1.19",
     "@radix-ui/react-dropdown-menu": "^2.1.20",
     "@radix-ui/react-popover": "^1.1.19",
-    "@vitejs/plugin-react": "^5.1.1",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",
     "clsx": "^2.1.1",
@@ -39,20 +44,22 @@
     "@eslint/js": "^9.39.1",
     "@playwright/test": "^1.59.1",
     "@tailwindcss/forms": "^0.5.10",
+    "@tailwindcss/vite": "^4.3.3",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
-    "autoprefixer": "^10.4.22",
+    "@vitejs/plugin-react": "^5.2.0",
     "eslint": "^9.39.1",
+    "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
     "globals": "^16.5.0",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^3.4.18",
+    "tailwindcss": "^4.3.3",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.49.0",
     "vite": "^7.2.4",
-    "vitest": "^3.2.6"
-  }
+    "vitest": "^5.0.3"
+  },
+  "license": "Apache-2.0"
 }

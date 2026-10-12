@@ -85,7 +85,7 @@ export function ConfirmDialog({
                   type="text"
                   value={inputValue}
                   onChange={(event) => setInputValue(event.target.value)}
-                  className="h-8 w-full rounded border border-border bg-background px-3 font-mono text-sm outline-none focus:ring-1 focus:ring-ring"
+                  className="h-8 w-full rounded border border-border bg-background px-3 font-mono text-sm outline-hidden focus:ring-1 focus:ring-ring"
                   placeholder={confirmValue}
                 />
               </div>

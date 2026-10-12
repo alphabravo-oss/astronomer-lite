@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alphabravo/astronomer-lite/server/internal/auth"
 	authorizationv1 "k8s.io/api/authorization/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -45,20 +46,26 @@ type portForwardRow struct {
 	LocalPort    int    `json:"localPort"`
 	RemotePort   int    `json:"remotePort"`
 	URL          string `json:"url"`
+	BrowserURL   string `json:"browserUrl,omitempty"`
 	CreatedAt    string `json:"createdAt"`
 	ExpiresAt    string `json:"expiresAt,omitempty"`
 	Error        string `json:"error,omitempty"`
 }
 
 type portForwardSession struct {
-	row      portForwardRow
-	stop     chan struct{}
-	done     chan struct{}
-	stopOnce sync.Once
+	row          portForwardRow
+	stop         chan struct{}
+	done         chan struct{}
+	stopOnce     sync.Once
+	forwardKey   string
+	remoteCancel context.CancelFunc
 }
 
 func (session *portForwardSession) stopForward() {
 	session.stopOnce.Do(func() {
+		if session.remoteCancel != nil {
+			session.remoteCancel()
+		}
 		close(session.stop)
 	})
 }
@@ -132,6 +139,32 @@ func (s *Server) handlePortForwardDelete(w http.ResponseWriter, _ *http.Request,
 	}
 	session.stopForward()
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handlePortForwardBrowser(w http.ResponseWriter, r *http.Request, id, sessionID string) {
+	if s.forwardGateway == nil {
+		writeError(w, 404, fmt.Errorf("browser forwarding is not configured"))
+		return
+	}
+	s.portForwardMu.Lock()
+	session, ok := s.portForwards[sessionID]
+	key := ""
+	if ok && session.row.ClusterID == id {
+		key = session.forwardKey
+	}
+	s.portForwardMu.Unlock()
+	if key == "" {
+		writeError(w, 404, os.ErrNotExist)
+		return
+	}
+	link, err := s.forwardGateway.Ticket(key)
+	if err != nil {
+		writeError(w, 409, err)
+		return
+	}
+	w.Header().Set("Referrer-Policy", "no-referrer")
+	w.Header().Set("Cache-Control", "no-store")
+	http.Redirect(w, r, link, http.StatusSeeOther)
 }
 
 func (s *Server) startPortForward(ctx context.Context, id string, request portForwardRequest) (portForwardRow, error) {
@@ -229,8 +262,12 @@ func (s *Server) startPortForward(ctx context.Context, id string, request portFo
 		CreatedAt:    now.Format(time.RFC3339Nano),
 		ExpiresAt:    expiresAt,
 	}
-	session := &portForwardSession{row: row, stop: stopChan, done: doneChan}
+	remoteContext, remoteCancel := context.WithCancel(auth.SessionContext(ctx))
+	session := &portForwardSession{row: row, stop: stopChan, done: doneChan, remoteCancel: remoteCancel}
+	stopOnLogout := context.AfterFunc(auth.SessionContext(ctx), session.stopForward)
 	go func() {
+		defer remoteCancel()
+		defer stopOnLogout()
 		defer close(doneChan)
 		if err := forwarder.ForwardPorts(); err != nil {
 			errChan <- err
@@ -246,6 +283,13 @@ func (s *Server) startPortForward(ctx context.Context, id string, request portFo
 	}()
 	select {
 	case <-readyChan:
+		if s.forwardGateway != nil {
+			key, remove := s.forwardGateway.Register(remoteContext, localPort)
+			session.forwardKey = key
+			context.AfterFunc(remoteContext, remove)
+			row.BrowserURL = fmt.Sprintf("/api/clusters/%s/portforwards/%s/browser", id, sessionID)
+			session.row = row
+		}
 		s.portForwardMu.Lock()
 		s.portForwards[sessionID] = session
 		s.portForwardMu.Unlock()

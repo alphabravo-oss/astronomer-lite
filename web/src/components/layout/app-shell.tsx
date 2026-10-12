@@ -33,6 +33,7 @@ export function AppShell({ clusters, onRefresh, selectedNamespaces, onSelectedNa
   return (
     <ActivityProvider>
       <div className="flex h-screen overflow-hidden bg-background">
+        <a href="#main-content" className="sr-only z-50 rounded-md bg-primary p-3 text-primary-foreground focus:not-sr-only focus:fixed focus:left-3 focus:top-3">Skip to content</a>
         <Sidebar clusters={clusters} />
         <MobileSidebarDrawer clusters={clusters} open={mobileSidebarOpen} onClose={() => setMobileSidebarOpen(false)} />
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -44,7 +45,7 @@ export function AppShell({ clusters, onRefresh, selectedNamespaces, onSelectedNa
             onOpenMobileNav={() => setMobileSidebarOpen(true)}
             onOpenCommandPalette={() => setCommandPaletteOpen(true)}
           />
-          <main className="min-h-0 flex-1 overflow-y-auto">
+          <main id="main-content" tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto focus:outline-hidden">
             <div className="mx-auto max-w-[1600px] animate-fade-in p-4 md:p-6">
               <Outlet />
             </div>

@@ -163,6 +163,10 @@ func (s *Server) handleCluster(w http.ResponseWriter, r *http.Request) {
 		s.handlePortForwards(w, r, id)
 		return
 	}
+	if len(parts) == 4 && parts[1] == "portforwards" && parts[3] == "browser" && r.Method == http.MethodGet {
+		s.handlePortForwardBrowser(w, r, id, parts[2])
+		return
+	}
 	if len(parts) == 3 && parts[1] == "portforwards" && r.Method == http.MethodDelete {
 		sessionID, err := url.PathUnescape(parts[2])
 		if err != nil {

@@ -1,0 +1,24 @@
+<h1>Namespace summary</h1>
+<p>Namespaces visible to your Kubernetes identity.</p>
+<button id="refresh">Refresh namespaces</button>
+<p id="status" role="status"></p>
+<ul id="namespaces"></ul>
+<script>
+  async function refresh() {
+    const status = document.getElementById('status');
+    status.textContent = 'Loading…';
+    try {
+      const result = await astronomer.request({ verb: 'list', group: '', version: 'v1', resource: 'namespaces' });
+      const list = document.getElementById('namespaces');
+      list.replaceChildren();
+      for (const item of result.items) {
+        const row = document.createElement('li');
+        row.textContent = item.metadata.name + ' · ' + item.status.phase;
+        list.append(row);
+      }
+      status.textContent = result.items.length + ' namespaces';
+    } catch (error) { status.textContent = error.message; }
+  }
+  document.getElementById('refresh').addEventListener('click', refresh);
+  refresh();
+</script>

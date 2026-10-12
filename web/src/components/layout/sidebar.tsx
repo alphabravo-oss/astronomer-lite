@@ -1,19 +1,22 @@
-import { ArrowLeft, BookOpen, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Orbit, Server, Star } from "lucide-react";
+import { useAuth } from "../../lib/auth-context";
+import { ArrowLeft, BookOpen, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, Orbit, Puzzle, Server, Star } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, NavLink, useLocation, useParams } from "react-router-dom";
-import { api } from "../../lib/api";
+import { api, request } from "../../lib/api";
 import type { Cluster } from "../../lib/api";
 import { clusterStatus } from "../../lib/cluster";
 import { useFavorites } from "../../lib/favorites";
 import { resourceConfigs } from "../../lib/resources";
+import { resourceLink } from "../../lib/resource-link";
 import { cn } from "../../lib/utils";
-import { navPlugins, type NavItemPlugin } from "../../plugins/registry";
+import { extensions, type Extension } from "../../lib/extensions";
+import { navigationItems, type NavigationItem } from "../../navigation/registry";
 import { ClusterChip } from "../clusters/cluster-chip";
 import { Dialog, DialogContent, DialogTitle } from "../ui/dialog";
 
 type SidebarGroup = {
   label: string;
-  items: NavItemPlugin[];
+  items: NavigationItem[];
 };
 
 const groupOrder = ["Cluster", "Workloads", "Service Discovery", "Storage", "Policy", "Helm", "More Resources"];
@@ -30,14 +33,15 @@ function sidebarGroups(clusterId?: string, availableResourceIds?: Set<string>): 
             route: "",
             group: "Platform",
             icon: Server
-          }
+          },
+          { id: "projects", label: "Projects", route: "projects", group: "Platform", icon: BookOpen }
         ]
       }
     ];
   }
 
   const resourceIds = new Set(resourceConfigs.map((resource) => resource.id));
-  const items = navPlugins().filter((item) => !resourceIds.has(item.id) || !availableResourceIds || availableResourceIds.has(item.id));
+  const items = navigationItems().filter((item) => !resourceIds.has(item.id) || !availableResourceIds || availableResourceIds.has(item.id));
   const groups = Array.from(new Set([...groupOrder, ...items.map((item) => item.group)]));
   return groups
     .map((label) => ({
@@ -48,7 +52,8 @@ function sidebarGroups(clusterId?: string, availableResourceIds?: Set<string>): 
 }
 
 export function Sidebar({ clusters }: { clusters: Cluster[] }) {
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem("astronomer-lite-sidebar-collapsed") === "true");
+  useEffect(() => { localStorage.setItem("astronomer-lite-sidebar-collapsed", String(collapsed)); }, [collapsed]);
 
   return (
     <aside className={cn("hidden h-screen shrink-0 flex-col border-r border-sidebar-border bg-sidebar transition-all duration-200 ease-in-out lg:flex", collapsed ? "w-16" : "w-60")}>
@@ -91,6 +96,20 @@ function SidebarContent({
   const { clusterId } = useParams();
   const { pathname } = useLocation();
   const [availableResourceIds, setAvailableResourceIds] = useState<Set<string> | undefined>();
+  const { plugins: pluginsEnabled } = useAuth();
+  const [installed, setInstalled] = useState<Extension[]>([]);
+  const [version, setVersion] = useState("");
+  useEffect(() => {
+    let cancelled = false;
+    request<{version: string}>("/api/version").then((build) => { if (!cancelled) setVersion(build.version); }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+  useEffect(() => {
+    let cancelled = false;
+    if (!pluginsEnabled) { setInstalled([]); return; }
+    extensions.list().then((rows) => { if (!cancelled) setInstalled(rows.filter((row) => row.enabled)); }).catch(() => { if (!cancelled) setInstalled([]); });
+    return () => { cancelled = true; };
+  }, [pathname, pluginsEnabled]);
   const groups = useMemo(() => sidebarGroups(clusterId, availableResourceIds), [availableResourceIds, clusterId]);
   const activeCluster = clusters.find((cluster) => cluster.id === clusterId);
   const [openGroup, setOpenGroup] = useState(clusterId ? "Cluster" : "Platform");
@@ -204,6 +223,10 @@ function SidebarContent({
             onNavigate={onNavigate}
           />
         ))}
+        {clusterId && installed.length > 0 && <div className="mb-2 mt-2">
+          {!collapsed && <p className="px-3 py-1 text-xs font-semibold text-muted-foreground">Plugins</p>}
+          {installed.map((plugin) => <NavLink key={plugin.id} to={`/clusters/${clusterId}/extensions/${plugin.id}`} title={plugin.name} onClick={onNavigate} className={({ isActive }) => cn("nav-item h-9", collapsed && "justify-center px-0", isActive && "active")}><Puzzle className="h-4 w-4 shrink-0" />{!collapsed && <span className="truncate">{plugin.name}</span>}</NavLink>)}
+        </div>}
         {clusterId && favorites.length > 0 && !collapsed ? (
           <div className="mb-1 mt-2">
             <div className="flex h-8 w-full items-center px-3 text-xs font-semibold text-sidebar-foreground/75">
@@ -211,10 +234,7 @@ function SidebarContent({
             </div>
             <div className="mt-1 space-y-1">
               {favorites.map((fav) => {
-                const route = fav.route ?? "resources";
-                const target = fav.namespace
-                  ? `/clusters/${clusterId}/${route}?q=${encodeURIComponent(fav.name)}`
-                  : `/clusters/${clusterId}/${route}`;
+                const target = resourceLink(clusterId, fav);
                 return (
                   <NavLink
                     key={`${fav.kind}/${fav.namespace ?? ""}/${fav.name}`}
@@ -248,7 +268,7 @@ function SidebarContent({
                 <BookOpen className="h-4 w-4" />
                 <span className="text-sm">Documentation</span>
               </a>
-              <p className="px-3 pb-2 text-xs text-sidebar-foreground/60">Astronomer-Lite v0.0.0</p>
+              <p className="px-3 pb-2 text-[10px] text-muted-foreground">Astronomer-Lite{version ? ` · ${version}` : ""}</p>
             </>
           ) : null}
           <button
@@ -256,6 +276,7 @@ function SidebarContent({
             onClick={onToggleCollapsed}
             className="nav-item w-full justify-center"
             title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {collapsed ? (
               <ChevronRight className="h-4 w-4" />
@@ -375,19 +396,10 @@ function ClusterListGroup({ clusters, collapsed, onNavigate }: { clusters: Clust
   );
 }
 
-function SidebarItem({ item, clusterId, collapsed, onNavigate }: { item: NavItemPlugin; clusterId?: string; collapsed: boolean; onNavigate?: () => void }) {
+function SidebarItem({ item, clusterId, collapsed, onNavigate }: { item: NavigationItem; clusterId?: string; collapsed: boolean; onNavigate?: () => void }) {
   const Icon = item.icon;
-  const to = clusterId ? `/clusters/${clusterId}${item.route ? `/${item.route}` : ""}` : "/";
+  const to = clusterId ? `/clusters/${clusterId}${item.route ? `/${item.route}` : ""}` : `/${item.route}`;
   const classes = cn("nav-item h-9", collapsed && "justify-center px-0");
-
-  if (item.disabled) {
-    return (
-      <div className={cn(classes, "text-sidebar-foreground/45")} title={item.label}>
-        <Icon className="h-4 w-4" />
-        {!collapsed ? <span>{item.label}</span> : null}
-      </div>
-    );
-  }
 
   return (
     <NavLink

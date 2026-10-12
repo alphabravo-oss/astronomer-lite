@@ -1,0 +1,17 @@
+{
+  "id": "headlamp-pod-counter",
+  "name": "Headlamp pod counter",
+  "version": "0.0.1",
+  "description": "Upstream Headlamp example running through Lite's sandboxed React compatibility profile.",
+  "entry": "index.html",
+  "runtime": "headlamp-v1",
+  "permissions": [
+    {
+      "group": "",
+      "resource": "pods",
+      "verbs": [
+        "list"
+      ]
+    }
+  ]
+}

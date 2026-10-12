@@ -64,7 +64,7 @@ export function YamlViewDialog({
                   onClick={() => onEditModeChange(false)}
                   className={cn(
                     "inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors",
-                    !editMode ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                    !editMode ? "bg-background text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
                   )}
                 >
                   <Eye className="h-3 w-3" />
@@ -76,7 +76,7 @@ export function YamlViewDialog({
                   disabled={!editable}
                   className={cn(
                     "inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50",
-                    editMode ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                    editMode ? "bg-background text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
                   )}
                 >
                   <Pencil className="h-3 w-3" />

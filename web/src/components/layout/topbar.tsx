@@ -1,10 +1,11 @@
-import { Check, ChevronDown, Copy, ExternalLink, Menu, Moon, Plug, RefreshCcw, Search, Server, Square, Sun } from "lucide-react";
+import { Check, ChevronDown, Copy, ExternalLink, Menu, Moon, Plug, RefreshCcw, Rows3, Search, Server, Settings, Square, Sun } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import type { Cluster, Namespace, PortForward } from "../../lib/api";
 import { api } from "../../lib/api";
 import { clusterStatus } from "../../lib/cluster";
 import { useTheme } from "../../lib/theme";
+import { useDensity } from "../../lib/density";
 import { cn } from "../../lib/utils";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -26,6 +27,7 @@ export function Topbar({ clusters, onRefresh, selectedNamespaces, onSelectedName
   const { clusterId } = useParams();
   const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
+  const { compact, toggleDensity } = useDensity();
   const [namespaces, setNamespaces] = useState<Namespace[]>([]);
   const [namespaceError, setNamespaceError] = useState("");
   const [portForwards, setPortForwards] = useState<PortForward[]>([]);
@@ -116,7 +118,7 @@ export function Topbar({ clusters, onRefresh, selectedNamespaces, onSelectedName
 
   async function copyPortForwardUrl(session: PortForward) {
     try {
-      await navigator.clipboard.writeText(session.url);
+      await navigator.clipboard.writeText(session.browserUrl ? new URL(session.browserUrl, window.location.origin).href : session.url);
       setCopiedPortForwardId(session.id);
       window.setTimeout(() => setCopiedPortForwardId((current) => (current === session.id ? "" : current)), 1_500);
       setPortForwardError("");
@@ -131,27 +133,28 @@ export function Topbar({ clusters, onRefresh, selectedNamespaces, onSelectedName
   }
 
   return (
-    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-background/80 px-4 backdrop-blur-lg md:px-6">
-      <div className="flex min-w-0 items-center gap-2">
+    <header className="sticky top-0 z-30 flex min-h-14 shrink-0 flex-wrap items-center justify-between gap-y-2 border-b border-border bg-background/80 px-4 py-2 backdrop-blur-lg md:h-14 md:flex-nowrap md:py-0 md:px-6">
+      <div className="flex min-w-0 flex-1 basis-full items-center gap-2 md:basis-auto">
         <Button variant="ghost" size="icon" onClick={onOpenMobileNav} className="lg:hidden" aria-label="Open navigation">
           <Menu className="h-4 w-4" />
         </Button>
         <Breadcrumbs clusters={clusters} />
       </div>
-      <div className="hidden flex-1 justify-center px-6 md:flex">
+      <div className="hidden w-48 shrink-0 justify-center px-3 xl:flex">
         <button
           type="button"
           onClick={onOpenCommandPalette}
-          className="flex h-8 w-full max-w-md items-center gap-2 rounded-md border border-border bg-muted/40 px-3 text-sm text-muted-foreground transition-colors hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex h-8 w-full max-w-md items-center gap-2 rounded-md border border-border bg-muted/40 px-3 text-sm text-muted-foreground transition-colors hover:bg-background hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
           aria-label="Open command palette"
           aria-keyshortcuts="Control+K Meta+K"
         >
           <Search className="h-3.5 w-3.5 shrink-0" />
-          <span className="flex-1 text-left">Search pages, clusters, actions...</span>
+          <span className="min-w-0 flex-1 truncate text-left">Search…</span>
           <kbd className="shrink-0 rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[10px]">Ctrl K</kbd>
         </button>
       </div>
-      <div className="flex min-w-0 items-center gap-2">
+      <div className="flex max-w-full shrink-0 flex-wrap items-center gap-1 sm:flex-nowrap sm:gap-2">
+        <Button variant="ghost" size="icon" onClick={onOpenCommandPalette} className="xl:hidden" aria-label="Open command palette" aria-keyshortcuts="Control+K Meta+K"><Search className="h-4 w-4" /></Button>
         {clusterId ? (
           <Popover>
             <PopoverTrigger asChild>
@@ -160,7 +163,7 @@ export function Topbar({ clusters, onRefresh, selectedNamespaces, onSelectedName
                 className="inline-flex h-8 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                 title={namespaceError || "Namespace filter"}
               >
-                <span>{selectedNamespaces.length === 0 ? "All namespaces" : `${selectedNamespaces.length} namespaces`}</span>
+                <span className="max-w-28 truncate">{selectedNamespaces.length === 0 ? "All namespaces" : `${selectedNamespaces.length} namespaces`}</span>
               </button>
             </PopoverTrigger>
             <PopoverContent className="w-72">
@@ -207,7 +210,7 @@ export function Topbar({ clusters, onRefresh, selectedNamespaces, onSelectedName
             <PopoverTrigger asChild>
               <button
                 type="button"
-                className="relative inline-flex h-9 w-9 items-center justify-center gap-2 rounded-md border border-transparent bg-transparent text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="relative inline-flex h-9 w-9 items-center justify-center gap-2 rounded-md border border-transparent bg-transparent text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                 aria-label="Active port-forwards"
                 title={portForwardError || "Active port-forwards"}
               >
@@ -276,12 +279,12 @@ export function Topbar({ clusters, onRefresh, selectedNamespaces, onSelectedName
                       </div>
                       <div className="mt-2 flex items-center justify-between gap-3 text-xs">
                         <a
-                          href={session.url}
+                          href={session.browserUrl || session.url}
                           target="_blank"
                           rel="noreferrer"
                           className="inline-flex min-w-0 items-center gap-1.5 font-mono text-foreground hover:underline"
                         >
-                          <span className="truncate">{session.url}</span>
+                          <span className="truncate">{session.browserUrl ? "Open forwarded app" : session.url}</span>
                           <ExternalLink className="h-3 w-3 shrink-0" />
                         </a>
                         <span className="shrink-0 text-muted-foreground">{session.remotePort}/TCP</span>
@@ -303,7 +306,7 @@ export function Topbar({ clusters, onRefresh, selectedNamespaces, onSelectedName
           <PopoverTrigger asChild>
             <button
               type="button"
-              className="inline-flex h-8 max-w-[13rem] items-center gap-2 rounded-md border border-border bg-background px-3 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              className="inline-flex h-8 max-w-[9rem] items-center gap-2 rounded-md border border-border bg-background px-3 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground xl:max-w-[11rem]"
               aria-label="Select cluster"
             >
               {activeCluster ? <ClusterChip cluster={activeCluster} size="sm" /> : <Server className="h-3.5 w-3.5 shrink-0" />}
@@ -322,7 +325,7 @@ export function Topbar({ clusters, onRefresh, selectedNamespaces, onSelectedName
                     value={clusterQuery}
                     onChange={(event) => setClusterQuery(event.target.value)}
                     placeholder="Search clusters..."
-                    className="h-8 w-full rounded-md border border-border bg-background pl-8 pr-3 text-sm outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring"
+                    className="h-8 w-full rounded-md border border-border bg-background pl-8 pr-3 text-sm outline-hidden placeholder:text-muted-foreground focus:ring-1 focus:ring-ring"
                     autoFocus
                   />
                 </div>
@@ -376,6 +379,10 @@ export function Topbar({ clusters, onRefresh, selectedNamespaces, onSelectedName
         </Popover>
         <Button variant="ghost" size="icon" onClick={onRefresh} aria-label="Refresh clusters">
           <RefreshCcw className="h-4 w-4" />
+        </Button>
+        <Link to="/settings" aria-label="Settings" title="Account and plugins" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"><Settings className="h-4 w-4" /></Link>
+        <Button variant="ghost" size="icon" onClick={toggleDensity} aria-label="Compact density" aria-pressed={compact} title={compact ? "Use comfortable density" : "Use compact density"} className="hidden sm:inline-flex">
+          <Rows3 className="h-4 w-4" />
         </Button>
         <Button
           variant="ghost"

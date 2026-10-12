@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strings"
 	"sync"
@@ -33,6 +34,7 @@ type topologyGraph struct {
 	Namespace string         `json:"namespace"`
 	Nodes     []topologyNode `json:"nodes"`
 	Edges     []topologyEdge `json:"edges"`
+	Warnings  []string       `json:"warnings,omitempty"`
 }
 
 func nodeID(kind, namespace, name string) string {
@@ -53,6 +55,7 @@ func (s *Server) handleTopology(w http.ResponseWriter, r *http.Request, id strin
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
+	warnings := []string{}
 	nodes := map[string]topologyNode{}
 	edges := []topologyEdge{}
 
@@ -114,43 +117,77 @@ func (s *Server) handleTopology(w http.ResponseWriter, r *http.Request, id strin
 			}
 		}
 	} else {
+		var warningMu sync.Mutex
+		report := func(kind string, err error, continuation string) {
+			warningMu.Lock()
+			defer warningMu.Unlock()
+			if err != nil {
+				warnings = append(warnings, fmt.Sprintf("%s: %v", kind, err))
+			} else if continuation != "" {
+				warnings = append(warnings, kind+": inventory limited; use the resource browser for more results")
+			}
+		}
 		var wg sync.WaitGroup
 		wg.Add(6)
 		go func() {
 			defer wg.Done()
-			if list, err := client.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{Limit: 500}); err == nil {
-				deps = list.Items
+			list, err := client.AppsV1().Deployments(namespace).List(ctx, metav1.ListOptions{Limit: 500})
+			if err != nil {
+				report("deployments", err, "")
+				return
 			}
+			deps = list.Items
+			report("deployments", nil, list.Continue)
 		}()
 		go func() {
 			defer wg.Done()
-			if list, err := client.AppsV1().ReplicaSets(namespace).List(ctx, metav1.ListOptions{Limit: 500}); err == nil {
-				rss = list.Items
+			list, err := client.AppsV1().ReplicaSets(namespace).List(ctx, metav1.ListOptions{Limit: 500})
+			if err != nil {
+				report("replicasets", err, "")
+				return
 			}
+			rss = list.Items
+			report("replicasets", nil, list.Continue)
 		}()
 		go func() {
 			defer wg.Done()
-			if list, err := client.AppsV1().StatefulSets(namespace).List(ctx, metav1.ListOptions{Limit: 500}); err == nil {
-				statefulSet = list.Items
+			list, err := client.AppsV1().StatefulSets(namespace).List(ctx, metav1.ListOptions{Limit: 500})
+			if err != nil {
+				report("statefulsets", err, "")
+				return
 			}
+			statefulSet = list.Items
+			report("statefulsets", nil, list.Continue)
 		}()
 		go func() {
 			defer wg.Done()
-			if list, err := client.AppsV1().DaemonSets(namespace).List(ctx, metav1.ListOptions{Limit: 500}); err == nil {
-				daemonSet = list.Items
+			list, err := client.AppsV1().DaemonSets(namespace).List(ctx, metav1.ListOptions{Limit: 500})
+			if err != nil {
+				report("daemonsets", err, "")
+				return
 			}
+			daemonSet = list.Items
+			report("daemonsets", nil, list.Continue)
 		}()
 		go func() {
 			defer wg.Done()
-			if list, err := client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{Limit: 1000}); err == nil {
-				pods = list.Items
+			list, err := client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{Limit: 1000})
+			if err != nil {
+				report("pods", err, "")
+				return
 			}
+			pods = list.Items
+			report("pods", nil, list.Continue)
 		}()
 		go func() {
 			defer wg.Done()
-			if list, err := client.CoreV1().Services(namespace).List(ctx, metav1.ListOptions{Limit: 500}); err == nil {
-				services = list.Items
+			list, err := client.CoreV1().Services(namespace).List(ctx, metav1.ListOptions{Limit: 500})
+			if err != nil {
+				report("services", err, "")
+				return
 			}
+			services = list.Items
+			report("services", nil, list.Continue)
 		}()
 		wg.Wait()
 	}
@@ -223,7 +260,8 @@ func (s *Server) handleTopology(w http.ResponseWriter, r *http.Request, id strin
 		}
 	}
 
-	out := topologyGraph{Namespace: namespace, Nodes: make([]topologyNode, 0, len(nodes)), Edges: edges}
+	warnings = append(warnings, addTopologyExtras(ctx, client, namespace, pods, nodes, &edges)...)
+	out := topologyGraph{Warnings: warnings, Namespace: namespace, Nodes: make([]topologyNode, 0, len(nodes)), Edges: edges}
 	for _, n := range nodes {
 		out.Nodes = append(out.Nodes, n)
 	}

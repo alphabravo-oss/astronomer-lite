@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { ArrowDownUp } from "lucide-react";
 import { cn } from "../../lib/utils";
 
@@ -10,11 +11,12 @@ type SortableHeaderProps<K extends string> = {
   direction: SortDirection;
   onSort: (key: K) => void;
   className?: string;
+  style?: CSSProperties;
 };
 
-export function SortableHeader<K extends string>({ label, sortKey, active, direction, onSort, className }: SortableHeaderProps<K>) {
+export function SortableHeader<K extends string>({ label, sortKey, active, direction, onSort, className, style }: SortableHeaderProps<K>) {
   return (
-    <th className={cn("k8s-th", className)}>
+    <th className={cn("k8s-th", className)} style={style} aria-sort={active === sortKey ? (direction === "asc" ? "ascending" : "descending") : "none"}>
       <button type="button" className="inline-flex items-center gap-1 hover:text-foreground" onClick={() => onSort(sortKey)}>
         {label}
         <ArrowDownUp className={cn("h-3 w-3", active === sortKey && direction === "desc" && "rotate-180")} />

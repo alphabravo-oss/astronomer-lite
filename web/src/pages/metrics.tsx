@@ -226,7 +226,7 @@ export function MetricsPage() {
               <select
                 value={promRange}
                 onChange={(event) => setPromRange(event.target.value as PromRangeKey)}
-                className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground outline-none focus:ring-2 focus:ring-ring"
+                className="h-9 rounded-md border border-input bg-background px-3 text-sm text-foreground outline-hidden focus:ring-2 focus:ring-ring"
                 aria-label="Prometheus range window"
               >
                 {PROM_RANGES.map((option) => (

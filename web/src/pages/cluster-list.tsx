@@ -1,5 +1,6 @@
 import { Activity, AlertTriangle, Plus, Server, Upload, WifiOff, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import type { Cluster, KubeconfigContextPreview } from "../lib/api";
 import { api } from "../lib/api";
 import { clusterStatus } from "../lib/cluster";
@@ -97,12 +98,15 @@ export function ClusterList({ clusters, onRefresh }: ClusterListProps) {
     <PageShell>
       <PageHeader
         title="Clusters"
-        description="Kubeconfig contexts available to this single-container console."
+        description="Clusters connected to your workspace."
         actions={
+          <>
+          <Link className="rounded-md border border-border px-4 py-2 text-sm hover:bg-accent" to="/clusters/connect">Connect with token</Link>
           <Button onClick={() => setAddOpen(true)}>
             <Plus className="h-4 w-4" />
             Add kubeconfig
           </Button>
+          </>
         }
       />
 
@@ -130,7 +134,7 @@ export function ClusterList({ clusters, onRefresh }: ClusterListProps) {
         <section className="flex min-h-56 flex-col items-center justify-center rounded-lg border border-dashed border-border bg-card/40 px-6 py-10 text-center">
           <Server className="mb-3 h-8 w-8 text-muted-foreground" />
           <h2 className="text-sm font-medium text-foreground">No kubeconfig contexts found.</h2>
-          <p className="mt-1 max-w-md text-sm text-muted-foreground">Add a kubeconfig to connect this single-container console to a remote cluster.</p>
+          <p className="mt-1 max-w-md text-sm text-muted-foreground">Add a kubeconfig or token to connect your first cluster.</p>
           <Button className="mt-4" onClick={() => setAddOpen(true)}>
             <Plus className="h-4 w-4" />
             Add kubeconfig
@@ -238,7 +242,7 @@ function AddKubeconfigDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <button className="absolute inset-0 bg-background/70 backdrop-blur-sm" onClick={onClose} aria-label="Close dialog" />
+      <button className="absolute inset-0 bg-background/70 backdrop-blur-xs" onClick={onClose} aria-label="Close dialog" />
       <section className="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg border border-border bg-card shadow-xl">
         <div className="flex items-start justify-between gap-4 border-b border-border px-6 py-4">
           <div>

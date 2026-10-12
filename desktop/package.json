@@ -1,0 +1,133 @@
+{
+  "name": "astronomer-lite-desktop",
+  "productName": "Astronomer-Lite",
+  "version": "0.2.0-rc.1",
+  "private": true,
+  "description": "Kubernetes workspace by AlphaBravo",
+  "author": "AlphaBravo",
+  "license": "Apache-2.0",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "build:server": "node build-server.cjs",
+    "package": "electron-builder --config release-config.cjs --publish never",
+    "test": "node --test test/*.test.cjs",
+    "package:linux": "electron-builder --config release-config.cjs --linux --x64 --publish never",
+    "package:rhel": "electron-builder --config release-config.cjs --linux rpm --x64 --publish never",
+    "package:windows": "electron-builder --config release-config.cjs --win nsis --x64 --publish never",
+    "package:mac": "electron-builder --config release-config.cjs --mac --x64 --arm64 --publish never"
+  },
+  "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
+    "electron": "44.7.0",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "io.alphabravo.astronomer-lite",
+    "asar": true,
+    "files": [
+      "main.cjs",
+      "launcher.cjs",
+      "icon.png",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "bin/${os}-${arch}",
+        "to": "server",
+        "filter": [
+          "astronomer-lite",
+          "astronomer-lite.exe"
+        ]
+      },
+      {
+        "from": "../release/generated",
+        "to": "licenses"
+      }
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb",
+        "rpm"
+      ],
+      "category": "Development",
+      "icon": "icon.png",
+      "executableName": "astronomer-lite",
+      "maintainer": "AlphaBravo",
+      "syncDesktopName": true
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "category": "public.app-category.developer-tools",
+      "icon": "icon.png",
+      "hardenedRuntime": true
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false
+    },
+    "beforePack": "./before-pack.cjs",
+    "afterPack": "./after-pack.cjs",
+    "artifactBuildCompleted": "./checksum.cjs",
+    "artifactName": "Astronomer-Lite-${version}-${os}-${arch}.${ext}",
+    "rpm": {
+      "depends": [
+        "gtk3",
+        "nss",
+        "nspr",
+        "atk",
+        "at-spi2-atk",
+        "cups-libs",
+        "libdrm",
+        "libXcomposite",
+        "libXdamage",
+        "libXrandr",
+        "mesa-libgbm",
+        "libxkbcommon",
+        "alsa-lib",
+        "glibc >= 2.28"
+      ],
+      "packageCategory": "Applications/System",
+      "compression": "gzip",
+      "fpm": [
+        "--rpm-rpmbuild-define",
+        "_rpmformat 4",
+        "--rpm-tag",
+        "Recommends: xdg-utils",
+        "--rpm-tag",
+        "Recommends: libnotify"
+      ]
+    }
+  },
+  "homepage": "https://github.com/alphabravo-oss/astronomer-lite",
+  "overrides": {
+    "global-agent": "4.1.3"
+  },
+  "desktopName": "io.alphabravo.astronomer-lite.desktop"
+}

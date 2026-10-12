@@ -8,6 +8,14 @@ type BreadcrumbsProps = {
 };
 
 const routeLabels: Record<string, string> = {
+  settings: "Settings",
+  projects: "Projects",
+  new: "Create",
+  edit: "Edit",
+  install: "Install",
+  upgrade: "Upgrade",
+  topology: "Topology",
+  extensions: "Plugins",
   clusters: "Clusters",
   resources: "API Resources",
   metrics: "Metrics",
@@ -115,7 +123,7 @@ function buildBreadcrumbs(pathname: string, clusters: Cluster[]) {
     } else {
       const known = routeLabels[segment];
       label = known ?? decodeURIComponent(segment);
-      navigable = known !== undefined;
+      navigable = known !== undefined && segment !== "extensions";
     }
     crumbs.push({ label, href, navigable });
   }

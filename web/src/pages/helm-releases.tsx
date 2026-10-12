@@ -1,6 +1,6 @@
 import { Anchor, History, Package, RefreshCcw, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import type { HelmReleaseDetail, HelmReleaseSummary } from "../lib/api";
 import { api, ApiError } from "../lib/api";
 import {
@@ -179,6 +179,7 @@ export function HelmReleasesPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Helm Releases</h1>
           <p className="mt-1 text-sm text-muted-foreground">Releases tracked by Helm v3 in this cluster.</p>
+          <Link className="mt-2 inline-block text-sm underline" to={`/clusters/${clusterId}/helm/install`}>Install chart</Link>
         </div>
         <Button variant="secondary" onClick={() => void refresh()} disabled={loading}>
           <RefreshCcw className="h-4 w-4" />
@@ -246,6 +247,7 @@ export function HelmReleasesPage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
+              <Link className="text-sm underline" to={`/clusters/${clusterId}/helm/releases/${encodeURIComponent(selected.namespace)}/${encodeURIComponent(selected.name)}/upgrade`}>Upgrade</Link>
               <Button
                 variant="ghost"
                 size="sm"

@@ -1,0 +1,10 @@
+Headlamp pod-counter example
+Copyright 2025 The Kubernetes Authors
+Apache License 2.0; see LICENSE.
+
+Source: https://github.com/kubernetes-sigs/headlamp/tree/22ea6b22de8b1ece8e28b75e5e54d54b773db688/plugins/examples/pod-counter
+Built without source modifications using the upstream package-lock.json and
+@kinvolk/headlamp-plugin 0.13.1, then wrapped with scripts/package-plugin.mjs.
+
+The example's app-bar action and settings render within its Lite plugin page.
+This does not grant access to Lite's global app bar or other plugins.

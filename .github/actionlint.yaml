@@ -1,0 +1,6 @@
+self-hosted-runner:
+  labels:
+    - lite-windows-11
+    - lite-rhel-8
+    - lite-rhel-9
+    - lite-rhel-10

@@ -94,8 +94,23 @@ type resourceOwnerRef struct {
 	Controller bool   `json:"controller,omitempty"`
 }
 
-func (s *Server) handleResourceList(w http.ResponseWriter, r *http.Request, id string, resource string) {
+// Gateway API versions differ across cluster installations. Resolve each cluster's
+// preferred served version without mutating the shared resource definitions.
+func (s *Server) resourceDefinitionFor(id, resource string) (resourceDefinition, bool) {
 	def, ok := resourceDefinitions[resource]
+	if !ok || (def.GVR.Group != "gateway.networking.k8s.io" && def.GVR.Group != "gateway.networking.x-k8s.io") {
+		return def, ok
+	}
+	if mapper, err := s.restMapperFor(id); err == nil {
+		if gvr, err := mapper.ResourceFor(schema.GroupVersionResource{Group: def.GVR.Group, Resource: def.GVR.Resource}); err == nil {
+			def.GVR = gvr
+		}
+	}
+	return def, ok
+}
+
+func (s *Server) handleResourceList(w http.ResponseWriter, r *http.Request, id string, resource string) {
+	def, ok := s.resourceDefinitionFor(id, resource)
 	if !ok {
 		writeError(w, http.StatusNotFound, fmt.Errorf("unknown resource %q", resource))
 		return
@@ -156,6 +171,7 @@ func (s *Server) handleResourceList(w http.ResponseWriter, r *http.Request, id s
 		"resource":   resource,
 		"label":      def.Label,
 		"namespaced": def.Namespaced,
+		"apiVersion": def.GVR.GroupVersion().String(),
 		"items":      rows,
 	})
 }
@@ -260,6 +276,7 @@ func (s *Server) handleDynamicResourceList(w http.ResponseWriter, r *http.Reques
 		"resource":   resource,
 		"label":      def.Label,
 		"namespaced": def.Namespaced,
+		"apiVersion": def.GVR.GroupVersion().String(),
 		"items":      rows,
 	})
 }
@@ -279,7 +296,7 @@ func resourceOwnerRefs(refs []metav1.OwnerReference) []resourceOwnerRef {
 }
 
 func (s *Server) handleResourceDetail(w http.ResponseWriter, r *http.Request, id string, resource string, namespace string, name string) {
-	def, ok := resourceDefinitions[resource]
+	def, ok := s.resourceDefinitionFor(id, resource)
 	if !ok {
 		writeError(w, http.StatusNotFound, fmt.Errorf("unknown resource %q", resource))
 		return
@@ -288,7 +305,7 @@ func (s *Server) handleResourceDetail(w http.ResponseWriter, r *http.Request, id
 }
 
 func (s *Server) handleResourceApply(w http.ResponseWriter, r *http.Request, id string, resource string, namespace string, name string) {
-	def, ok := resourceDefinitions[resource]
+	def, ok := s.resourceDefinitionFor(id, resource)
 	if !ok {
 		writeError(w, http.StatusNotFound, fmt.Errorf("unknown resource %q", resource))
 		return
@@ -297,7 +314,7 @@ func (s *Server) handleResourceApply(w http.ResponseWriter, r *http.Request, id 
 }
 
 func (s *Server) handleResourceDelete(w http.ResponseWriter, r *http.Request, id string, resource string, namespace string, name string) {
-	def, ok := resourceDefinitions[resource]
+	def, ok := s.resourceDefinitionFor(id, resource)
 	if !ok {
 		writeError(w, http.StatusNotFound, fmt.Errorf("unknown resource %q", resource))
 		return
@@ -306,7 +323,7 @@ func (s *Server) handleResourceDelete(w http.ResponseWriter, r *http.Request, id
 }
 
 func (s *Server) handleResourceScale(w http.ResponseWriter, r *http.Request, id string, resource string, namespace string, name string) {
-	def, ok := resourceDefinitions[resource]
+	def, ok := s.resourceDefinitionFor(id, resource)
 	if !ok {
 		writeError(w, http.StatusNotFound, fmt.Errorf("unknown resource %q", resource))
 		return

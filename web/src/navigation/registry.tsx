@@ -1,5 +1,14 @@
 import type { ReactNode } from "react";
-import { Activity, BarChart3, Container, Gauge, Network, Package, Puzzle, type LucideIcon } from "lucide-react";
+import {
+  Activity,
+  BarChart3,
+  Container,
+  Gauge,
+  Network,
+  Package,
+  Puzzle,
+  type LucideIcon,
+} from "lucide-react";
 import { ClusterDashboard } from "../pages/cluster-dashboard";
 import { PodsPage } from "../pages/pods";
 import type { Cluster } from "../lib/api";
@@ -11,82 +20,73 @@ import { ResourceListPage } from "../pages/resource-list";
 import { HelmReleasesPage } from "../pages/helm-releases";
 import { TopologyPage } from "../pages/topology";
 
-export type NavItemPlugin = {
+export type NavigationItem = {
   id: string;
   label: string;
   route: string;
   group: string;
   icon: LucideIcon;
-  disabled?: boolean;
 };
 
-export type ResourcePagePlugin = NavItemPlugin & {
+export type ResourcePage = NavigationItem & {
   element: ReactNode;
 };
 
-export type ResourceActionPlugin<TResource = unknown> = {
-  id: string;
-  label: string;
-  resource: string;
-  render: (resource: TResource) => ReactNode;
-  isVisible?: (resource: TResource) => boolean;
-};
-
-const internalPagePlugins = [
+const builtInPages = [
   {
     id: "dashboard",
     label: "Dashboard",
     route: "",
     group: "Cluster",
-    icon: Gauge
+    icon: Gauge,
   },
   {
     id: "api-resources",
     label: "API Resources",
     route: "resources",
     group: "Cluster",
-    icon: Puzzle
+    icon: Puzzle,
   },
   {
     id: "metrics",
     label: "Metrics",
     route: "metrics",
     group: "Cluster",
-    icon: BarChart3
+    icon: BarChart3,
   },
   {
     id: "events",
     label: "Events",
     route: "events",
     group: "Cluster",
-    icon: Activity
+    icon: Activity,
   },
   {
     id: "topology",
     label: "Topology",
     route: "topology",
     group: "Cluster",
-    icon: Network
+    icon: Network,
   },
   {
     id: "pods",
     label: "Pods",
     route: "pods",
     group: "Workloads",
-    icon: Container
+    icon: Container,
   },
   {
     id: "helm-releases",
     label: "Helm Releases",
     route: "helm/releases",
     group: "Helm",
-    icon: Package
-  }
-] satisfies NavItemPlugin[];
+    icon: Package,
+  },
+] satisfies NavigationItem[];
 
-export function navPlugins(): NavItemPlugin[] {
+export function navigationItems(): NavigationItem[] {
   return [
-    ...internalPagePlugins,
+    ...builtInPages,
     ...resourceConfigs
       .filter((resource) => resource.id !== "events")
       .map((resource) => ({
@@ -94,36 +94,44 @@ export function navPlugins(): NavItemPlugin[] {
         label: resource.label,
         route: resource.route,
         group: resource.group,
-        icon: resource.icon
-      }))
+        icon: resource.icon,
+      })),
   ];
 }
 
-export function resourcePlugins(clusters: Cluster[], selectedNamespaces: string[]): ResourcePagePlugin[] {
+export function resourcePages(
+  clusters: Cluster[],
+  selectedNamespaces: string[],
+): ResourcePage[] {
   const pageElement: Record<string, ReactNode> = {
     dashboard: <ClusterDashboard clusters={clusters} />,
-    "api-resources": <GenericResourceBrowser selectedNamespaces={selectedNamespaces} />,
+    "api-resources": (
+      <GenericResourceBrowser selectedNamespaces={selectedNamespaces} />
+    ),
     metrics: <MetricsPage />,
     events: <EventsPage selectedNamespaces={selectedNamespaces} />,
     topology: <TopologyPage />,
     pods: <PodsPage selectedNamespaces={selectedNamespaces} />,
-    "helm-releases": <HelmReleasesPage />
+    "helm-releases": <HelmReleasesPage />,
   };
   return [
-    ...internalPagePlugins
+    ...builtInPages
       .filter((page) => pageElement[page.id])
       .map((page) => ({ ...page, element: pageElement[page.id] })),
-    ...resourceConfigs.filter((resource) => resource.id !== "events").map((resource) => ({
-      id: resource.id,
-      label: resource.label,
-      route: resource.route,
-      group: resource.group,
-      icon: resource.icon,
-      element: <ResourceListPage resourceId={resource.route} selectedNamespaces={selectedNamespaces} />
-    }))
+    ...resourceConfigs
+      .filter((resource) => resource.id !== "events")
+      .map((resource) => ({
+        id: resource.id,
+        label: resource.label,
+        route: resource.route,
+        group: resource.group,
+        icon: resource.icon,
+        element: (
+          <ResourceListPage
+            resourceId={resource.route}
+            selectedNamespaces={selectedNamespaces}
+          />
+        ),
+      })),
   ];
-}
-
-export function resourceActionPlugins(): ResourceActionPlugin[] {
-  return [];
 }

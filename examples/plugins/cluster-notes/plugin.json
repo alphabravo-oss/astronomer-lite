@@ -1,0 +1,8 @@
+{
+  "id": "cluster-notes",
+  "name": "Cluster notes",
+  "version": "1.0.0",
+  "description": "Store a note in a ConfigMap, with a reviewed dry-run before each change.",
+  "entry": "index.html",
+  "permissions": [{ "group": "", "resource": "configmaps", "verbs": ["get", "apply", "delete"] }]
+}

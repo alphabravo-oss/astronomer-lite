@@ -213,7 +213,7 @@ export function PodExecPage() {
             <input
               value={command}
               onChange={(event) => setCommand(event.target.value)}
-              className="h-9 w-full rounded-md border border-input bg-background px-3 font-mono text-sm outline-none focus:ring-2 focus:ring-ring"
+              className="h-9 w-full rounded-md border border-input bg-background px-3 font-mono text-sm outline-hidden focus:ring-2 focus:ring-ring"
             />
           </label>
         ) : null}

@@ -1,0 +1,15 @@
+{
+  "react-remove-scroll-bar@2.3.8": {
+    "file": "react-remove-scroll-bar-2.3.8.txt",
+    "source": "https://raw.githubusercontent.com/theKashey/react-remove-scroll-bar/8ca9ba5ea52de03308fe8ced94f7b159a44d28ff/LICENSE",
+    "note": "Upstream MIT license; npm 2.3.8 declares MIT but omits the license file and its gitHead is unavailable upstream."
+  },
+  "victory-vendor@37.3.6": {
+    "file": "victory-vendor-37.3.6.txt",
+    "source": "https://github.com/FormidableLabs/victory/blob/v37.3.6/LICENSE.txt"
+  },
+  "isarray@0.0.1": {
+    "file": "isarray-0.0.1.txt",
+    "source": "isarray@0.0.1 npm tarball README.md, License section"
+  }
+}

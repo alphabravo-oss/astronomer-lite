@@ -3,9 +3,9 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Moon, Search, Server, Sun } from "lucide-react";
 import type { Cluster, SearchHit } from "../lib/api";
 import { api } from "../lib/api";
-import { resourceConfigs } from "../lib/resources";
+import { resourceLink } from "../lib/resource-link";
 import { useTheme } from "../lib/theme";
-import { navPlugins } from "../plugins/registry";
+import { navigationItems } from "../navigation/registry";
 import { StatusBadge } from "./ui/status-badge";
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "./ui/command";
 
@@ -28,7 +28,7 @@ export function CommandPalette({ open, onOpenChange, clusters }: CommandPaletteP
 
   const searchMode = search.startsWith("/");
   const resourceQuery = searchMode ? search.slice(1).trim() : "";
-  const pages = useMemo(() => (clusterId ? navPlugins() : []), [clusterId]);
+  const pages = useMemo(() => (clusterId ? navigationItems() : []), [clusterId]);
 
   // Live resource search when the query is prefixed with "/". Debounced; the
   // backend already fuzzy-matches, so cmdk filtering is turned off in this mode.
@@ -71,13 +71,12 @@ export function CommandPalette({ open, onOpenChange, clusters }: CommandPaletteP
 
   function openHit(hit: SearchHit) {
     if (!clusterId) return;
-    const route = resourceConfigs.find((res) => res.resource === hit.resource && res.version === hit.apiVersion.split("/").pop());
-    go(route ? `/clusters/${clusterId}/${route.route}` : `/clusters/${clusterId}/resources?q=${encodeURIComponent(hit.resource)}`);
+    go(resourceLink(clusterId, hit));
   }
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange} shouldFilter={!searchMode}>
-      <CommandInput value={search} onValueChange={setSearch} placeholder="Search pages and clusters, or / to search resources..." />
+      <CommandInput aria-label="Command palette search" value={search} onValueChange={setSearch} placeholder="Search pages and clusters, or / to search resources..." />
       <CommandList>
         <CommandEmpty>{searchMode && searchPending ? "Searching…" : "No results found."}</CommandEmpty>
 

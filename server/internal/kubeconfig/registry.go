@@ -110,6 +110,11 @@ type Registry struct {
 	displays    map[string]displayOverride
 	logger      *slog.Logger
 	httpClient  *http.Client
+	// A non-empty scope enables server-mode import restrictions and isolates IDs
+	// used by process-wide discovery/OpenAPI caches between users.
+	scope          string
+	allowedServers []string
+	helperPolicy   string
 
 	invalidationMu        sync.RWMutex
 	invalidationCallbacks []func(id string)
@@ -132,6 +137,51 @@ func NewRegistry(systemPaths []string, managedDir, displayFile string, logger *s
 		logger.Warn("failed to load cluster display overrides", "error", err)
 	}
 	return r
+}
+
+func (r *Registry) SetUserScope(scope string)        { r.scope = scope }
+func (r *Registry) SetCredentialHelpers(path string) { r.helperPolicy = path }
+func (r *Registry) SetAllowedServers(servers []string) {
+	r.allowedServers = append([]string(nil), servers...)
+}
+
+func (r *Registry) clusterID(server, context string) string {
+	if r.scope == "" {
+		return stableID(server, context)
+	}
+	return stableID(r.scope+"\x00"+server, context)
+}
+
+func (r *Registry) validateImport(cfg *clientcmdapi.Config) error {
+	if r.scope == "" {
+		return nil
+	}
+	for name, u := range cfg.AuthInfos {
+		if u.Exec != nil {
+			if err := r.validateHelper(cfg, name); err != nil {
+				return err
+			}
+		}
+		if u.AuthProvider != nil || u.TokenFile != "" || u.ClientCertificate != "" || u.ClientKey != "" {
+			return fmt.Errorf("server mode accepts inline credentials or approved helper IDs; arbitrary exec plugins, auth providers, and file references are not allowed")
+		}
+	}
+	for _, c := range cfg.Clusters {
+		allowed := false
+		for _, server := range r.allowedServers {
+			if c.Server == strings.TrimSpace(server) {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			return fmt.Errorf("cluster server is not approved; ask an administrator to add its exact URL to ASTRONOMER_LITE_ALLOWED_CLUSTER_SERVERS")
+		}
+		if c.CertificateAuthority != "" || c.ProxyURL != "" {
+			return fmt.Errorf("server mode requires inline certificate-authority-data and does not accept proxy-url")
+		}
+	}
+	return nil
 }
 
 func (r *Registry) loadDisplays() error {
@@ -420,12 +470,20 @@ func (r *Registry) loadFile(path string, source Source, clusters map[string]Clus
 	if err != nil {
 		return fmt.Errorf("%s: %w", path, err)
 	}
+	if err := r.validateImport(cfg); err != nil {
+		return err
+	}
+	if r.scope != "" {
+		if err := r.prepareHelpers(cfg); err != nil {
+			return err
+		}
+	}
 	for contextName, contextDef := range cfg.Contexts {
 		clusterDef := cfg.Clusters[contextDef.Cluster]
 		if clusterDef == nil {
 			continue
 		}
-		id := stableID(clusterDef.Server, contextName)
+		id := r.clusterID(clusterDef.Server, contextName)
 		if err := validateExecPlugin(cfg, contextDef); err != nil {
 			clusters[id] = Cluster{
 				ID: id, Name: displayName(contextName, contextDef.Cluster), Context: contextName,
@@ -482,6 +540,9 @@ func (r *Registry) Preview(raw []byte) ([]ContextPreview, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not parse kubeconfig YAML: %w", err)
 	}
+	if err := r.validateImport(cfg); err != nil {
+		return nil, err
+	}
 	r.mu.RLock()
 	existing := map[string]bool{}
 	for id := range r.clusters {
@@ -494,7 +555,7 @@ func (r *Registry) Preview(raw []byte) ([]ContextPreview, error) {
 		if clusterDef == nil {
 			continue
 		}
-		id := stableID(clusterDef.Server, contextName)
+		id := r.clusterID(clusterDef.Server, contextName)
 		contexts = append(contexts, ContextPreview{
 			ID:            id,
 			Name:          contextName,
@@ -518,6 +579,9 @@ func (r *Registry) AddManaged(raw []byte, selectedContexts []string) ([]Cluster,
 	cfg, err := clientcmd.Load(raw)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse kubeconfig YAML: %w", err)
+	}
+	if err := r.validateImport(cfg); err != nil {
+		return nil, err
 	}
 	if len(selectedContexts) > 0 {
 		cfg, err = filterConfigContexts(cfg, selectedContexts)
@@ -552,7 +616,7 @@ func (r *Registry) ensureNoDuplicateContexts(cfg *clientcmdapi.Config) error {
 		if clusterDef == nil {
 			continue
 		}
-		id := stableID(clusterDef.Server, contextName)
+		id := r.clusterID(clusterDef.Server, contextName)
 		if existing, ok := r.clusters[id]; ok {
 			return fmt.Errorf("context %q for %s already exists as %q", contextName, clusterDef.Server, existing.Name)
 		}

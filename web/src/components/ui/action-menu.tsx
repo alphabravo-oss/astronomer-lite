@@ -30,7 +30,7 @@ export function ActionMenu({ items, label = "Open actions" }: ActionMenuProps) {
         <button
           type="button"
           onClick={(event) => event.stopPropagation()}
-          className="inline-flex h-8 w-8 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="inline-flex h-8 w-8 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
           aria-label={label}
         >
           <MoreHorizontal className="h-4 w-4" />

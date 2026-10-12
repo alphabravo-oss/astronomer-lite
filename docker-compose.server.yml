@@ -1,0 +1,48 @@
+# Standalone server-mode deployment. Use an HTTPS reverse proxy for remote access.
+# docker compose -f docker-compose.server.yml up -d --build
+services:
+  astronomer-lite:
+    image: astronomer-lite:dev
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile
+      args:
+        VERSION: ${VERSION:-dev}
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${ASTRONOMER_LITE_PORT:-8080}:8080"
+    environment:
+      ASTRONOMER_LITE_AUTH_MODE: server
+      ASTRONOMER_LITE_PUBLIC_URL: ${ASTRONOMER_LITE_PUBLIC_URL:?Set the public HTTPS URL, or http://localhost:8080 for local testing}
+      ASTRONOMER_LITE_ADMIN_USER: ${ASTRONOMER_LITE_ADMIN_USER:-admin}
+      ASTRONOMER_LITE_ADMIN_PASSWORD_FILE: /run/secrets/bootstrap_password
+      ASTRONOMER_LITE_ALLOWED_CLUSTER_SERVERS: ${ASTRONOMER_LITE_ALLOWED_CLUSTER_SERVERS:-}
+      ASTRONOMER_LITE_OIDC_ISSUER: ${ASTRONOMER_LITE_OIDC_ISSUER:-}
+      ASTRONOMER_LITE_OIDC_CLIENT_ID: ${ASTRONOMER_LITE_OIDC_CLIENT_ID:-}
+      ASTRONOMER_LITE_OIDC_REFRESH: ${ASTRONOMER_LITE_OIDC_REFRESH:-true}
+      ASTRONOMER_LITE_OIDC_GROUPS_CLAIM: ${ASTRONOMER_LITE_OIDC_GROUPS_CLAIM:-groups}
+      ASTRONOMER_LITE_OIDC_ADMIN_GROUPS: ${ASTRONOMER_LITE_OIDC_ADMIN_GROUPS:-}
+      ASTRONOMER_LITE_OIDC_REQUIRED_GROUPS: ${ASTRONOMER_LITE_OIDC_REQUIRED_GROUPS:-}
+      ASTRONOMER_LITE_TRUSTED_PROXIES: ${ASTRONOMER_LITE_TRUSTED_PROXIES:-}
+      ASTRONOMER_LITE_PROXY_USER_HEADER: ${ASTRONOMER_LITE_PROXY_USER_HEADER:-}
+      ASTRONOMER_LITE_PROXY_GROUPS_HEADER: ${ASTRONOMER_LITE_PROXY_GROUPS_HEADER:-}
+      ASTRONOMER_LITE_PROXY_ADMIN_GROUPS: ${ASTRONOMER_LITE_PROXY_ADMIN_GROUPS:-}
+      ASTRONOMER_LITE_PROXY_REQUIRED_GROUPS: ${ASTRONOMER_LITE_PROXY_REQUIRED_GROUPS:-}
+      ASTRONOMER_LITE_FORWARD_DOMAIN: ${ASTRONOMER_LITE_FORWARD_DOMAIN:-}
+      ASTRONOMER_LITE_HELM_REPOSITORIES: ${ASTRONOMER_LITE_HELM_REPOSITORIES:-}
+      ASTRONOMER_LITE_PLUGINS_DIR: /opt/astronomer-lite/plugins
+    secrets:
+      - bootstrap_password
+    volumes:
+      - astronomer-lite-server-config:/home/astronomer/.config/astronomer-lite
+      - ${ASTRONOMER_LITE_PLUGIN_PATH:-./examples/plugins}:/opt/astronomer-lite/plugins:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8080/api/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+secrets:
+  bootstrap_password:
+    file: ${ASTRONOMER_LITE_ADMIN_PASSWORD_FILE:?Set the path to a bootstrap password file}
+volumes:
+  astronomer-lite-server-config:

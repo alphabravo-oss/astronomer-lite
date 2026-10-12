@@ -1,0 +1,32 @@
+<style>
+  body { max-width: 680px; margin: 24px auto; padding: 0 16px; }
+  label { display: block; margin: 16px 0 8px; font-weight: 600; }
+  input, textarea { box-sizing: border-box; width: 100%; padding: 10px; border: 1px solid #71717a; border-radius: 6px; background: transparent; color: inherit; font: inherit; }
+  textarea { min-height: 160px; }
+  button { padding: 8px 14px; margin: 12px 8px 0 0; border: 1px solid #71717a; border-radius: 6px; font: inherit; }
+</style>
+<h1>Cluster notes</h1>
+<p>A note stored as <code>astronomer-lite-note</code> in your chosen namespace. Kubernetes permissions apply.</p>
+<label for="namespace">Namespace</label><input id="namespace" value="default">
+<label for="note">Note</label><textarea id="note"></textarea>
+<button id="load">Load note</button><button id="save">Save note</button><button id="remove">Delete note</button>
+<p id="status" role="status"></p>
+<script>
+  const namespace = document.getElementById('namespace');
+  const note = document.getElementById('note');
+  const status = document.getElementById('status');
+  namespace.value = astronomer.context.namespaces[0] || 'default';
+  async function perform(verb) {
+    const request = { group: '', version: 'v1', resource: 'configmaps', namespace: namespace.value, name: 'astronomer-lite-note', verb };
+    if (verb === 'apply') request.object = { apiVersion: 'v1', kind: 'ConfigMap', metadata: { name: request.name, namespace: request.namespace }, data: { note: note.value } };
+    status.textContent = verb === 'get' ? 'Loading…' : 'Waiting for confirmation…';
+    try {
+      const result = await astronomer.request(request);
+      if (verb === 'get') note.value = result.data?.note || '';
+      status.textContent = verb === 'apply' ? 'Note saved.' : verb === 'delete' ? 'Note deleted.' : 'Note loaded.';
+    } catch (err) { status.textContent = err.message; }
+  }
+  document.getElementById('load').onclick = () => perform('get');
+  document.getElementById('save').onclick = () => perform('apply');
+  document.getElementById('remove').onclick = () => perform('delete');
+</script>

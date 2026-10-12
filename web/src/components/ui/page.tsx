@@ -6,7 +6,7 @@ import { cn } from "../../lib/utils";
 // token-driven, no framework coupling.
 
 export function PageShell({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn("space-y-6", className)}>{children}</div>;
+  return <div className={cn("space-y-[var(--gap-section)]", className)}>{children}</div>;
 }
 
 export function PageHeader({

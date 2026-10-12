@@ -1,0 +1,10 @@
+# Optional confidential OIDC client override; combine with docker-compose.server.yml.
+services:
+  astronomer-lite:
+    environment:
+      ASTRONOMER_LITE_OIDC_CLIENT_SECRET_FILE: /run/secrets/oidc_client_secret
+    secrets:
+      - oidc_client_secret
+secrets:
+  oidc_client_secret:
+    file: ${ASTRONOMER_LITE_OIDC_CLIENT_SECRET_FILE:?Set the path to the OIDC client secret file}

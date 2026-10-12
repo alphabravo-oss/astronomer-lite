@@ -619,7 +619,9 @@ test("displays gateway policy resource details", async ({ page, request }) => {
   kubectl(cluster.context, ["wait", "--for=condition=Established", `crd/${backendTLSPolicyCRDName}`, "--timeout=60s"]);
   kubectl(cluster.context, ["wait", "--for=condition=Established", `crd/${backendTrafficPolicyCRDName}`, "--timeout=60s"]);
 
-  kubectlApply(cluster.context, backendTLSPolicyManifest(backendTLSPolicyName));
+  const tlsVersions = JSON.parse(kubectlOutput(cluster.context, ["get", "crd", backendTLSPolicyCRDName, "-o", "json"])).spec.versions as { name: string; served: boolean; storage: boolean }[];
+  const tlsVersion = tlsVersions.find(version => version.served && version.storage)!.name;
+  kubectlApply(cluster.context, backendTLSPolicyManifest(backendTLSPolicyName, tlsVersion));
   kubectlApply(cluster.context, backendTrafficPolicyManifest(backendTrafficPolicyName));
 
   await page.goto(`/clusters/${cluster.id}/backendtlspolicies`);
@@ -724,8 +726,8 @@ test("renders metrics page when metrics-server is present or absent", async ({ p
 
   if (metrics.available) {
     await expect(page.getByText("metrics-server").first()).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Node CPU" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Top Pod CPU" })).toBeVisible();
+    await expect(page.getByText("Cluster CPU", { exact: true })).toBeVisible();
+    await expect(page.getByText("Cluster Memory", { exact: true })).toBeVisible();
   } else {
     await expect(page.getByText("optional")).toBeVisible();
     await expect(page.getByText(/metrics-server is not available for this cluster/)).toBeVisible();
@@ -796,12 +798,13 @@ test("opens the command palette and navigates to pods", async ({ page, request }
   const cluster = await reachableCluster(request);
   cleanupContext = cluster.context;
   await page.goto(`/clusters/${cluster.id}`);
+  await expect(page.getByRole("button", { name: "Open command palette", exact: true })).toBeVisible();
   await page.locator("body").click();
   await page.keyboard.press("Control+k");
-  const input = page.getByLabel("Command palette search");
+  const input = page.getByRole("combobox", { name: "Command palette search" });
   await expect(input).toBeVisible();
-  await input.fill("Open Pods");
-  const option = page.getByRole("option").filter({ hasText: /^Open Pods/ }).first();
+  await input.fill("Pods");
+  const option = page.getByRole("option").filter({ hasText: /^Pods/ }).first();
   await expect(option).toBeVisible({ timeout: 5_000 });
   await option.click();
   await expect(page.getByRole("heading", { name: "Pods" })).toBeVisible();
@@ -811,8 +814,10 @@ test("global search returns cluster resources through the palette", async ({ pag
   const cluster = await reachableCluster(request);
   cleanupContext = cluster.context;
   await page.goto(`/clusters/${cluster.id}`);
-  await page.keyboard.press("ControlOrMeta+k");
-  await page.getByPlaceholder("Type a command or search...").fill("/coredns");
+  // AuthGate resolves the session asynchronously after the document loads.
+  // Wait for the shell's control instead of sending a shortcut before it mounts.
+  await page.getByRole("button", { name: "Open command palette", exact: true }).click();
+  await page.getByRole("combobox", { name: "Command palette search" }).fill("/coredns");
   // CoreDNS ships with k3d in kube-system; either the deployment or pod should match.
   await expect(page.getByRole("option", { name: /coredns/ }).first()).toBeVisible({ timeout: 15_000 });
 });
@@ -987,7 +992,7 @@ test("topology endpoint returns a graph and the page renders nodes", async ({ pa
   expect(graph.nodes.length).toBeGreaterThan(0);
   await page.goto(`/clusters/${cluster.id}/topology`);
   await expect(page.getByRole("heading", { name: "Topology" })).toBeVisible();
-  await page.getByLabel("Namespace").fill("kube-system");
+  await page.getByLabel("Namespace", { exact: true }).selectOption("kube-system");
   await expect(page.getByText(/\d+ nodes · \d+ edges/)).toBeVisible({ timeout: 15_000 });
 });
 
@@ -1714,8 +1719,8 @@ spec:
           x-kubernetes-preserve-unknown-fields: true`;
 }
 
-function backendTLSPolicyManifest(name: string) {
-  return `apiVersion: gateway.networking.k8s.io/v1alpha3
+function backendTLSPolicyManifest(name: string, version: string) {
+  return `apiVersion: gateway.networking.k8s.io/${version}
 kind: BackendTLSPolicy
 metadata:
   name: ${name}

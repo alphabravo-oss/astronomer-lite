@@ -1,0 +1,15 @@
+# Optional signed catalog, combined with docker-compose.server.yml.
+# The mounted plugin directory must be writable by the container's astronomer user.
+services:
+  astronomer-lite:
+    environment:
+      ASTRONOMER_LITE_PLUGINS_ENABLED: "true"
+      ASTRONOMER_LITE_PLUGIN_CATALOG_URL: ${ASTRONOMER_LITE_PLUGIN_CATALOG_URL:?Set the signed HTTPS catalog URL}
+      ASTRONOMER_LITE_PLUGIN_TRUST_KEY_FILE: /run/secrets/plugin_publisher
+    secrets:
+      - plugin_publisher
+    volumes:
+      - ${ASTRONOMER_LITE_PLUGIN_PATH:?Set a writable managed plugin directory}:/opt/astronomer-lite/plugins
+secrets:
+  plugin_publisher:
+    file: ${ASTRONOMER_LITE_PLUGIN_TRUST_KEY_FILE:?Set the publisher public key file}

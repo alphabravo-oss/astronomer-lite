@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"embed"
+	"github.com/alphabravo/astronomer-lite/server/internal/forward"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -31,18 +32,23 @@ import (
 var embeddedDist embed.FS
 
 type Server struct {
-	Config        config.Config
-	registry      *kubeconfig.Registry
-	logger        *slog.Logger
-	portForwardMu sync.Mutex
-	portForwards  map[string]*portForwardSession
-	informers     *cache.InformerManager
-	helmGetterMu  sync.Mutex
-	helmGetters   map[string]*restClientGetter
+	forwardGateway *forward.Gateway
+	Config         config.Config
+	registry       *kubeconfig.Registry
+	logger         *slog.Logger
+	portForwardMu  sync.Mutex
+	portForwards   map[string]*portForwardSession
+	informers      *cache.InformerManager
+	helmGetterMu   sync.Mutex
+	helmDeployMu   sync.Mutex
+	helmGetters    map[string]*restClientGetter
 	// Client acquisition is routed through these seams (defaulting to the
 	// registry) so handlers can be exercised against fake clients in tests.
 	dynamicClientFor func(id string) (dynamic.Interface, error)
 	kubeClientFor    func(id string) (kubernetes.Interface, error)
+	cancel           context.CancelFunc
+	extensions       *plugins.Catalog
+	projectsMu       sync.Mutex
 }
 
 var wsUpgrader = websocket.Upgrader{
@@ -55,17 +61,29 @@ func New(logger *slog.Logger) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	return newWorkspace(cfg, "", logger)
+}
+
+func newWorkspace(cfg config.Config, scope string, logger *slog.Logger) (*Server, error) {
 	if err := cfg.EnsureDirs(); err != nil {
 		return nil, err
 	}
-	registry := kubeconfig.NewRegistry(config.SystemKubeconfigPath(cfg.Kubeconfig), cfg.ClustersDir, cfg.DisplayFile, logger)
-	ctx := context.Background()
+	var systemPaths []string
+	if scope == "" {
+		systemPaths = config.SystemKubeconfigPath(cfg.Kubeconfig)
+	}
+	registry := kubeconfig.NewRegistry(systemPaths, cfg.ClustersDir, cfg.DisplayFile, logger)
+	registry.SetUserScope(scope)
+	registry.SetCredentialHelpers(cfg.CredentialHelpersFile)
+	registry.SetAllowedServers(cfg.AllowedClusterServers)
+	ctx, cancel := context.WithCancel(context.Background())
 	if err := registry.Reload(); err != nil {
 		logger.Warn("failed to reload kubeconfigs", "error", err)
 	}
 	registry.Start(ctx)
 	informerMgr := cache.NewInformerManager()
 	s := &Server{Config: cfg, registry: registry, logger: logger, portForwards: map[string]*portForwardSession{}, informers: informerMgr, helmGetters: map[string]*restClientGetter{}}
+	s.cancel = cancel
 	s.dynamicClientFor = registry.Dynamic
 	s.kubeClientFor = func(id string) (kubernetes.Interface, error) { return registry.Client(id) }
 	// Drop per-cluster cached state (openapi, prom detection, informer
@@ -79,6 +97,20 @@ func New(logger *slog.Logger) (*Server, error) {
 		s.invalidateHelmGetters(id)
 	})
 	return s, nil
+}
+
+func (s *Server) Close() {
+	if s.cancel != nil {
+		s.cancel()
+	}
+	if s.informers != nil {
+		s.informers.Clear()
+	}
+	s.portForwardMu.Lock()
+	defer s.portForwardMu.Unlock()
+	for _, session := range s.portForwards {
+		session.stopForward()
+	}
 }
 
 func (s *Server) restMapperFor(id string) (meta.RESTMapper, error) {
@@ -119,13 +151,12 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("/api/clusters/preview", s.handleKubeconfigPreview)
 	mux.HandleFunc("/api/clusters", s.handleClusters)
 	mux.HandleFunc("/api/clusters/", s.handleCluster)
-	mux.HandleFunc("/api/plugins/nav", s.handlePluginNav)
+	mux.HandleFunc("/api/extensions", s.handleExtensions)
+	mux.HandleFunc("/api/extensions/", s.handleExtensions)
+	mux.HandleFunc("/api/projects", s.handleProjects)
+	mux.HandleFunc("/api/projects/", s.handleProjects)
 	mux.Handle("/", s.spaHandler())
 	return logRequests(s.logger, mux)
-}
-
-func (s *Server) handlePluginNav(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, plugins.DefaultRegistry().NavItems())
 }
 
 // handleVersion reports the build-stamped version and the Kubernetes client

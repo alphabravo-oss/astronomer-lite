@@ -39,6 +39,15 @@ import (
 //	DELETE /api/clusters/{id}/helm/releases/{ns}/{name}
 func (s *Server) handleHelm(w http.ResponseWriter, r *http.Request, id string, parts []string) {
 	switch {
+	case len(parts) == 1 && parts[0] == "repositories" && r.Method == http.MethodGet:
+		s.helmRepositories(w, r)
+		return
+	case len(parts) == 1 && parts[0] == "charts" && r.Method == http.MethodGet:
+		s.helmCharts(w, r)
+		return
+	case len(parts) == 1 && (parts[0] == "install" || parts[0] == "upgrade") && r.Method == http.MethodPost:
+		s.helmDeploy(w, r, id, parts[0] == "upgrade")
+		return
 	case len(parts) == 1 && parts[0] == "releases" && r.Method == http.MethodGet:
 		s.helmListReleases(w, r, id)
 		return

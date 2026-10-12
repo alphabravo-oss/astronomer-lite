@@ -3,6 +3,7 @@ set -Eeuo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CLUSTER_NAME="${K3D_CLUSTER_NAME:-astronomer-lite}"
+CLUSTER_AGENTS="${K3D_AGENTS:-1}"
 PORT="${ASTRONOMER_LITE_E2E_PORT:-18080}"
 BASE_URL="http://127.0.0.1:${PORT}"
 KUBECONFIG_PATH="${KUBECONFIG_PATH:-${ROOT_DIR}/.kube/config}"
@@ -51,6 +52,7 @@ require_command kubectl
 require_command make
 require_command node
 require_command npm
+require_command python3
 
 cd "${ROOT_DIR}"
 
@@ -60,7 +62,9 @@ if k3d cluster list "${CLUSTER_NAME}" >/dev/null 2>&1; then
     exit 1
   fi
 else
-  k3d cluster create "${CLUSTER_NAME}" --agents 1 --wait --kubeconfig-update-default=false --kubeconfig-switch-context=false
+  image_args=()
+  if [[ -n "${K3D_IMAGE:-}" ]]; then image_args=(--image "$K3D_IMAGE"); fi
+  k3d cluster create "${CLUSTER_NAME}" --servers 1 --agents "${CLUSTER_AGENTS}" "${image_args[@]}" --wait --kubeconfig-update-default=false --kubeconfig-switch-context=false
   CLUSTER_CREATED=1
 fi
 
@@ -78,11 +82,14 @@ if [[ "${SKIP_PLAYWRIGHT_INSTALL:-0}" != "1" ]]; then
   (cd web && npx playwright install --with-deps chromium)
 fi
 
-make build
+if [[ "${SKIP_BUILD:-0}" != "1" ]]; then make build; fi
 
 mkdir -p "${ASTRONOMER_LITE_CONFIG_DIR}"
 ASTRONOMER_LITE_CONFIG_DIR="${ASTRONOMER_LITE_CONFIG_DIR}" \
   KUBECONFIG="${KUBECONFIG_PATH}" \
+  ASTRONOMER_LITE_AUTH_MODE=single-user \
+  ASTRONOMER_LITE_PLUGINS_ENABLED=true \
+  ASTRONOMER_LITE_PLUGINS_DIR="${ASTRONOMER_LITE_PLUGINS_DIR:-${ROOT_DIR}/examples/plugins}" \
   PORT="${PORT}" \
   ./server/bin/astronomer-lite > "${SERVER_LOG}" 2>&1 &
 SERVER_PID=$!
@@ -133,3 +140,6 @@ E2E_BASE_URL="${BASE_URL}" \
   KUBECONFIG="${KUBECONFIG_PATH}" \
   EXPECT_UNREACHABLE_CONTEXT=astronomer-lite-unreachable \
   npm run e2e
+
+cd "${ROOT_DIR}"
+python3 scripts/verify-k3d-server-mode.py --kubeconfig "${KUBECONFIG_PATH}"

@@ -17,7 +17,7 @@ interface MetricCardProps {
 
 export function MetricCard({ title, value, unit, subtitle, trend, trendValue, percentage, icon, sparkline, className }: MetricCardProps) {
   return (
-    <div className={cn("rounded-lg border border-border bg-card p-5 transition-colors hover:bg-card/80", className)}>
+    <div className={cn("rounded-lg border border-border bg-card p-[var(--card-p)] transition-colors hover:bg-card/80", className)}>
       <div className="flex items-start justify-between">
         <div className="space-y-1">
           <p className="text-sm font-medium text-muted-foreground">{title}</p>
