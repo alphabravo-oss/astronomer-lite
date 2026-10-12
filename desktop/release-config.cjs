@@ -1,5 +1,18 @@
 const { signing } = require("../scripts/release-preflight.cjs");
+const { join } = require("node:path");
 const config = structuredClone(require("./package.json").build);
+config.mac.extraDistFiles = ["READ ME FIRST.txt"];
+config.dmg = {
+  backgroundColor: "#f8fafc",
+  window: { width: 560, height: 440 },
+  iconSize: 96,
+  iconTextSize: 13,
+  contents: [
+    { x: 150, y: 150, type: "file" },
+    { x: 410, y: 150, type: "link", path: "/Applications" },
+    { x: 280, y: 330, type: "file", path: join(__dirname, "READ ME FIRST.txt") },
+  ],
+};
 const signed = process.platform === "linux" ? process.env.LITE_SIGNED_RELEASE === "true" : signing(process.platform);
 if (!signed) {
   // electron-builder treats an empty CSC_LINK as a path to the current directory.

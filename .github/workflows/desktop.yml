@@ -186,8 +186,13 @@ jobs:
           mount="$RUNNER_TEMP/lite-dmg"
           mkdir -p "$mount" "$RUNNER_TEMP/lite-installed"
           hdiutil attach "desktop/dist/Astronomer-Lite-${{ needs.preflight.outputs.version }}-mac-${{ matrix.arch }}.dmg" -nobrowse -mountpoint "$mount"
+          trap 'hdiutil detach "$mount" || true' EXIT
+          cmp "desktop/READ ME FIRST.txt" "$mount/READ ME FIRST.txt"
+          test "$(readlink "$mount/Applications")" = /Applications
+          unzip -p "desktop/dist/Astronomer-Lite-${{ needs.preflight.outputs.version }}-mac-${{ matrix.arch }}.zip" 'READ ME FIRST.txt' | cmp - "desktop/READ ME FIRST.txt"
           ditto "$mount/Astronomer-Lite.app" "$RUNNER_TEMP/lite-installed/Astronomer-Lite.app"
           hdiutil detach "$mount"
+          trap - EXIT
           echo "LITE_DESKTOP_EXECUTABLE=$RUNNER_TEMP/lite-installed/Astronomer-Lite.app/Contents/MacOS/Astronomer-Lite" >> "$GITHUB_ENV"
       - name: Verify installed macOS signatures and notarization
         if: runner.os == 'macOS' && env.LITE_SIGNED_RELEASE == 'true'
