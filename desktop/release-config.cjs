@@ -1,6 +1,12 @@
 const { signing } = require("../scripts/release-preflight.cjs");
 const config = structuredClone(require("./package.json").build);
 const signed = process.platform === "linux" ? process.env.LITE_SIGNED_RELEASE === "true" : signing(process.platform);
+if (!signed) {
+  // electron-builder treats an empty CSC_LINK as a path to the current directory.
+  // Candidate builds must not import production certificates, including ambient ones.
+  for (const name of ["CSC_LINK", "CSC_KEY_PASSWORD", "CSC_NAME", "WIN_CSC_LINK", "WIN_CSC_KEY_PASSWORD"]) delete process.env[name];
+  process.env.CSC_IDENTITY_AUTO_DISCOVERY = "false";
+}
 config.forceCodeSigning = signed && process.platform !== "linux";
 if (process.platform === "darwin") config.mac.binaries = ["Contents/Resources/server/astronomer-lite"];
 if (signed && process.platform === "darwin") {
