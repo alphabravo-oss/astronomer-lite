@@ -35,7 +35,9 @@ also ship with Electron. Containers include the application notices under
 Production signing/notarization is deferred by user decision on October 12, 2026.
 Unsigned distribution is accepted for now. Signing credentials are not a blocker
 for this path; native platform validation remains a stable-release readiness requirement.
-Signing support stays available for later use. Tag builds default to unsigned;
+Signing support stays available for later use. Native macOS candidates use an
+ad-hoc local signature so the modified app bundle can launch; this supplies no
+verified publisher identity or notarization. Tag builds default to unsigned;
 set repository variable `DESKTOP_RELEASE_SIGNING_ENABLED=true` to opt tag releases
 into production signing later. Manual runs select signing with `signed=true`.
 

@@ -199,6 +199,7 @@ jobs:
         run: npm run e2e:desktop -- --reporter=line,json
         working-directory: web
         env:
+          DEBUG: pw:browser
           PLAYWRIGHT_JSON_OUTPUT_FILE: test-results-desktop/results.json
       - name: Stage current-version artifacts and provenance
         run: node scripts/release-artifacts.cjs stage ${{ matrix.platform }}-${{ matrix.arch }}
