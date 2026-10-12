@@ -237,7 +237,7 @@ export function DataTable<T>({
                   <th
                     key={column.key}
                     className={cn(
-                      "whitespace-nowrap px-4 py-3 font-medium text-muted-foreground",
+                      "k8s-th whitespace-nowrap",
                       column.align === "center" && "text-center",
                       column.align === "right" && "text-right",
                       column.sortable !== false &&

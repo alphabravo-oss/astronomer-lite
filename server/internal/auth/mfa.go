@@ -136,8 +136,8 @@ func (m *Manager) manageMFA(w http.ResponseWriter, r *http.Request, user User) {
 		}
 		m.mfaPending[user.ID] = mfaEnrollment{Secret: secret, PasswordHash: current.PasswordHash, Expires: time.Now().Add(5 * time.Minute)}
 		m.mu.Unlock()
-		query := url.Values{"secret": {secret}, "issuer": {"Astronomer-Lite"}, "algorithm": {"SHA1"}, "digits": {"6"}, "period": {"30"}}
-		jsonResponse(w, 200, map[string]string{"secret": secret, "uri": "otpauth://totp/" + url.PathEscape("Astronomer-Lite:"+user.Username) + "?" + query.Encode()})
+		query := url.Values{"secret": {secret}, "issuer": {"Astronomer Lite"}, "algorithm": {"SHA1"}, "digits": {"6"}, "period": {"30"}}
+		jsonResponse(w, 200, map[string]string{"secret": secret, "uri": "otpauth://totp/" + url.PathEscape("Astronomer Lite:"+user.Username) + "?" + query.Encode()})
 	case "/api/auth/mfa/enable", "/api/auth/mfa/disable":
 		enable := strings.HasSuffix(r.URL.Path, "/enable")
 		m.mu.Lock()

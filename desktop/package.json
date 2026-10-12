@@ -1,7 +1,7 @@
 {
   "name": "astronomer-lite-desktop",
-  "productName": "Astronomer-Lite",
-  "version": "0.2.0-rc.2",
+  "productName": "Astronomer Lite",
+  "version": "0.2.0-rc.3",
   "private": true,
   "description": "Kubernetes workspace by AlphaBravo",
   "author": "AlphaBravo",
@@ -27,9 +27,11 @@
     "asar": true,
     "files": [
       "main.cjs",
+      "menu.cjs",
       "launcher.cjs",
       "icon.png",
-      "package.json"
+      "package.json",
+      "preload.cjs"
     ],
     "extraResources": [
       {

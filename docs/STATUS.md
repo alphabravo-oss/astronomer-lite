@@ -1,6 +1,6 @@
-# Astronomer-Lite — current status
+# Astronomer Lite — current status
 
-Updated 2026-10-12. Release candidate 0.2.0-rc.1. External plugins are now deferred from the default release: preserved behind `ASTRONOMER_LITE_PLUGINS_ENABLED=true`, with their UI and APIs disabled by default. The requested parity implementation includes desktop packaging while retaining single-instance, file-backed operation. This document supersedes older MVP exclusions. See the [capability matrix](headlamp-parity.md) for precise boundaries; universal Headlamp plugin parity is not claimed.
+Updated 2026-10-12. Source version 0.2.0-rc.3; published candidates are listed on the [releases page](https://github.com/alphabravo-oss/astronomer-lite/releases). External plugins are now deferred from the default release: preserved behind `ASTRONOMER_LITE_PLUGINS_ENABLED=true`, with their UI and APIs disabled by default. The requested parity implementation includes desktop packaging while retaining single-instance, file-backed operation. This document supersedes older MVP exclusions. See the [capability matrix](headlamp-parity.md) for precise boundaries; universal Headlamp plugin parity is not claimed.
 
 ## Implemented
 
@@ -12,7 +12,7 @@ Updated 2026-10-12. Release candidate 0.2.0-rc.1. External plugins are now defer
 - Opt-in/deferred external plugins, brokered permissions, mutation review, signed catalog installation and reviewed updates. A scoped React/MUI Headlamp profile runs the upstream pod-counter example; see [compatibility](headlamp-plugins.md).
 - Optional remote HTTPS browser-forward gateway with session-bound one-use links, isolated host cookies and HTTP/WebSocket proxying.
 - Astronomer typography, colors, layout, theme and density; table saved views, column sizing/pinning/visibility, keyboard navigation and CSV; Lite branding retained.
-- Electron desktop launcher, private local API and process locks. Linux AppImage/deb/RPM, Windows x64 NSIS and Intel/Apple Silicon Mac ZIPs built. RPM install/runtime/remove verified on Red Hat UBI 8/9/10; native Mac DMG and Windows installer/browser CI defined. Container/native server operation remains available.
+- Electron desktop launcher, private local API and process locks. Linux AppImage/deb/RPM, Windows x64 NSIS and Intel/Apple Silicon Mac DMG/ZIP packages. Hosted Mac/Windows installer and browser tests and RPM install/runtime/remove checks on Red Hat UBI 8/9/10 passed for RC.2; each candidate repeats these gates. Container/native server operation remains available.
 
 ## Verification and boundaries
 
@@ -24,7 +24,7 @@ Only reviewed, trusted [plugins](plugins.md) should be installed. Iframe restric
 
 ## Release work and product limits
 
-- Apache-2.0 licensing and owned UI relicensing authorization are recorded. Signing, native workstation gates, versioned artifact manifests, and draft-release automation are implemented; see [release setup](releasing.md). Production signing/notarization is deferred by user decision; unsigned distribution is accepted for now. Registered desktop runners and successful native macOS/Windows/RHEL runs remain required before declaring native release readiness. No public release has been published.
+- Apache-2.0 licensing and owned UI relicensing authorization are recorded. Signing, native workstation gates, versioned artifact manifests, and draft-release automation are implemented; see [release setup](releasing.md). Production signing/notarization is deferred by user decision; unsigned distribution is accepted for now. Windows 11 and graphical RHEL 8/9/10 workstation validation remain required for stable release readiness. RC.1 and RC.2 have been published publicly.
 - Production OIDC/proxy/cloud-helper configurations and public wildcard DNS/TLS forwarding need deployment-specific validation.
 - Synthetic multi-context load on one physical cluster does not establish production fleet capacity. Longer representative tests are still needed.
 - Headlamp compatibility intentionally exposes a documented SDK subset. Additional upstream plugins/global extension hooks need adaptation; not every observability integration is included.

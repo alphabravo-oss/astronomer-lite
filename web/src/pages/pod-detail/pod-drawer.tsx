@@ -1,3 +1,5 @@
+import { QueryState } from "../../components/ui/query-state";
+import { Drawer } from "../../components/ui/drawer";
 import { dump } from "js-yaml";
 import {
   FileCode2,
@@ -59,13 +61,8 @@ export function PodDrawer({
   const [eventsError, setEventsError] = useState("");
   const [yamlDialogOpen, setYamlDialogOpen] = useState(false);
   const [resourceYaml, setResourceYaml] = useState("");
-  // The Pods page shows YAML read-only (allowEdit={false} below); editing a Pod
-  // is done through the generic resource drawer. editedYaml/editMode satisfy the
-  // dialog's required props but stay inert here by design.
-  const [editedYaml, setEditedYaml] = useState("");
   const [yamlLoading, setYamlLoading] = useState(false);
   const [yamlError, setYamlError] = useState("");
-  const [editMode, setEditMode] = useState(false);
   const navigate = useNavigate();
   const podRoute = `/clusters/${clusterId}/pods/${encodeURIComponent(pod.namespace)}/${encodeURIComponent(pod.name)}`;
 
@@ -130,9 +127,7 @@ export function PodDrawer({
   useEffect(() => {
     setYamlDialogOpen(false);
     setResourceYaml("");
-    setEditedYaml("");
     setYamlError("");
-    setEditMode(false);
   }, [pod.name, pod.namespace]);
 
   const openYaml = useCallback(async () => {
@@ -148,8 +143,6 @@ export function PodDrawer({
       );
       const nextYaml = dump(resource, { lineWidth: -1, noRefs: true });
       setResourceYaml(nextYaml);
-      setEditedYaml(nextYaml);
-      setEditMode(false);
       setYamlDialogOpen(true);
     } catch (err) {
       setYamlError(
@@ -162,216 +155,200 @@ export function PodDrawer({
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex justify-end bg-background/60 backdrop-blur-xs">
-        <aside className="h-full w-full max-w-xl animate-slide-in-right overflow-y-auto border-l border-border bg-card shadow-2xl">
-          <div className="sticky top-0 z-10 flex items-start justify-between border-b border-border bg-card/95 p-5 backdrop-blur">
-            <div className="min-w-0">
-              <div className="mb-2 flex items-center gap-2">
-                <Badge tone={pod.status === "Running" ? "success" : "warning"}>
-                  {pod.status}
-                </Badge>
-                <span className="text-xs text-muted-foreground">
-                  {pod.namespace}
-                </span>
-              </div>
-              <h2 className="truncate text-lg font-semibold">{pod.name}</h2>
+      <Drawer title={pod.name} onClose={onClose} className="max-w-xl">
+        <div className="sticky top-0 z-10 flex items-start justify-between border-b border-border bg-card/95 p-5 backdrop-blur">
+          <div className="min-w-0">
+            <div className="mb-2 flex items-center gap-2">
+              <Badge tone={pod.status === "Running" ? "success" : "warning"}>
+                {pod.status}
+              </Badge>
+              <span className="text-xs text-muted-foreground">
+                {pod.namespace}
+              </span>
             </div>
-            <div className="flex shrink-0 items-center gap-2">
-              <ActionMenu
-                label={`Open ${pod.name} actions`}
-                items={[
-                  {
-                    label: yamlLoading ? "Loading YAML..." : "View YAML",
-                    icon: <FileCode2 className="h-3.5 w-3.5" />,
-                    onClick: () => void openYaml(),
-                    disabled: yamlLoading,
-                  },
-                  {
-                    label: "Logs",
-                    icon: <ScrollText className="h-3.5 w-3.5" />,
-                    onClick: () => navigate(`${podRoute}/logs`),
-                  },
-                  {
-                    label: "Exec",
-                    icon: <TerminalSquare className="h-3.5 w-3.5" />,
-                    onClick: () => navigate(`${podRoute}/exec`),
-                  },
-                  {
-                    label: "Attach",
-                    icon: <PlugZap className="h-3.5 w-3.5" />,
-                    onClick: () => navigate(`${podRoute}/attach`),
-                  },
-                  {
-                    label: "Port-forward",
-                    icon: <Plug className="h-3.5 w-3.5" />,
-                    onClick: () => navigate(`${podRoute}/port-forward`),
-                  },
-                ]}
+            <h2 className="truncate text-lg font-semibold">{pod.name}</h2>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <ActionMenu
+              label={`Open ${pod.name} actions`}
+              items={[
+                {
+                  label: yamlLoading ? "Loading YAML..." : "View YAML",
+                  icon: <FileCode2 className="h-3.5 w-3.5" />,
+                  onClick: () => void openYaml(),
+                  disabled: yamlLoading,
+                },
+                {
+                  label: "Logs",
+                  icon: <ScrollText className="h-3.5 w-3.5" />,
+                  onClick: () => navigate(`${podRoute}/logs`),
+                },
+                {
+                  label: "Exec",
+                  icon: <TerminalSquare className="h-3.5 w-3.5" />,
+                  onClick: () => navigate(`${podRoute}/exec`),
+                },
+                {
+                  label: "Attach",
+                  icon: <PlugZap className="h-3.5 w-3.5" />,
+                  onClick: () => navigate(`${podRoute}/attach`),
+                },
+                {
+                  label: "Port-forward",
+                  icon: <Plug className="h-3.5 w-3.5" />,
+                  onClick: () => navigate(`${podRoute}/port-forward`),
+                },
+              ]}
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() =>
+                toggleFavorite({
+                  kind: "Pod",
+                  resource: "pods",
+                  namespace: pod.namespace,
+                  name: pod.name,
+                  route: "pods",
+                })
+              }
+              aria-label={pinned ? `Unpin ${pod.name}` : `Pin ${pod.name}`}
+              aria-pressed={pinned}
+              title={pinned ? "Unpin from sidebar" : "Pin to sidebar"}
+            >
+              <Star
+                className={cn(
+                  "h-4 w-4",
+                  pinned ? "fill-yellow-400 text-yellow-400" : "",
+                )}
               />
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() =>
-                  toggleFavorite({
-                    kind: "Pod",
-                    resource: "pods",
-                    namespace: pod.namespace,
-                    name: pod.name,
-                    route: "pods",
-                  })
-                }
-                aria-label={pinned ? `Unpin ${pod.name}` : `Pin ${pod.name}`}
-                aria-pressed={pinned}
-                title={pinned ? "Unpin from sidebar" : "Pin to sidebar"}
-              >
-                <Star
-                  className={cn(
-                    "h-4 w-4",
-                    pinned ? "fill-yellow-400 text-yellow-400" : "",
-                  )}
-                />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={onClose}
-                aria-label="Close pod detail"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onClose}
+              aria-label="Close pod detail"
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </div>
-          <div className="space-y-6 p-5">
-            {error ? (
-              <div className="rounded-lg border border-destructive/35 bg-destructive/10 p-3 text-sm text-destructive">
-                {error}
-              </div>
-            ) : null}
-            {yamlError ? (
-              <div className="rounded-lg border border-destructive/35 bg-destructive/10 p-3 text-sm text-destructive">
-                {yamlError}
-              </div>
-            ) : null}
-            {!detail && !error ? (
-              <div className="shimmer h-24 rounded-lg bg-muted" />
-            ) : null}
-            {detail ? (
-              <>
-                <section className="grid grid-cols-2 gap-3 text-sm">
-                  <Info label="Ready" value={detail.ready} />
-                  <Info label="Restarts" value={detail.restarts} />
-                  <Info
-                    label="Pod IPs"
-                    value={listSummary(detail.podIPs, detail.podIP)}
-                  />
-                  <Info
-                    label="Host IPs"
-                    value={listSummary(detail.hostIPs, detail.hostIP)}
-                  />
-                  <Info label="Node" value={detail.node || "-"} />
-                  <Info
-                    label="Service Account"
-                    value={detail.serviceAccountName || "-"}
-                  />
-                  <Info label="QoS Class" value={detail.qosClass || "-"} />
-                  <Info label="Priority" value={detail.priority ?? "-"} />
-                  <Info
-                    label="Created"
-                    value={formatTimestamp(detail.createdAt)}
-                  />
-                  <Info label="UID" value={detail.uid || "-"} />
-                </section>
-
-                <MetricSummary
-                  title="Pod metrics"
-                  metric={metric}
-                  unavailable={metricError}
+        </div>
+        <div className="space-y-6 p-5">
+          {error ? <QueryState error={error} /> : null}
+          {yamlError ? <QueryState error={yamlError} /> : null}
+          {!detail && !error ? (
+            <div className="shimmer h-24 rounded-lg bg-muted" />
+          ) : null}
+          {detail ? (
+            <>
+              <section className="grid grid-cols-2 gap-3 text-sm">
+                <Info label="Ready" value={detail.ready} />
+                <Info label="Restarts" value={detail.restarts} />
+                <Info
+                  label="Pod IPs"
+                  value={listSummary(detail.podIPs, detail.podIP)}
                 />
-
-                <RelatedResourcesSection
-                  clusterId={clusterId}
-                  namespace={detail.namespace}
-                  node={detail.node}
-                  serviceAccount={detail.serviceAccountName}
-                  owners={detail.ownerReferences ?? []}
-                  onNavigate={navigate}
+                <Info
+                  label="Host IPs"
+                  value={listSummary(detail.hostIPs, detail.hostIP)}
                 />
+                <Info label="Node" value={detail.node || "-"} />
+                <Info
+                  label="Service Account"
+                  value={detail.serviceAccountName || "-"}
+                />
+                <Info label="QoS Class" value={detail.qosClass || "-"} />
+                <Info label="Priority" value={detail.priority ?? "-"} />
+                <Info
+                  label="Created"
+                  value={formatTimestamp(detail.createdAt)}
+                />
+                <Info label="UID" value={detail.uid || "-"} />
+              </section>
 
+              <MetricSummary
+                title="Pod metrics"
+                metric={metric}
+                unavailable={metricError}
+              />
+
+              <RelatedResourcesSection
+                clusterId={clusterId}
+                namespace={detail.namespace}
+                node={detail.node}
+                serviceAccount={detail.serviceAccountName}
+                owners={detail.ownerReferences ?? []}
+                onNavigate={navigate}
+              />
+
+              <ContainerDetailsSection
+                title="Containers"
+                containers={detail.containers}
+              />
+              {detail.initContainers && detail.initContainers.length > 0 ? (
                 <ContainerDetailsSection
-                  title="Containers"
-                  containers={detail.containers}
+                  title="Init Containers"
+                  containers={detail.initContainers}
                 />
-                {detail.initContainers && detail.initContainers.length > 0 ? (
-                  <ContainerDetailsSection
-                    title="Init Containers"
-                    containers={detail.initContainers}
-                  />
-                ) : null}
+              ) : null}
 
-                <VolumesSection volumes={detail.volumes ?? []} />
-                <TolerationsSection tolerations={detail.tolerations ?? []} />
+              <VolumesSection volumes={detail.volumes ?? []} />
+              <TolerationsSection tolerations={detail.tolerations ?? []} />
 
-                <section>
-                  <h3 className="mb-2 text-sm font-semibold">Conditions</h3>
-                  <div className="space-y-2">
-                    {detail.conditions.map((condition) => (
-                      <div
-                        key={condition.type}
-                        className="flex items-start justify-between gap-3 rounded-md border border-border p-3 text-sm"
-                      >
-                        <div>
-                          <div className="font-medium">{condition.type}</div>
-                          {condition.message ? (
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              {condition.message}
-                            </div>
-                          ) : null}
-                        </div>
-                        <Badge
-                          tone={
-                            condition.status === "True" ? "success" : "muted"
-                          }
-                        >
-                          {condition.status}
-                        </Badge>
+              <section>
+                <h3 className="mb-2 text-sm font-semibold">Conditions</h3>
+                <div className="space-y-2">
+                  {detail.conditions.map((condition) => (
+                    <div
+                      key={condition.type}
+                      className="flex items-start justify-between gap-3 rounded-md border border-border p-3 text-sm"
+                    >
+                      <div>
+                        <div className="font-medium">{condition.type}</div>
+                        {condition.message ? (
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {condition.message}
+                          </div>
+                        ) : null}
                       </div>
-                    ))}
-                  </div>
-                </section>
+                      <Badge
+                        tone={condition.status === "True" ? "success" : "muted"}
+                      >
+                        {condition.status}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              </section>
 
-                <section>
-                  <h3 className="mb-2 text-sm font-semibold">Labels</h3>
-                  <KeyValuePills entries={labels} emptyText="No labels." />
-                </section>
+              <section>
+                <h3 className="mb-2 text-sm font-semibold">Labels</h3>
+                <KeyValuePills entries={labels} emptyText="No labels." />
+              </section>
 
-                <section>
-                  <h3 className="mb-2 text-sm font-semibold">Annotations</h3>
-                  <KeyValuePills
-                    entries={Object.entries(detail.annotations ?? {})}
-                    emptyText="No annotations."
-                  />
-                </section>
-
-                <PodEventsSection
-                  events={events}
-                  loading={eventsLoading}
-                  error={eventsError}
-                  onRefresh={loadEvents}
+              <section>
+                <h3 className="mb-2 text-sm font-semibold">Annotations</h3>
+                <KeyValuePills
+                  entries={Object.entries(detail.annotations ?? {})}
+                  emptyText="No annotations."
                 />
-              </>
-            ) : null}
-          </div>
-        </aside>
-      </div>
+              </section>
+
+              <PodEventsSection
+                events={events}
+                loading={eventsLoading}
+                error={eventsError}
+                onRefresh={loadEvents}
+              />
+            </>
+          ) : null}
+        </div>
+      </Drawer>
       <YamlViewDialog
         open={yamlDialogOpen}
         onClose={() => setYamlDialogOpen(false)}
         title={`Pod YAML: ${pod.name}`}
         yaml={resourceYaml}
-        editedYaml={editedYaml}
-        onEditedYamlChange={setEditedYaml}
-        editMode={editMode}
-        onEditModeChange={setEditMode}
         allowEdit={false}
         readOnly
         kind="Pod"
@@ -444,11 +421,7 @@ function PodEventsSection({
           Refresh
         </Button>
       </div>
-      {error ? (
-        <div className="rounded-md border border-destructive/35 bg-destructive/10 p-3 text-sm text-destructive">
-          {error}
-        </div>
-      ) : null}
+      {error ? <QueryState error={error} /> : null}
       {!error && loading ? (
         <div className="shimmer h-16 rounded-md bg-muted" />
       ) : null}

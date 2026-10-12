@@ -1,6 +1,6 @@
-# Astronomer-lite
+# Astronomer Lite
 
-A Headlamp-style Kubernetes UI with Astronomer styling and Astronomer-Lite branding. Run one container or the desktop application, connect kubeconfigs, and manage multiple clusters.
+A Headlamp-style Kubernetes UI with Astronomer styling and Astronomer Lite branding. Run one container or the desktop application, connect kubeconfigs, and manage multiple clusters.
 
 > **Status:** Alpha — Core cluster management, local multi-user login and optional OIDC are implemented, including Helm, topology, metrics, exec/logs/port-forward and YAML editing with server-side dry-run. External plugins are deferred and disabled by default. See [`docs/STATUS.md`](docs/STATUS.md) for implemented features, verification and release limits.
 > **Spec:** [`docs/specs/i-want-to-make-a-headlamp-style-single-container--process-ui.md`](docs/specs/i-want-to-make-a-headlamp-style-single-container--process-ui.md)
@@ -148,7 +148,7 @@ The runtime image runs as the unprivileged `astronomer` user and only needs writ
 - Optional OIDC with PKCE, refresh and group mapping, or trusted identity-aware proxy login; local login remains available.
 - Server mode uses separate kubeconfigs and caches for each user. Application roles never grant Kubernetes permissions.
 - Deferred, explicit opt-in only (`ASTRONOMER_LITE_PLUGINS_ENABLED=true`): external plugins with declared permissions, signed catalog install/update, per-user settings, a documented Headlamp compatibility profile, sandboxed frames and host confirmation for changes. See [plugin development](docs/plugins.md).
-- Astronomer typography, semantic colors, light/dark themes, persisted density and sidebar preferences, with Astronomer-Lite branding.
+- Astronomer typography, semantic colors, light/dark themes, persisted density and sidebar preferences, with Astronomer Lite branding.
 
 See the [Headlamp comparison](docs/headlamp-parity.md) for verified coverage and remaining gaps.
 

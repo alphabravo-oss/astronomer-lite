@@ -5,18 +5,15 @@ import { Dialog, DialogContent, DialogTitle } from "./dialog";
 import { cn } from "../../lib/utils";
 import type { OpenAPIDocument } from "../../lib/openapi";
 
-const YamlEditor = lazy(() => import("./yaml-editor").then((module) => ({ default: module.YamlEditor })));
+const YamlEditor = lazy(() =>
+  import("./yaml-editor").then((module) => ({ default: module.YamlEditor })),
+);
 
 type YamlViewDialogProps = {
   open: boolean;
   onClose: () => void;
   title: string;
   yaml: string;
-  editedYaml: string;
-  onEditedYamlChange: (value: string) => void;
-  editMode: boolean;
-  onEditModeChange: (value: boolean) => void;
-  allowEdit?: boolean;
   readOnly?: boolean;
   actions?: ReactNode;
   message?: ReactNode;
@@ -24,7 +21,22 @@ type YamlViewDialogProps = {
   kind?: string;
   apiVersion?: string;
   openApiDoc?: OpenAPIDocument | null;
-};
+} & (
+  | {
+      allowEdit: false;
+      editedYaml?: never;
+      onEditedYamlChange?: never;
+      editMode?: never;
+      onEditModeChange?: never;
+    }
+  | {
+      allowEdit?: boolean;
+      editedYaml: string;
+      onEditedYamlChange: (value: string) => void;
+      editMode: boolean;
+      onEditModeChange: (value: boolean) => void;
+    }
+);
 
 export function YamlViewDialog({
   open,
@@ -42,7 +54,7 @@ export function YamlViewDialog({
   childrenAfterEditor,
   kind,
   apiVersion,
-  openApiDoc
+  openApiDoc,
 }: YamlViewDialogProps) {
   const editable = allowEdit && !readOnly;
 
@@ -53,18 +65,26 @@ export function YamlViewDialog({
         if (!nextOpen) onClose();
       }}
     >
-      <DialogContent className="flex h-[80vh] w-[90vw] max-w-5xl flex-col gap-0 p-0">
-        <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 pr-12">
+      <DialogContent
+        aria-describedby={undefined}
+        className="flex h-[80vh] w-[90vw] max-w-5xl flex-col gap-0 p-0"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-4 py-3 pr-12">
           <div className="flex min-w-0 items-center gap-3">
-            <DialogTitle className="truncate text-sm font-semibold">{title}</DialogTitle>
+            <DialogTitle className="truncate text-sm font-semibold">
+              {title}
+            </DialogTitle>
             {allowEdit ? (
               <div className="flex items-center rounded bg-muted p-0.5">
                 <button
                   type="button"
-                  onClick={() => onEditModeChange(false)}
+                  aria-pressed={!editMode}
+                  onClick={() => onEditModeChange?.(false)}
                   className={cn(
                     "inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors",
-                    !editMode ? "bg-background text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
+                    !editMode
+                      ? "bg-background text-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground",
                   )}
                 >
                   <Eye className="h-3 w-3" />
@@ -72,11 +92,14 @@ export function YamlViewDialog({
                 </button>
                 <button
                   type="button"
-                  onClick={() => onEditModeChange(true)}
+                  aria-pressed={!!editMode}
+                  onClick={() => onEditModeChange?.(true)}
                   disabled={!editable}
                   className={cn(
                     "inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50",
-                    editMode ? "bg-background text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
+                    editMode
+                      ? "bg-background text-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground",
                   )}
                 >
                   <Pencil className="h-3 w-3" />
@@ -85,9 +108,11 @@ export function YamlViewDialog({
               </div>
             ) : null}
           </div>
-          <div className="flex shrink-0 items-center gap-2">{actions}</div>
+          <div className="flex flex-wrap items-center gap-2">{actions}</div>
         </div>
-        {message ? <div className="border-b border-border px-4 py-3">{message}</div> : null}
+        {message ? (
+          <div className="border-b border-border px-4 py-3">{message}</div>
+        ) : null}
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <Suspense
             fallback={
@@ -97,7 +122,7 @@ export function YamlViewDialog({
             }
           >
             <YamlEditor
-              value={editMode && editable ? editedYaml : yaml}
+              value={editMode && editable ? (editedYaml ?? yaml) : yaml}
               onChange={editMode && editable ? onEditedYamlChange : undefined}
               readOnly={!editMode || !editable}
               height={childrenAfterEditor ? "48vh" : "100%"}
@@ -107,7 +132,11 @@ export function YamlViewDialog({
               openApiDoc={openApiDoc}
             />
           </Suspense>
-          {childrenAfterEditor ? <div className="max-h-[28vh] overflow-auto border-t border-border">{childrenAfterEditor}</div> : null}
+          {childrenAfterEditor ? (
+            <div className="max-h-[28vh] overflow-auto border-t border-border">
+              {childrenAfterEditor}
+            </div>
+          ) : null}
         </div>
       </DialogContent>
     </Dialog>

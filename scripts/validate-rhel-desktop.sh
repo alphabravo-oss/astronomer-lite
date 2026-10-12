@@ -21,13 +21,13 @@ if [[ "${LITE_SIGNED_RELEASE:-false}" == true ]]; then
   rpmkeys --checksig "$RPM_FILE"
 fi
 sudo -n dnf -y install "$RPM_FILE"
-export LITE_DESKTOP_EXECUTABLE=/opt/Astronomer-Lite/astronomer-lite
+export LITE_DESKTOP_EXECUTABLE="/opt/Astronomer Lite/astronomer-lite"
 # Require a native display: do not use the Xvfb convenience wrapper here.
 if [[ -z "${DISPLAY:-}" ]]; then export LITE_DESKTOP_OZONE_PLATFORM=wayland; fi
 cd "$ROOT_DIR/web"
 ./node_modules/.bin/playwright test --config playwright.desktop.config.ts --reporter=line,json
 sudo -n dnf -y remove astronomer-lite-desktop
 trap - EXIT
-test ! -e /opt/Astronomer-Lite/astronomer-lite
+test ! -e "/opt/Astronomer Lite/astronomer-lite"
 test ! -e /usr/bin/astronomer-lite
 printf 'RHEL %s GNOME install/launch/uninstall passed with SELinux Enforcing\n' "$MAJOR"

@@ -1,3 +1,5 @@
+import { QueryState } from "../components/ui/query-state";
+import { Card } from "../components/ui/card";
 import { Textarea } from "../components/ui/input";
 import { Check, FileUp, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -169,13 +171,9 @@ export function GenericResourceBrowser({
         description="Discovery-backed browser for any listable Kubernetes GVR."
       />
 
-      {error ? (
-        <div className="rounded-lg border border-destructive/35 bg-destructive/10 p-4 text-sm text-destructive">
-          {error}
-        </div>
-      ) : null}
+      {error ? <QueryState error={error} /> : null}
 
-      <section className="rounded-lg border border-border bg-card p-4">
+      <Card as="section">
         <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
@@ -206,6 +204,7 @@ export function GenericResourceBrowser({
           </div>
         </div>
         <Textarea
+          aria-label="Manifest YAML"
           id="apply-yaml"
           name="apply-yaml"
           value={applyYaml}
@@ -215,11 +214,7 @@ export function GenericResourceBrowser({
           }
           className="min-h-44 w-full resize-y rounded-md border border-input bg-background px-3 py-2 font-mono text-xs leading-5 outline-hidden placeholder:text-muted-foreground focus:ring-2 focus:ring-ring"
         />
-        {applyError ? (
-          <div className="mt-3 rounded-md border border-destructive/35 bg-destructive/10 p-3 text-sm text-destructive">
-            {applyError}
-          </div>
-        ) : null}
+        {applyError ? <QueryState error={applyError} /> : null}
         {applyResponse ? (
           <div
             className={cn(
@@ -248,7 +243,7 @@ export function GenericResourceBrowser({
             </div>
           </div>
         ) : null}
-      </section>
+      </Card>
 
       <section className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
         <aside className="overflow-hidden rounded-lg border border-border bg-card">
@@ -256,6 +251,7 @@ export function GenericResourceBrowser({
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
               <Input
+                aria-label="Filter API resources"
                 id="api-resource-filter"
                 name="api-resource-filter"
                 value={query}

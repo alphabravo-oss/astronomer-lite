@@ -1,6 +1,6 @@
 # Desktop application
 
-Astronomer-Lite Desktop wraps the embedded Go server and Astronomer-styled UI in Electron. It retains the Orbit mark, blue/violet colors and AlphaBravo attribution. One private workspace runs per profile; there is no database or HA mode.
+Astronomer Lite Desktop wraps the embedded Go server and Astronomer-styled UI in Electron. It retains the Orbit mark, blue/violet colors and AlphaBravo attribution. One private workspace runs per profile; there is no database or HA mode.
 
 ## Platforms and artifacts
 
@@ -12,7 +12,7 @@ Astronomer-Lite Desktop wraps the embedded Go server and Astronomer-styled UI in
 | RHEL 8, 9 and 10 | x86_64 | RPM | Install, runtime loading, private API, shutdown and removal passed on Red Hat UBI for every major version |
 | Other Linux | x64 | AppImage / deb | Packaged desktop browser test passed on Ubuntu |
 
-The published 0.2.0-rc.1 [desktop validation run](https://github.com/alphabravo-oss/astronomer-lite/actions/runs/38190349918) passed the hosted platform and UBI checks above. Graphical RHEL validation remains pending.
+The published 0.2.0-rc.2 [desktop validation run](https://github.com/alphabravo-oss/astronomer-lite/actions/runs/38206533148) passed the hosted platform and UBI checks above. Graphical RHEL validation remains pending.
 
 Packages are in `desktop/dist`, with adjacent `.sha256` files for new artifacts. Production signing/notarization is deferred; unsigned prerelease distribution is accepted for now. Native workstation checks remain required for stable release readiness. DMG creation runs on macOS; Linux cross-builds produce Mac ZIPs. Lite is licensed under Apache-2.0 with AlphaBravo authorization for the reused Astronomer UI; third-party licenses are preserved.
 
@@ -21,7 +21,7 @@ Packages are in `desktop/dist`, with adjacent `.sha256` files for new artifacts.
 **RHEL 8/9/10:** on an x86_64 machine with a graphical desktop and the usual BaseOS/AppStream repositories enabled:
 
 ```sh
-sudo dnf install ./Astronomer-Lite-0.2.0-rc.2-linux-x86_64.rpm
+sudo dnf install ./Astronomer-Lite-0.2.0-rc.3-linux-x86_64.rpm
 astronomer-lite
 # Remove the application; private user workspaces remain:
 sudo dnf remove astronomer-lite-desktop
@@ -31,11 +31,17 @@ The same RPM targets all three major versions with current security updates; the
 
 Run the application as your normal desktop user. The container tests verify ABI/runtime compatibility, not a graphical RHEL workstation with SELinux enforcing. They do not require a subscription and do not disable SELinux or change host policy. The host Ubuntu browser test covers the actual renderer; native RHEL desktop/display/SELinux validation remains a release check.
 
-**Windows:** run `Astronomer-Lite-0.2.0-rc.2-win-x64.exe`, choose the installation directory and launch from the Start menu. The installer is per-user; it does not install a Windows service. Silent installation uses `/S`; `/D=PATH` must be the final argument. Uninstall through Windows Settings or the installed uninstaller.
+**Windows:** run `Astronomer-Lite-0.2.0-rc.3-win-x64.exe`, choose the installation directory and launch from the Start menu. The installer is per-user; it does not install a Windows service. Silent installation uses `/S`; `/D=PATH` must be the final argument. Uninstall through Windows Settings or the installed uninstaller.
 
-**macOS:** download the DMG matching Intel (`mac-x64`) or Apple Silicon (`mac-arm64`). Open it and drag `Astronomer-Lite.app` onto the Applications shortcut. Open `READ ME FIRST.txt` beside those icons for installation and first-launch instructions. The Mac ZIPs include the same guide beside the app.
+**macOS:** download the DMG matching Intel (`mac-x64`) or Apple Silicon (`mac-arm64`). Open it and drag `Astronomer Lite.app` (`Astronomer-Lite.app` in 0.2.0-rc.2) onto the Applications shortcut. Open `READ ME FIRST.txt` beside those icons for installation and first-launch instructions. The Mac ZIPs include the same guide beside the app.
 
-Unsigned releases have not been notarized. If macOS says Apple cannot check the app for malicious software, dismiss the warning, open **System Settings → Privacy & Security**, scroll to **Security**, and select **Open Anyway** for Astronomer-Lite. Authenticate if requested and confirm **Open**. Use this exception for a trusted copy from our official release. macOS remembers the exception for later launches. See [Apple's instructions](https://support.apple.com/en-us/102445) and the [bundled guide](../desktop/READ%20ME%20FIRST.txt).
+Unsigned releases have not been notarized. If macOS says Apple cannot check the app for malicious software, dismiss the warning, open **System Settings → Privacy & Security**, scroll to **Security**, and select **Open Anyway** for Astronomer Lite. Authenticate if requested and confirm **Open**. Use this exception for a trusted copy from our official release. macOS remembers the exception for later launches. See [Apple's instructions](https://support.apple.com/en-us/102445) and the [bundled guide](../desktop/READ%20ME%20FIRST.txt).
+
+## Settings and app name
+
+Open **Astronomer Lite → Settings…** on macOS (**⌘,**) or **File → Settings…** on Windows/Linux (**Ctrl+,**). The gear link in the workspace opens the same Settings page.
+
+The display name is **Astronomer Lite**. Existing desktop profiles remain in the original `Astronomer-Lite` data directory so upgrades retain imported clusters and preferences. Package IDs and release download filenames also remain stable. These naming and menu changes apply from RC.3; RC.2 uses the previous name. When upgrading a Mac, open the new app before removing the old `Astronomer-Lite.app` from Applications.
 
 ## Build
 
@@ -71,14 +77,18 @@ For development, `(cd desktop && npm run build:server && npm start)` builds/runs
 ```sh
 (cd desktop && npm test)
 (cd web && npm run e2e:desktop)
-./scripts/verify-rpm.sh desktop/dist/Astronomer-Lite-0.2.0-rc.2-linux-x86_64.rpm 8
-./scripts/verify-rpm.sh desktop/dist/Astronomer-Lite-0.2.0-rc.2-linux-x86_64.rpm 9
-./scripts/verify-rpm.sh desktop/dist/Astronomer-Lite-0.2.0-rc.2-linux-x86_64.rpm 10
+./scripts/verify-rpm.sh desktop/dist/Astronomer-Lite-0.2.0-rc.3-linux-x86_64.rpm 8
+./scripts/verify-rpm.sh desktop/dist/Astronomer-Lite-0.2.0-rc.3-linux-x86_64.rpm 9
+./scripts/verify-rpm.sh desktop/dist/Astronomer-Lite-0.2.0-rc.3-linux-x86_64.rpm 10
 ```
 
 The RPM harness uses disposable containers and checks DNF install/remove, required shared libraries, the packaged Electron runtime and its Go child, unauthorized API rejection and child shutdown. It leaves host packages/configuration untouched. Desktop tests cover exact capability origin, process locks, restart, executable mismatch rejection, branding/Settings, renderer isolation and second-instance behavior. Headless Linux browser tests require Xvfb. Only root-owned test runs use `--no-sandbox`; the application defaults keep sandboxing enabled.
 
 ## Workspace and lifecycle
+
+To add another kubeconfig in the installed app, open **Clusters → Add kubeconfig → Upload file**, choose the file, click **Preview contexts**, select the contexts, then click **Add selected**. Repeat for additional files. Pasting YAML uses the same flow. The web UI provides these same controls; shared server-mode imports belong to the signed-in user and follow the operator's cluster/credential restrictions.
+
+Uploading imports a copy into the workspace; it does not establish a live link to the original file. The desktop does not currently provide a settings screen for selecting additional on-disk kubeconfig paths or configuring credential-helper executable paths.
 
 The launcher reads `KUBECONFIG` or the normal local kubeconfig; install local cloud helpers on PATH. Imports, projects and plugin state live under Electron's user-data directory in `workspace/`; plugin packages go in `workspace/plugins/`. Browser preferences stay in the Electron profile. A remembered loopback port preserves that browser origin; an occupied port causes selection of a different port.
 

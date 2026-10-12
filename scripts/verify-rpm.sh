@@ -22,12 +22,12 @@ exec docker run --rm --init --platform linux/amd64 \
     if test -f /tmp/lite-key.asc; then rpm --import /tmp/lite-key.asc; rpmkeys --checksig /tmp/astronomer-lite.rpm; fi
     dnf -y --setopt=install_weak_deps=False install /tmp/astronomer-lite.rpm
     rpm -q astronomer-lite-desktop
-    ldd /opt/Astronomer-Lite/astronomer-lite > /tmp/linked-libraries
+    ldd "/opt/Astronomer Lite/astronomer-lite" > /tmp/linked-libraries
     cat /tmp/linked-libraries
     if grep -q "not found" /tmp/linked-libraries; then exit 1; fi
-    ELECTRON_RUN_AS_NODE=1 /opt/Astronomer-Lite/astronomer-lite /tmp/smoke.cjs
+    ELECTRON_RUN_AS_NODE=1 "/opt/Astronomer Lite/astronomer-lite" /tmp/smoke.cjs
     dnf -y remove astronomer-lite-desktop
     test ! -e /usr/bin/astronomer-lite
-    test ! -e /opt/Astronomer-Lite/astronomer-lite
+    test ! -e "/opt/Astronomer Lite/astronomer-lite"
     echo "RPM install/runtime/uninstall passed"
   '

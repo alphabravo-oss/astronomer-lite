@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CartesianGrid, Legend, Line, LineChart, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  CartesianGrid,
+  Legend,
+  Line,
+  LineChart,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 export type RangeSeries = {
   /** Stable identifier for the series (used as the Recharts dataKey). */
@@ -24,20 +32,19 @@ type ChartRow = {
   ts: number;
 } & Record<string, number | undefined>;
 
-const SERIES_COLORS = [
-  "hsl(var(--primary))",
-  "#10b981",
-  "#f59e0b",
-  "#ef4444",
-  "#3b82f6",
-  "#a855f7",
-  "#ec4899",
-  "#14b8a6",
-  "#84cc16",
-  "#f97316"
-];
+// Astronomer's semantic palette follows the active light/dark theme.
+const SERIES_COLORS = ["info", "pending", "success", "warning", "error"].map(
+  (tone) => `hsl(var(--status-${tone}))`,
+);
 
-export function RangeChart({ title, subtitle, series, unit, empty, loading = false }: RangeChartProps) {
+export function RangeChart({
+  title,
+  subtitle,
+  series,
+  unit,
+  empty,
+  loading = false,
+}: RangeChartProps) {
   const chartRef = useRef<HTMLDivElement | null>(null);
   const [chartWidth, setChartWidth] = useState(0);
 
@@ -58,15 +65,25 @@ export function RangeChart({ title, subtitle, series, unit, empty, loading = fal
     <section className="min-w-0 overflow-hidden rounded-lg border border-border bg-card">
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
         <h2 className="text-sm font-semibold">{title}</h2>
-        {subtitle ? <span className="text-xs text-muted-foreground">{subtitle}</span> : null}
+        {subtitle ? (
+          <span className="text-xs text-muted-foreground">{subtitle}</span>
+        ) : null}
       </div>
       {loading && !hasData ? (
         <div className="shimmer h-72 bg-muted/40" />
       ) : hasData ? (
         <div ref={chartRef} className="h-72 min-h-72 min-w-0 p-4">
           {chartWidth > 0 ? (
-            <LineChart data={rows} width={chartWidth} height={256} margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
-              <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" />
+            <LineChart
+              data={rows}
+              width={chartWidth}
+              height={256}
+              margin={{ top: 4, right: 16, bottom: 4, left: 8 }}
+            >
+              <CartesianGrid
+                stroke="hsl(var(--border))"
+                strokeDasharray="3 3"
+              />
               <XAxis
                 dataKey="ts"
                 type="number"
@@ -78,7 +95,9 @@ export function RangeChart({ title, subtitle, series, unit, empty, loading = fal
               />
               <YAxis
                 tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-                tickFormatter={(value) => formatValue(Number(value), unit, true)}
+                tickFormatter={(value) =>
+                  formatValue(Number(value), unit, true)
+                }
                 stroke="hsl(var(--border))"
                 width={64}
               />
@@ -87,19 +106,42 @@ export function RangeChart({ title, subtitle, series, unit, empty, loading = fal
                 content={({ active, payload, label }) => {
                   if (!active || !payload?.length) return null;
                   const ts = typeof label === "number" ? label : Number(label);
-                  const sorted = [...payload].sort((a, b) => Number(b.value ?? 0) - Number(a.value ?? 0));
+                  const sorted = [...payload].sort(
+                    (a, b) => Number(b.value ?? 0) - Number(a.value ?? 0),
+                  );
                   return (
                     <div className="rounded-md border border-border bg-popover px-3 py-2 text-xs shadow-xl">
-                      <div className="mb-1 font-mono text-foreground">{formatTimestamp(ts)}</div>
+                      <div className="mb-1 font-mono text-foreground">
+                        {formatTimestamp(ts)}
+                      </div>
                       <div className="space-y-0.5">
                         {sorted.map((entry) => {
-                          const seriesItem = series.find((s) => s.key === entry.dataKey);
-                          const display = seriesItem?.label ?? String(entry.dataKey);
+                          const seriesItem = series.find(
+                            (s) => s.key === entry.dataKey,
+                          );
+                          const display =
+                            seriesItem?.label ?? String(entry.dataKey);
                           return (
-                            <div key={String(entry.dataKey)} className="flex items-center gap-2 text-muted-foreground">
-                              <span className="inline-block h-2 w-2 rounded-full" style={{ background: String(entry.color ?? "#888") }} />
-                              <span className="truncate font-mono text-foreground">{display}</span>
-                              <span className="ml-auto tabular-nums">{formatValue(Number(entry.value ?? 0), unit, false)}</span>
+                            <div
+                              key={String(entry.dataKey)}
+                              className="flex items-center gap-2 text-muted-foreground"
+                            >
+                              <span
+                                className="inline-block h-2 w-2 rounded-full"
+                                style={{
+                                  background: String(entry.color ?? "#888"),
+                                }}
+                              />
+                              <span className="truncate font-mono text-foreground">
+                                {display}
+                              </span>
+                              <span className="ml-auto tabular-nums">
+                                {formatValue(
+                                  Number(entry.value ?? 0),
+                                  unit,
+                                  false,
+                                )}
+                              </span>
                             </div>
                           );
                         })}
@@ -113,7 +155,11 @@ export function RangeChart({ title, subtitle, series, unit, empty, loading = fal
                   wrapperStyle={{ fontSize: 11 }}
                   formatter={(value) => {
                     const item = series.find((s) => s.key === value);
-                    return <span className="text-muted-foreground">{item?.label ?? value}</span>;
+                    return (
+                      <span className="text-muted-foreground">
+                        {item?.label ?? value}
+                      </span>
+                    );
                   }}
                 />
               ) : null}
@@ -124,6 +170,9 @@ export function RangeChart({ title, subtitle, series, unit, empty, loading = fal
                   dataKey={s.key}
                   stroke={SERIES_COLORS[index % SERIES_COLORS.length]}
                   strokeWidth={1.5}
+                  strokeDasharray={
+                    index >= SERIES_COLORS.length ? "5 3" : undefined
+                  }
                   dot={false}
                   isAnimationActive={false}
                   connectNulls
@@ -133,7 +182,9 @@ export function RangeChart({ title, subtitle, series, unit, empty, loading = fal
           ) : null}
         </div>
       ) : (
-        <div className="px-4 py-8 text-center text-sm text-muted-foreground">{empty}</div>
+        <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+          {empty}
+        </div>
       )}
     </section>
   );
@@ -164,10 +215,20 @@ function formatTime(value: number): string {
 function formatTimestamp(value: number): string {
   if (!Number.isFinite(value)) return "";
   const date = new Date(value * 1000);
-  return date.toLocaleString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", month: "short", day: "numeric" });
+  return date.toLocaleString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    month: "short",
+    day: "numeric",
+  });
 }
 
-function formatValue(value: number, unit: RangeChartProps["unit"], compact: boolean): string {
+function formatValue(
+  value: number,
+  unit: RangeChartProps["unit"],
+  compact: boolean,
+): string {
   if (!Number.isFinite(value)) return "-";
   if (unit === "cpu-cores") {
     if (value >= 1) return `${value.toFixed(compact ? 1 : 2)}`;
@@ -175,9 +236,12 @@ function formatValue(value: number, unit: RangeChartProps["unit"], compact: bool
     return value.toFixed(compact ? 2 : 4);
   }
   if (unit === "bytes") {
-    if (value >= 1024 ** 3) return `${(value / 1024 ** 3).toFixed(compact ? 1 : 2)}${compact ? "G" : " GiB"}`;
-    if (value >= 1024 ** 2) return `${(value / 1024 ** 2).toFixed(compact ? 0 : 1)}${compact ? "M" : " MiB"}`;
-    if (value >= 1024) return `${(value / 1024).toFixed(compact ? 0 : 1)}${compact ? "K" : " KiB"}`;
+    if (value >= 1024 ** 3)
+      return `${(value / 1024 ** 3).toFixed(compact ? 1 : 2)}${compact ? "G" : " GiB"}`;
+    if (value >= 1024 ** 2)
+      return `${(value / 1024 ** 2).toFixed(compact ? 0 : 1)}${compact ? "M" : " MiB"}`;
+    if (value >= 1024)
+      return `${(value / 1024).toFixed(compact ? 0 : 1)}${compact ? "K" : " KiB"}`;
     return `${value.toFixed(0)}${compact ? "" : " B"}`;
   }
   return compact ? value.toFixed(2) : value.toString();

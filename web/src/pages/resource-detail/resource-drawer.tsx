@@ -1,3 +1,7 @@
+import { QueryState } from "../../components/ui/query-state";
+import { Card } from "../../components/ui/card";
+import { Drawer } from "../../components/ui/drawer";
+import { Tabs } from "../../components/ui/tabs";
 import { dump } from "js-yaml";
 import { FileCode2, Plug, Scale, Star, Trash2, X } from "lucide-react";
 import {
@@ -559,8 +563,8 @@ export function ResourceDrawer({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-background/60 backdrop-blur-xs">
-      <aside className="h-full w-full max-w-3xl animate-slide-in-right overflow-y-auto border-l border-border bg-card shadow-2xl">
+    <>
+      <Drawer title={item.name} onClose={onClose}>
         <div className="sticky top-0 z-10 flex items-start justify-between border-b border-border bg-card/95 p-5 backdrop-blur">
           <div className="min-w-0">
             <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
@@ -605,480 +609,472 @@ export function ResourceDrawer({
           </div>
         </div>
         <div className="space-y-4 p-5">
-          <div className="flex w-fit rounded-md bg-muted p-0.5">
-            {(["summary", "events", "yaml", "json"] as const).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                className={cn(
-                  "rounded px-3 py-1.5 text-xs font-medium capitalize transition-colors",
-                  view === mode
-                    ? "bg-background text-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-                onClick={() => setView(mode)}
-              >
-                {mode}
-              </button>
-            ))}
-          </div>
-          {cleanedDetail ? (
-            <section className="rounded-lg border border-border bg-background p-4">
-              <div className="mb-3 flex items-center gap-2">
-                <Scale className="h-4 w-4 text-muted-foreground" />
-                <h3 className="text-sm font-semibold">Actions</h3>
-              </div>
-              <div className="grid gap-4 lg:grid-cols-2">
-                {activeResource.id === "nodes" ? (
-                  <div className="rounded-md border border-border bg-card p-3">
-                    <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Scheduling
-                    </div>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {nodeUnschedulable
-                        ? "This node is cordoned and will not receive new Pods."
-                        : "This node is schedulable for new Pods."}
-                    </p>
-                    <Button
-                      className="mt-3"
-                      variant="secondary"
-                      size="sm"
-                      onClick={() =>
-                        void setNodeUnschedulable(!nodeUnschedulable)
-                      }
-                      disabled={!canEdit || actionState !== "idle"}
-                      title={accessStatusMessage(updateAccess) || undefined}
-                    >
-                      {actionState === "cordoning"
-                        ? "Updating..."
-                        : nodeUnschedulable
-                          ? "Uncordon"
-                          : "Cordon"}
-                    </Button>
-                  </div>
-                ) : null}
-                {activeResource.id === "nodes" ? (
-                  <div className="rounded-md border border-border bg-card p-3">
-                    <label
-                      className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
-                      htmlFor={`drain-${item.name}`}
-                    >
-                      Drain
-                    </label>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Cordons the node and evicts eligible Pods. DaemonSet and
-                      static Pods are skipped.
-                    </p>
-                    <div className="mt-2 space-y-2">
-                      <label className="flex items-start gap-2 text-xs text-muted-foreground">
-                        <input
-                          type="checkbox"
-                          checked={drainForce}
-                          onChange={(event) =>
-                            setDrainForce(event.target.checked)
-                          }
-                          disabled={!canEdit || actionState !== "idle"}
-                          className="mt-0.5 rounded border-border text-primary focus:ring-ring"
-                        />
-                        Evict unmanaged Pods
-                      </label>
-                      <label className="flex items-start gap-2 text-xs text-muted-foreground">
-                        <input
-                          type="checkbox"
-                          checked={drainDeleteEmptyDirData}
-                          onChange={(event) =>
-                            setDrainDeleteEmptyDirData(event.target.checked)
-                          }
-                          disabled={!canEdit || actionState !== "idle"}
-                          className="mt-0.5 rounded border-border text-primary focus:ring-ring"
-                        />
-                        Allow emptyDir data deletion
-                      </label>
-                    </div>
-                    <div className="mt-3 flex items-center gap-2">
-                      <input
-                        id={`drain-${item.name}`}
-                        value={drainConfirm}
-                        onChange={(event) =>
-                          setDrainConfirm(event.target.value)
-                        }
-                        placeholder={item.name}
-                        disabled={!canEdit || actionState !== "idle"}
-                        className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-hidden focus:ring-2 focus:ring-ring"
-                      />
+          <Tabs
+            label="Resource views"
+            value={view}
+            onChange={setView}
+            tabs={(["summary", "events", "yaml", "json"] as const).map(
+              (value) => ({
+                value,
+                label:
+                  value === "yaml" || value === "json"
+                    ? value.toUpperCase()
+                    : value[0].toUpperCase() + value.slice(1),
+              }),
+            )}
+          >
+            {cleanedDetail ? (
+              <Card as="section" className="bg-background">
+                <div className="mb-3 flex items-center gap-2">
+                  <Scale className="h-4 w-4 text-muted-foreground" />
+                  <h3 className="text-sm font-semibold">Actions</h3>
+                </div>
+                <div className="grid gap-4 lg:grid-cols-2">
+                  {activeResource.id === "nodes" ? (
+                    <div className="rounded-md border border-border bg-card p-3">
+                      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Scheduling
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {nodeUnschedulable
+                          ? "This node is cordoned and will not receive new Pods."
+                          : "This node is schedulable for new Pods."}
+                      </p>
                       <Button
+                        className="mt-3"
                         variant="secondary"
                         size="sm"
-                        onClick={() => void drainNode()}
-                        disabled={
-                          !canEdit ||
-                          actionState !== "idle" ||
-                          drainConfirm !== item.name
+                        onClick={() =>
+                          void setNodeUnschedulable(!nodeUnschedulable)
                         }
+                        disabled={!canEdit || actionState !== "idle"}
                         title={accessStatusMessage(updateAccess) || undefined}
                       >
-                        {actionState === "draining" ? "Draining..." : "Drain"}
+                        {actionState === "cordoning"
+                          ? "Updating..."
+                          : nodeUnschedulable
+                            ? "Uncordon"
+                            : "Cordon"}
                       </Button>
                     </div>
-                  </div>
-                ) : null}
-                {activeResource.id === "services" && item.namespace ? (
-                  <div className="rounded-md border border-border bg-card p-3">
-                    <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                      Port-forward
-                    </div>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Forward a Service port through one of its backing Pods.
-                    </p>
-                    <Button
-                      className="mt-3"
-                      variant="secondary"
-                      size="sm"
-                      onClick={() =>
-                        navigate(
-                          `/clusters/${clusterId}/services/${encodeURIComponent(item.namespace ?? "")}/${encodeURIComponent(item.name)}/port-forward`,
-                        )
-                      }
-                    >
-                      <Plug className="h-3.5 w-3.5" />
-                      Forward
-                    </Button>
-                  </div>
-                ) : null}
-                {scalable ? (
-                  <div className="rounded-md border border-border bg-card p-3">
-                    <label
-                      className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
-                      htmlFor={`replicas-${item.name}`}
-                    >
-                      Replicas
-                    </label>
-                    <div className="mt-2 flex items-center gap-2">
-                      <input
-                        id={`replicas-${item.name}`}
-                        type="number"
-                        min={0}
-                        step={1}
-                        value={replicas}
-                        onChange={(event) => setReplicas(event.target.value)}
-                        disabled={!canScale}
-                        className="h-9 w-24 rounded-md border border-input bg-background px-3 text-sm outline-hidden focus:ring-2 focus:ring-ring"
-                      />
-                      <Button
-                        size="sm"
-                        onClick={() => void scaleResource()}
-                        disabled={
-                          actionState !== "idle" ||
-                          !replicas.trim() ||
-                          !canScale
-                        }
-                        title={accessStatusMessage(scaleAccess) || undefined}
-                      >
-                        {actionState === "scaling" ? "Scaling..." : "Scale"}
-                      </Button>
-                    </div>
-                    {accessDeniedMessage(scaleAccess) ? (
-                      <p className="mt-2 text-xs text-destructive">
-                        {accessDeniedMessage(scaleAccess)}
-                      </p>
-                    ) : null}
-                    {activeResource.id === "replicasets" ? (
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        Deployment-owned ReplicaSets may be reconciled by their
-                        owner.
-                      </p>
-                    ) : null}
-                  </div>
-                ) : (
-                  <div className="rounded-md border border-border bg-card p-3 text-sm text-muted-foreground">
-                    Scale is available for Deployments, StatefulSets, and
-                    ReplicaSets.
-                  </div>
-                )}
-                <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
-                  <label
-                    className="text-xs font-medium uppercase tracking-wide text-destructive"
-                    htmlFor={`delete-${item.name}`}
-                  >
-                    Delete
-                  </label>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Type the resource name to confirm deletion.
-                  </p>
-                  <div className="mt-2 flex items-center gap-2">
-                    <input
-                      id={`delete-${item.name}`}
-                      value={deleteConfirm}
-                      onChange={(event) => setDeleteConfirm(event.target.value)}
-                      placeholder={item.name}
-                      disabled={!canDelete}
-                      className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-hidden focus:ring-2 focus:ring-ring"
-                    />
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={() => void deleteResource()}
-                      disabled={
-                        actionState !== "idle" ||
-                        deleteConfirm !== item.name ||
-                        !canDelete
-                      }
-                      title={accessStatusMessage(deleteAccess) || undefined}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      {actionState === "deleting" ? "Deleting..." : "Delete"}
-                    </Button>
-                  </div>
-                  {accessDeniedMessage(deleteAccess) ? (
-                    <p className="mt-2 text-xs text-destructive">
-                      {accessDeniedMessage(deleteAccess)}
-                    </p>
                   ) : null}
-                </div>
-              </div>
-              {actionMessage ? (
-                <div
-                  className={cn(
-                    "mt-3 rounded-md border p-3 text-sm",
-                    isPositiveActionMessage(actionMessage)
-                      ? "border-status-success/35 bg-status-success/10 text-status-success"
-                      : "border-destructive/35 bg-destructive/10 text-destructive",
-                  )}
-                >
-                  {actionMessage}
-                </div>
-              ) : null}
-            </section>
-          ) : null}
-          {view === "yaml" && cleanedDetail ? (
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background p-3">
-              <div className="text-sm text-muted-foreground">{editHint}</div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setYamlDialogOpen(true)}
-                >
-                  Open YAML
-                </Button>
-                {canEdit ? (
-                  <>
-                    {editMode ? (
-                      <>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={resetEditedYaml}
-                          disabled={applyState !== "idle"}
-                        >
-                          Reset
-                        </Button>
+                  {activeResource.id === "nodes" ? (
+                    <div className="rounded-md border border-border bg-card p-3">
+                      <label
+                        className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                        htmlFor={`drain-${item.name}`}
+                      >
+                        Drain
+                      </label>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Cordons the node and evicts eligible Pods. DaemonSet and
+                        static Pods are skipped.
+                      </p>
+                      <div className="mt-2 space-y-2">
+                        <label className="flex items-start gap-2 text-xs text-muted-foreground">
+                          <input
+                            type="checkbox"
+                            checked={drainForce}
+                            onChange={(event) =>
+                              setDrainForce(event.target.checked)
+                            }
+                            disabled={!canEdit || actionState !== "idle"}
+                            className="mt-0.5 rounded border-border text-primary focus:ring-ring"
+                          />
+                          Evict unmanaged Pods
+                        </label>
+                        <label className="flex items-start gap-2 text-xs text-muted-foreground">
+                          <input
+                            type="checkbox"
+                            checked={drainDeleteEmptyDirData}
+                            onChange={(event) =>
+                              setDrainDeleteEmptyDirData(event.target.checked)
+                            }
+                            disabled={!canEdit || actionState !== "idle"}
+                            className="mt-0.5 rounded border-border text-primary focus:ring-ring"
+                          />
+                          Allow emptyDir data deletion
+                        </label>
+                      </div>
+                      <div className="mt-3 flex items-center gap-2">
+                        <input
+                          id={`drain-${item.name}`}
+                          value={drainConfirm}
+                          onChange={(event) =>
+                            setDrainConfirm(event.target.value)
+                          }
+                          placeholder={item.name}
+                          disabled={!canEdit || actionState !== "idle"}
+                          className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-hidden focus:ring-2 focus:ring-ring"
+                        />
                         <Button
                           variant="secondary"
                           size="sm"
-                          onClick={() => void validateYaml()}
+                          onClick={() => void drainNode()}
                           disabled={
-                            applyState !== "idle" ||
-                            !hasYamlChanges ||
-                            Boolean(yamlValidationError)
+                            !canEdit ||
+                            actionState !== "idle" ||
+                            drainConfirm !== item.name
                           }
+                          title={accessStatusMessage(updateAccess) || undefined}
                         >
-                          {applyState === "dry-running"
-                            ? "Validating..."
-                            : "Dry run"}
+                          {actionState === "draining" ? "Draining..." : "Drain"}
                         </Button>
-                        {applyConflict ? (
+                      </div>
+                    </div>
+                  ) : null}
+                  {activeResource.id === "services" && item.namespace ? (
+                    <div className="rounded-md border border-border bg-card p-3">
+                      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        Port-forward
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Forward a Service port through one of its backing Pods.
+                      </p>
+                      <Button
+                        className="mt-3"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() =>
+                          navigate(
+                            `/clusters/${clusterId}/services/${encodeURIComponent(item.namespace ?? "")}/${encodeURIComponent(item.name)}/port-forward`,
+                          )
+                        }
+                      >
+                        <Plug className="h-3.5 w-3.5" />
+                        Forward
+                      </Button>
+                    </div>
+                  ) : null}
+                  {scalable ? (
+                    <div className="rounded-md border border-border bg-card p-3">
+                      <label
+                        className="text-xs font-medium uppercase tracking-wide text-muted-foreground"
+                        htmlFor={`replicas-${item.name}`}
+                      >
+                        Replicas
+                      </label>
+                      <div className="mt-2 flex items-center gap-2">
+                        <input
+                          id={`replicas-${item.name}`}
+                          type="number"
+                          min={0}
+                          step={1}
+                          value={replicas}
+                          onChange={(event) => setReplicas(event.target.value)}
+                          disabled={!canScale}
+                          className="h-9 w-24 rounded-md border border-input bg-background px-3 text-sm outline-hidden focus:ring-2 focus:ring-ring"
+                        />
+                        <Button
+                          size="sm"
+                          onClick={() => void scaleResource()}
+                          disabled={
+                            actionState !== "idle" ||
+                            !replicas.trim() ||
+                            !canScale
+                          }
+                          title={accessStatusMessage(scaleAccess) || undefined}
+                        >
+                          {actionState === "scaling" ? "Scaling..." : "Scale"}
+                        </Button>
+                      </div>
+                      {accessDeniedMessage(scaleAccess) ? (
+                        <p className="mt-2 text-xs text-destructive">
+                          {accessDeniedMessage(scaleAccess)}
+                        </p>
+                      ) : null}
+                      {activeResource.id === "replicasets" ? (
+                        <p className="mt-2 text-xs text-muted-foreground">
+                          Deployment-owned ReplicaSets may be reconciled by
+                          their owner.
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <div className="rounded-md border border-border bg-card p-3 text-sm text-muted-foreground">
+                      Scale is available for Deployments, StatefulSets, and
+                      ReplicaSets.
+                    </div>
+                  )}
+                  <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3">
+                    <label
+                      className="text-xs font-medium uppercase tracking-wide text-destructive"
+                      htmlFor={`delete-${item.name}`}
+                    >
+                      Delete
+                    </label>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Type the resource name to confirm deletion.
+                    </p>
+                    <div className="mt-2 flex items-center gap-2">
+                      <input
+                        id={`delete-${item.name}`}
+                        value={deleteConfirm}
+                        onChange={(event) =>
+                          setDeleteConfirm(event.target.value)
+                        }
+                        placeholder={item.name}
+                        disabled={!canDelete}
+                        className="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm outline-hidden focus:ring-2 focus:ring-ring"
+                      />
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={() => void deleteResource()}
+                        disabled={
+                          actionState !== "idle" ||
+                          deleteConfirm !== item.name ||
+                          !canDelete
+                        }
+                        title={accessStatusMessage(deleteAccess) || undefined}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        {actionState === "deleting" ? "Deleting..." : "Delete"}
+                      </Button>
+                    </div>
+                    {accessDeniedMessage(deleteAccess) ? (
+                      <p className="mt-2 text-xs text-destructive">
+                        {accessDeniedMessage(deleteAccess)}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+                {actionMessage ? (
+                  <div
+                    className={cn(
+                      "mt-3 rounded-md border p-3 text-sm",
+                      isPositiveActionMessage(actionMessage)
+                        ? "border-status-success/35 bg-status-success/10 text-status-success"
+                        : "border-destructive/35 bg-destructive/10 text-destructive",
+                    )}
+                  >
+                    {actionMessage}
+                  </div>
+                ) : null}
+              </Card>
+            ) : null}
+            {view === "yaml" && cleanedDetail ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-background p-3">
+                <div className="text-sm text-muted-foreground">{editHint}</div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setYamlDialogOpen(true)}
+                  >
+                    Open YAML
+                  </Button>
+                  {canEdit ? (
+                    <>
+                      {editMode ? (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={resetEditedYaml}
+                            disabled={applyState !== "idle"}
+                          >
+                            Reset
+                          </Button>
                           <Button
                             variant="secondary"
                             size="sm"
-                            onClick={() => void validateYaml(true)}
+                            onClick={() => void validateYaml()}
                             disabled={
                               applyState !== "idle" ||
                               !hasYamlChanges ||
                               Boolean(yamlValidationError)
                             }
                           >
-                            Force dry run
+                            {applyState === "dry-running"
+                              ? "Validating..."
+                              : "Dry run"}
                           </Button>
-                        ) : null}
+                          {applyConflict ? (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              onClick={() => void validateYaml(true)}
+                              disabled={
+                                applyState !== "idle" ||
+                                !hasYamlChanges ||
+                                Boolean(yamlValidationError)
+                              }
+                            >
+                              Force dry run
+                            </Button>
+                          ) : null}
+                          <Button
+                            size="sm"
+                            onClick={() => void applyValidatedYaml()}
+                            disabled={
+                              applyState !== "idle" || !canApplyValidatedYaml
+                            }
+                          >
+                            {applyState === "applying"
+                              ? "Applying..."
+                              : forceApplyValidated
+                                ? "Force apply"
+                                : "Apply"}
+                          </Button>
+                        </>
+                      ) : (
                         <Button
+                          variant="secondary"
                           size="sm"
-                          onClick={() => void applyValidatedYaml()}
-                          disabled={
-                            applyState !== "idle" || !canApplyValidatedYaml
-                          }
+                          onClick={() => setEditMode(true)}
+                          disabled={!canEdit}
+                          title={accessStatusMessage(updateAccess) || undefined}
                         >
-                          {applyState === "applying"
-                            ? "Applying..."
-                            : forceApplyValidated
-                              ? "Force apply"
-                              : "Apply"}
+                          Edit YAML
                         </Button>
-                      </>
-                    ) : (
+                      )}
+                    </>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
+            {applyMessage ? (
+              <div
+                className={cn(
+                  "whitespace-pre-line rounded-lg border p-3 text-sm",
+                  isPositiveApplyMessage(applyMessage)
+                    ? "border-status-success/35 bg-status-success/10 text-status-success"
+                    : "border-destructive/35 bg-destructive/10 text-destructive",
+                )}
+              >
+                {applyMessage}
+                {applyConflict || preRefreshYaml ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {preRefreshYaml ? (
                       <Button
                         variant="secondary"
                         size="sm"
-                        onClick={() => setEditMode(true)}
-                        disabled={!canEdit}
-                        title={accessStatusMessage(updateAccess) || undefined}
+                        onClick={restorePreRefreshYaml}
+                        disabled={applyState !== "idle"}
                       >
-                        Edit YAML
+                        Restore pre-refresh edits
                       </Button>
-                    )}
-                  </>
+                    ) : null}
+                    {applyConflict ? (
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => void refreshYamlFromServer()}
+                        disabled={applyState !== "idle"}
+                      >
+                        Refresh YAML
+                      </Button>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
-            </div>
-          ) : null}
-          {applyMessage ? (
-            <div
-              className={cn(
-                "whitespace-pre-line rounded-lg border p-3 text-sm",
-                isPositiveApplyMessage(applyMessage)
-                  ? "border-status-success/35 bg-status-success/10 text-status-success"
-                  : "border-destructive/35 bg-destructive/10 text-destructive",
-              )}
-            >
-              {applyMessage}
-              {applyConflict || preRefreshYaml ? (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {preRefreshYaml ? (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={restorePreRefreshYaml}
-                      disabled={applyState !== "idle"}
-                    >
-                      Restore pre-refresh edits
-                    </Button>
-                  ) : null}
-                  {applyConflict ? (
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={() => void refreshYamlFromServer()}
-                      disabled={applyState !== "idle"}
-                    >
-                      Refresh YAML
-                    </Button>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-          {editMode && canEdit && yamlValidationError ? (
-            <div className="rounded-lg border border-destructive/35 bg-destructive/10 p-3 text-sm text-destructive">
-              {yamlValidationError}
-            </div>
-          ) : null}
-          {error ? (
-            <div className="rounded-lg border border-destructive/35 bg-destructive/10 p-3 text-sm text-destructive">
-              {error}
-            </div>
-          ) : null}
-          {secretError ? (
-            <div className="rounded-lg border border-destructive/35 bg-destructive/10 p-3 text-sm text-destructive">
-              {secretError}
-            </div>
-          ) : null}
-          {!detail && !error ? (
-            <div className="shimmer h-48 rounded-lg bg-muted" />
-          ) : null}
-          {cleanedDetail && view === "summary" ? (
-            <>
-              {activeResource.id === "nodes" ? (
-                <MetricSummary
-                  title="Node metrics"
-                  metric={nodeMetric}
-                  unavailable={nodeMetricError}
-                />
-              ) : null}
-              {activeResource.id === "services" && item.namespace ? (
-                <ServicePortsSection
-                  detail={cleanedDetail}
-                  onForward={(port) =>
-                    navigate(
-                      `/clusters/${clusterId}/services/${encodeURIComponent(item.namespace ?? "")}/${encodeURIComponent(item.name)}/port-forward?port=${port}`,
-                    )
-                  }
-                />
-              ) : null}
-              <ResourceSummary
-                {...related}
-                detail={cleanedDetail}
-                activeResource={activeResource}
-                discoveredResource={discoveredResource}
-                onRollback={
-                  canEdit &&
-                  supportsRevisionHistory(text(cleanedDetail?.kind ?? ""))
-                    ? rollbackToRevision
-                    : undefined
-                }
-                rollbackingRevision={rollbackRevision}
-                openApiDoc={openApiDoc}
-                secretState={
-                  canEdit
-                    ? undefined
-                    : {
-                        revealed: revealedSecrets,
-                        revealingKey: revealingSecretKey,
-                        onReveal: (key) => void revealSecretKey(key),
-                        onHide: hideSecretKey,
-                      }
-                }
-              />
-            </>
-          ) : null}
-          {cleanedDetail && view === "events" ? (
-            <ObjectEventsPanel
-              events={objectEvents}
-              loading={eventsLoading}
-              error={eventsError}
-              onRefresh={() => void loadObjectEvents()}
-            />
-          ) : null}
-          {cleanedDetail && view === "yaml" ? (
-            editMode && canEdit ? (
-              <div className="space-y-4">
-                <Suspense
-                  fallback={
-                    <div className="shimmer min-h-96 rounded-lg bg-muted" />
-                  }
-                >
-                  <YamlEditor
-                    value={editedYaml}
-                    onChange={updateEditedYaml}
-                    kind={item.kind || activeResource.label}
-                    apiVersion={item.apiVersion || activeResource.apiVersion}
-                    openApiDoc={openApiDoc}
-                  />
-                </Suspense>
-                <ResourceDiff
-                  rows={diffRows}
-                  unchanged={!hasYamlChanges}
-                  validated={canApplyValidatedYaml}
-                />
+            ) : null}
+            {editMode && canEdit && yamlValidationError ? (
+              <div className="rounded-lg border border-destructive/35 bg-destructive/10 p-3 text-sm text-destructive">
+                {yamlValidationError}
               </div>
-            ) : (
+            ) : null}
+            {error ? <QueryState error={error} /> : null}
+            {secretError ? <QueryState error={secretError} /> : null}
+            {!detail && !error ? (
+              <div className="shimmer h-48 rounded-lg bg-muted" />
+            ) : null}
+            {cleanedDetail && view === "summary" ? (
+              <>
+                {activeResource.id === "nodes" ? (
+                  <MetricSummary
+                    title="Node metrics"
+                    metric={nodeMetric}
+                    unavailable={nodeMetricError}
+                  />
+                ) : null}
+                {activeResource.id === "services" && item.namespace ? (
+                  <ServicePortsSection
+                    detail={cleanedDetail}
+                    onForward={(port) =>
+                      navigate(
+                        `/clusters/${clusterId}/services/${encodeURIComponent(item.namespace ?? "")}/${encodeURIComponent(item.name)}/port-forward?port=${port}`,
+                      )
+                    }
+                  />
+                ) : null}
+                <ResourceSummary
+                  {...related}
+                  detail={cleanedDetail}
+                  activeResource={activeResource}
+                  discoveredResource={discoveredResource}
+                  onRollback={
+                    canEdit &&
+                    supportsRevisionHistory(text(cleanedDetail?.kind ?? ""))
+                      ? rollbackToRevision
+                      : undefined
+                  }
+                  rollbackingRevision={rollbackRevision}
+                  openApiDoc={openApiDoc}
+                  secretState={
+                    canEdit
+                      ? undefined
+                      : {
+                          revealed: revealedSecrets,
+                          revealingKey: revealingSecretKey,
+                          onReveal: (key) => void revealSecretKey(key),
+                          onHide: hideSecretKey,
+                        }
+                  }
+                />
+              </>
+            ) : null}
+            {cleanedDetail && view === "events" ? (
+              <ObjectEventsPanel
+                events={objectEvents}
+                loading={eventsLoading}
+                error={eventsError}
+                onRefresh={() => void loadObjectEvents()}
+              />
+            ) : null}
+            {cleanedDetail && view === "yaml" ? (
+              editMode && canEdit ? (
+                <div className="space-y-4">
+                  <Suspense
+                    fallback={
+                      <div className="shimmer min-h-96 rounded-lg bg-muted" />
+                    }
+                  >
+                    <YamlEditor
+                      value={editedYaml}
+                      onChange={updateEditedYaml}
+                      kind={item.kind || activeResource.label}
+                      apiVersion={item.apiVersion || activeResource.apiVersion}
+                      openApiDoc={openApiDoc}
+                    />
+                  </Suspense>
+                  <ResourceDiff
+                    rows={diffRows}
+                    unchanged={!hasYamlChanges}
+                    validated={canApplyValidatedYaml}
+                  />
+                </div>
+              ) : (
+                <CodeBlock
+                  code={yaml}
+                  language="yaml"
+                  title={`${item.kind || "Resource"} YAML`}
+                  showLineNumbers
+                />
+              )
+            ) : null}
+            {cleanedDetail && view === "json" ? (
               <CodeBlock
-                code={yaml}
-                language="yaml"
-                title={`${item.kind || "Resource"} YAML`}
+                code={json}
+                language="json"
+                title={`${item.kind || "Resource"} JSON`}
                 showLineNumbers
               />
-            )
-          ) : null}
-          {cleanedDetail && view === "json" ? (
-            <CodeBlock
-              code={json}
-              language="json"
-              title={`${item.kind || "Resource"} JSON`}
-              showLineNumbers
-            />
-          ) : null}
+            ) : null}
+          </Tabs>
         </div>
-      </aside>
+      </Drawer>
       {cleanedDetail ? (
         <YamlViewDialog
           open={yamlDialogOpen}
@@ -1202,6 +1198,6 @@ export function ResourceDrawer({
           }
         />
       ) : null}
-    </div>
+    </>
   );
 }

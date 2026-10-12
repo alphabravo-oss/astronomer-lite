@@ -3,12 +3,12 @@ const assert = require('node:assert/strict');
 const { mkdtemp, rm } = require('node:fs/promises');
 const { join } = require('node:path');
 const { tmpdir } = require('node:os');
-const { startServer } = require('/opt/Astronomer-Lite/resources/app.asar/launcher.cjs');
+const { startServer } = require('/opt/Astronomer Lite/resources/app.asar/launcher.cjs');
 (async () => {
   const directory = await mkdtemp(join(tmpdir(), 'lite-rpm-'));
   let server;
   try {
-    server = startServer('/opt/Astronomer-Lite/resources/server/astronomer-lite', directory);
+    server = startServer('/opt/Astronomer Lite/resources/server/astronomer-lite', directory);
     const { origin, token } = await server.ready;
     assert.equal((await fetch(`${origin}/api/clusters`)).status, 401);
     const response = await fetch(`${origin}/api/auth/session`, { headers: { 'X-Astronomer-Desktop': token } });

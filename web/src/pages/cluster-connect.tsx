@@ -1,3 +1,4 @@
+import { Card } from "../components/ui/card";
 import { Textarea } from "../components/ui/input";
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -175,7 +176,7 @@ export function ClusterConnectPage({
         </fieldset>
       </form>
       {preview && (
-        <section className="max-w-2xl space-y-3 rounded-lg border border-border bg-card p-5">
+        <Card as="section" className="max-w-2xl space-y-3">
           <h2 className="text-sm font-semibold">Confirm connection</h2>
           <p className="text-sm">
             {name} · {server}
@@ -187,7 +188,7 @@ export function ClusterConnectPage({
           <Button disabled={busy} onClick={() => void connect()}>
             Connect cluster
           </Button>
-        </section>
+        </Card>
       )}
     </PageShell>
   );

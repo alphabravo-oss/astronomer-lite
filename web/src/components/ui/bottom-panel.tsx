@@ -2,7 +2,7 @@ import type { MouseEvent, ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { GripHorizontal, X } from "lucide-react";
-import { cn } from "../../lib/utils";
+import { Tabs } from "./tabs";
 
 export type BottomPanelTab = {
   key: string;
@@ -21,7 +21,16 @@ type BottomPanelProps = {
   children: ReactNode;
 };
 
-export function BottomPanel({ open, onClose, title, subtitle, tabs, activeTab, onTabChange, children }: BottomPanelProps) {
+export function BottomPanel({
+  open,
+  onClose,
+  title,
+  subtitle,
+  tabs,
+  activeTab,
+  onTabChange,
+  children,
+}: BottomPanelProps) {
   const [height, setHeight] = useState(40);
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
   const dragging = useRef(false);
@@ -40,14 +49,15 @@ export function BottomPanel({ open, onClose, title, subtitle, tabs, activeTab, o
       document.body.style.cursor = "row-resize";
       document.body.style.userSelect = "none";
     },
-    [height]
+    [height],
   );
 
   useEffect(() => {
     function onMouseMove(event: globalThis.MouseEvent) {
       if (!dragging.current) return;
       const delta = startY.current - event.clientY;
-      const nextHeight = startHeight.current + (delta / window.innerHeight) * 100;
+      const nextHeight =
+        startHeight.current + (delta / window.innerHeight) * 100;
       setHeight(Math.max(20, Math.min(80, nextHeight)));
     }
 
@@ -71,7 +81,12 @@ export function BottomPanel({ open, onClose, title, subtitle, tabs, activeTab, o
     if (!open) return;
 
     function handleKey(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
+      if (
+        event.key === "Escape" &&
+        !event.defaultPrevented &&
+        !document.querySelector('[role="dialog"]')
+      )
+        onClose();
     }
 
     document.addEventListener("keydown", handleKey);
@@ -81,10 +96,38 @@ export function BottomPanel({ open, onClose, title, subtitle, tabs, activeTab, o
   if (!portalTarget) return null;
 
   return createPortal(
-    <section className="flex shrink-0 flex-col overflow-hidden border-t border-border bg-card shadow-[0_-12px_32px_rgba(0,0,0,0.18)]" style={{ height: open ? `${height}vh` : "0px" }}>
+    <section
+      className="flex shrink-0 flex-col overflow-hidden border-t border-border bg-card shadow-[0_-12px_32px_rgba(0,0,0,0.18)]"
+      style={{ height: open ? `${height}vh` : "0px" }}
+    >
       {open ? (
         <>
           <div
+            role="separator"
+            aria-label="Resize details panel"
+            aria-orientation="horizontal"
+            aria-valuenow={height}
+            aria-valuemin={20}
+            aria-valuemax={80}
+            tabIndex={0}
+            onKeyDown={(event) => {
+              if (!["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key))
+                return;
+              event.preventDefault();
+              setHeight((current) =>
+                event.key === "Home"
+                  ? 20
+                  : event.key === "End"
+                    ? 80
+                    : Math.max(
+                        20,
+                        Math.min(
+                          80,
+                          current + (event.key === "ArrowUp" ? 5 : -5),
+                        ),
+                      ),
+              );
+            }}
             onMouseDown={onDragStart}
             className="flex h-2 shrink-0 cursor-row-resize items-center justify-center transition-colors hover:bg-accent/50"
           >
@@ -94,26 +137,12 @@ export function BottomPanel({ open, onClose, title, subtitle, tabs, activeTab, o
             <div className="flex min-w-0 items-center gap-4">
               <div className="min-w-0">
                 <h2 className="truncate text-sm font-medium">{title}</h2>
-                {subtitle ? <p className="truncate text-xs text-muted-foreground">{subtitle}</p> : null}
+                {subtitle ? (
+                  <p className="truncate text-xs text-muted-foreground">
+                    {subtitle}
+                  </p>
+                ) : null}
               </div>
-              {tabs && tabs.length > 1 ? (
-                <div className="flex items-center gap-1 border-l border-border pl-4">
-                  {tabs.map((tab) => (
-                    <button
-                      key={tab.key}
-                      type="button"
-                      onClick={() => onTabChange?.(tab.key)}
-                      className={cn(
-                        "inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-xs transition-colors",
-                        activeTab === tab.key ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent/50 hover:text-foreground"
-                      )}
-                    >
-                      {tab.icon}
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
             </div>
             <button
               type="button"
@@ -124,10 +153,31 @@ export function BottomPanel({ open, onClose, title, subtitle, tabs, activeTab, o
               <X className="h-4 w-4" />
             </button>
           </div>
-          <div className="min-h-0 flex-1 overflow-hidden">{children}</div>
+          {tabs && tabs.length > 1 && activeTab && onTabChange ? (
+            <Tabs
+              label={`${title} views`}
+              tabs={tabs.map((tab) => ({
+                value: tab.key,
+                label: (
+                  <>
+                    {tab.icon}
+                    {tab.label}
+                  </>
+                ),
+              }))}
+              value={activeTab}
+              onChange={onTabChange}
+              className="flex min-h-0 flex-1 flex-col space-y-0"
+              panelClassName="min-h-0 flex-1 overflow-auto"
+            >
+              {children}
+            </Tabs>
+          ) : (
+            <div className="min-h-0 flex-1 overflow-auto">{children}</div>
+          )}
         </>
       ) : null}
     </section>,
-    portalTarget
+    portalTarget,
   );
 }

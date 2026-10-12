@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { lazy, type ReactNode } from "react";
 import {
   Activity,
   BarChart3,
@@ -9,16 +9,8 @@ import {
   Puzzle,
   type LucideIcon,
 } from "lucide-react";
-import { ClusterDashboard } from "../pages/cluster-dashboard";
-import { PodsPage } from "../pages/pods";
 import type { Cluster } from "../lib/api";
 import { resourceConfigs } from "../lib/resources";
-import { EventsPage } from "../pages/events";
-import { GenericResourceBrowser } from "../pages/generic-resource-browser";
-import { MetricsPage } from "../pages/metrics";
-import { ResourceListPage } from "../pages/resource-list";
-import { HelmReleasesPage } from "../pages/helm-releases";
-import { TopologyPage } from "../pages/topology";
 
 export type NavigationItem = {
   id: string;
@@ -31,6 +23,43 @@ export type NavigationItem = {
 export type ResourcePage = NavigationItem & {
   element: ReactNode;
 };
+
+const ClusterDashboard = lazy(() =>
+  import("../pages/cluster-dashboard").then((module) => ({
+    default: module.ClusterDashboard,
+  })),
+);
+const PodsPage = lazy(() =>
+  import("../pages/pods").then((module) => ({ default: module.PodsPage })),
+);
+const EventsPage = lazy(() =>
+  import("../pages/events").then((module) => ({ default: module.EventsPage })),
+);
+const GenericResourceBrowser = lazy(() =>
+  import("../pages/generic-resource-browser").then((module) => ({
+    default: module.GenericResourceBrowser,
+  })),
+);
+const MetricsPage = lazy(() =>
+  import("../pages/metrics").then((module) => ({
+    default: module.MetricsPage,
+  })),
+);
+const ResourceListPage = lazy(() =>
+  import("../pages/resource-list").then((module) => ({
+    default: module.ResourceListPage,
+  })),
+);
+const HelmReleasesPage = lazy(() =>
+  import("../pages/helm-releases").then((module) => ({
+    default: module.HelmReleasesPage,
+  })),
+);
+const TopologyPage = lazy(() =>
+  import("../pages/topology").then((module) => ({
+    default: module.TopologyPage,
+  })),
+);
 
 const builtInPages = [
   {

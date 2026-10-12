@@ -1,3 +1,4 @@
+import { Card } from "../components/ui/card";
 import { Select } from "../components/ui/input";
 import { LogOut, Plus, UserRound } from "lucide-react";
 import { lazy, Suspense, useEffect, useState, type FormEvent } from "react";
@@ -87,7 +88,7 @@ export function SettingsPage() {
       )}
       <MFASettings />
       <PageSection title="Your account">
-        <div className="rounded-lg border border-border bg-card p-[var(--card-p)]">
+        <Card>
           <div className="flex items-center gap-3">
             <UserRound className="h-5 w-5 text-muted-foreground" />
             <div>
@@ -133,7 +134,7 @@ export function SettingsPage() {
               </Button>
             </form>
           )}
-        </div>
+        </Card>
       </PageSection>
       {session.user?.role === "admin" && (
         <PageSection

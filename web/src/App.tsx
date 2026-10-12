@@ -1,21 +1,56 @@
+import { QueryState } from "./components/ui/query-state";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Route, Routes, useLocation } from "react-router-dom";
 import { AppShell } from "./components/layout/app-shell";
 import type { Cluster } from "./lib/api";
 import { api } from "./lib/api";
 import { ClusterList } from "./pages/cluster-list";
-import { PodLogsPage } from "./pages/pod-logs";
-import { PodPortForwardPage } from "./pages/pod-port-forward";
 import { resourcePages } from "./navigation/registry";
-import { SettingsPage } from "./pages/settings";
-import { HelmDeployPage } from "./pages/helm-deploy";
-import { ProjectsPage, ProjectFormPage } from "./pages/projects";
-import { ProjectDetailPage } from "./pages/project-detail";
-import { ClusterConnectPage } from "./pages/cluster-connect";
 
 import { useAuth } from "./lib/auth-context";
 
-const emptyNamespaces: string[] = [];
+import { NotFoundPage } from "./pages/not-found";
+
+const PodLogsPage = lazy(() =>
+  import("./pages/pod-logs").then((module) => ({
+    default: module.PodLogsPage,
+  })),
+);
+const PodPortForwardPage = lazy(() =>
+  import("./pages/pod-port-forward").then((module) => ({
+    default: module.PodPortForwardPage,
+  })),
+);
+const SettingsPage = lazy(() =>
+  import("./pages/settings").then((module) => ({
+    default: module.SettingsPage,
+  })),
+);
+const HelmDeployPage = lazy(() =>
+  import("./pages/helm-deploy").then((module) => ({
+    default: module.HelmDeployPage,
+  })),
+);
+const ProjectsPage = lazy(() =>
+  import("./pages/projects").then((module) => ({
+    default: module.ProjectsPage,
+  })),
+);
+const ProjectFormPage = lazy(() =>
+  import("./pages/projects").then((module) => ({
+    default: module.ProjectFormPage,
+  })),
+);
+const ProjectDetailPage = lazy(() =>
+  import("./pages/project-detail").then((module) => ({
+    default: module.ProjectDetailPage,
+  })),
+);
+const ClusterConnectPage = lazy(() =>
+  import("./pages/cluster-connect").then((module) => ({
+    default: module.ClusterConnectPage,
+  })),
+);
 const ExtensionPage = lazy(() =>
   import("./pages/extension").then((module) => ({
     default: module.ExtensionPage,
@@ -26,6 +61,7 @@ const PodExecPage = lazy(() =>
     default: module.PodExecPage,
   })),
 );
+const emptyNamespaces: string[] = [];
 
 function sameClusters(a: Cluster[], b: Cluster[]) {
   if (a.length !== b.length) return false;
@@ -163,11 +199,7 @@ export function App() {
           index
           element={
             <>
-              {error ? (
-                <div className="mb-4 rounded-lg border border-destructive/35 bg-destructive/10 p-4 text-sm text-destructive">
-                  {error}
-                </div>
-              ) : null}
+              {error ? <QueryState error={error} /> : null}
               <ClusterList clusters={clusters} onRefresh={refresh} />
             </>
           }
@@ -255,7 +287,7 @@ export function App() {
           path="clusters/:clusterId/services/:namespace/:name/port-forward"
           element={<PodPortForwardPage />}
         />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Route>
     </Routes>
   );

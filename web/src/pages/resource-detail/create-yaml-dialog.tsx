@@ -1,3 +1,4 @@
+import { QueryState } from "../../components/ui/query-state";
 import { Check, Plus, X } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import {
@@ -80,11 +81,7 @@ export function CreateYamlDialog({
             className="min-h-[26rem] w-full resize-y rounded-md border border-input bg-background px-3 py-2 font-mono text-xs leading-5 outline-hidden focus:ring-2 focus:ring-ring"
             autoFocus
           />
-          {error ? (
-            <div className="mt-3 rounded-md border border-destructive/35 bg-destructive/10 p-3 text-sm text-destructive">
-              {error}
-            </div>
-          ) : null}
+          {error ? <QueryState error={error} /> : null}
           {response ? (
             <div
               className={cn(

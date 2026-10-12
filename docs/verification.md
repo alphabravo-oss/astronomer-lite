@@ -1,8 +1,31 @@
 # Verification record
 
-Date: 2026-10-11. Scope: the [parity capability matrix](headlamp-parity.md), including desktop packaging and single-instance operation. Tests use isolated local state and disposable cluster resources, not production credentials.
+Historical baseline: 2026-10-11. Scope: the [parity capability matrix](headlamp-parity.md), including desktop packaging and single-instance operation. Tests use isolated local state and disposable cluster resources, not production credentials.
 
-## Release automation (2026-10-12)
+## RC.3 review (2026-10-12)
+
+The working source is version `0.2.0-rc.3`. RC.1 and RC.2 were published publicly;
+[RC.2 platform validation](https://github.com/alphabravo-oss/astronomer-lite/actions/runs/38206533148)
+passed on hosted macOS Intel/Apple Silicon, Windows Server 2025, Linux, and UBI
+8/9/10. Historical entries below describe evidence available at their individual
+review stages, not current release availability.
+
+The RC.3 review adds shared global styling for all Helm history cells, bounded
+command-palette scrolling in short windows, and a narrow desktop navigation
+bridge so the native Settings command no longer reloads the workspace. Packaged
+Linux regression tests passed at 900px and 1440px, and an actual RC.2-to-RC.3
+profile upgrade retained imported clusters, projects, theme, density and sidebar
+preferences. The release workflow repeats this upgrade test on Linux.
+
+Go tests/vet and race checks, golangci-lint (zero issues), 48 frontend unit tests,
+6 desktop unit tests, 4 release-tool tests, TypeScript/production build, lint,
+7 account browser tests and the Dex login/refresh browser flow passed. Dependency
+audits reported no known advisories in the web, desktop or compatibility lockfiles.
+Cluster/layout test results and release-specific hosted platform evidence are
+recorded with the candidate release. Unsigned distribution remains intentional;
+Windows 11 and graphical RHEL workstation validation remain pending.
+
+## Initial release automation (2026-10-12; historical RC.1 preparation)
 
 The owned-code licensing decision is complete: AlphaBravo authorized the reused
 Astronomer UI under Apache-2.0 on October 11. LICENSE/NOTICE and owned package

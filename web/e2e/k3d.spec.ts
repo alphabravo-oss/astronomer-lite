@@ -62,7 +62,8 @@ const customResourceDefinitionName = `${customResourcePlural}.${customResourceGr
 const backendTLSPolicyName = `al-e2e-backend-tls-${Date.now()}`;
 const backendTrafficPolicyName = `al-e2e-backend-traffic-${Date.now()}`;
 const backendTLSPolicyCRDName = "backendtlspolicies.gateway.networking.k8s.io";
-const backendTrafficPolicyCRDName = "xbackendtrafficpolicies.gateway.networking.x-k8s.io";
+const backendTrafficPolicyCRDName =
+  "xbackendtrafficpolicies.gateway.networking.x-k8s.io";
 const helmReleaseName = `al-e2e-helm-${Date.now()}`;
 const helmChartDir = `/tmp/al-e2e-tiny-chart-${Date.now()}`;
 const workloadRollbackDeploymentName = `al-e2e-rollback-${Date.now()}`;
@@ -86,66 +87,371 @@ const hoverDeploymentName = `al-e2e-hover-${Date.now()}`;
 test.afterEach(async ({ request }) => {
   for (const sessionId of cleanupPortForwardIds) {
     if (cleanupClusterId) {
-      await request.delete(`/api/clusters/${cleanupClusterId}/portforwards/${encodeURIComponent(sessionId)}`);
+      await request.delete(
+        `/api/clusters/${cleanupClusterId}/portforwards/${encodeURIComponent(sessionId)}`,
+      );
     }
   }
   if (cleanupContext) {
-    kubectl(cleanupContext, ["delete", "deployment", deploymentName, "--ignore-not-found=true"], true);
-    kubectl(cleanupContext, ["delete", "deployment", actionDeploymentName, "--ignore-not-found=true"], true);
-    kubectl(cleanupContext, ["delete", "deployment", workloadDrawerDeploymentName, "--ignore-not-found=true"], true);
-    kubectl(cleanupContext, ["delete", "poddisruptionbudget", pdbName, "--ignore-not-found=true"], true);
-    kubectl(cleanupContext, ["delete", "deployment", pdbDeploymentName, "--ignore-not-found=true"], true);
-    kubectl(cleanupContext, ["delete", "horizontalpodautoscaler", hpaName, "--ignore-not-found=true"], true);
-    kubectl(cleanupContext, ["delete", "deployment", parityDeploymentName, "--ignore-not-found=true"], true);
-    kubectl(cleanupContext, ["delete", "ingressclass", ingressClassName, "--ignore-not-found=true"], true);
-    kubectl(cleanupContext, ["delete", "resourcequota", resourceQuotaName, "--ignore-not-found=true"], true);
-    kubectl(cleanupContext, ["delete", "limitrange", limitRangeName, "--ignore-not-found=true"], true);
-    kubectl(cleanupContext, ["delete", "lease", leaseName, "--ignore-not-found=true"], true);
-    kubectl(cleanupContext, ["delete", "pod", dashboardPodName, "--ignore-not-found=true", "--grace-period=0", "--force"], true);
-    kubectl(cleanupContext, ["delete", "pod", portForwardPodName, "--ignore-not-found=true", "--grace-period=0", "--force"], true);
-    kubectl(cleanupContext, ["delete", "pod", logPodName, "--ignore-not-found=true", "--grace-period=0", "--force"], true);
-    kubectl(cleanupContext, ["delete", "pod", reconnectLogPodName, "--ignore-not-found=true", "--grace-period=0", "--force"], true);
-    kubectl(cleanupContext, ["delete", "pod", dockStreamPodName, "--ignore-not-found=true", "--grace-period=0", "--force"], true);
-    kubectl(cleanupContext, ["delete", "pod", execPodName, "--ignore-not-found=true", "--grace-period=0", "--force"], true);
-    kubectl(cleanupContext, ["delete", "pod", attachPodName, "--ignore-not-found=true", "--grace-period=0", "--force"], true);
-    kubectl(cleanupContext, ["delete", "pod", readPagesPodName, "--ignore-not-found=true", "--grace-period=0", "--force"], true);
-    kubectl(cleanupContext, ["delete", "namespace", namespaceFilterName, "--ignore-not-found=true"], true);
-    kubectl(cleanupContext, ["delete", "service", readPagesServiceName, "--ignore-not-found=true"], true);
-    kubectl(cleanupContext, ["delete", "configmap", readPagesConfigMapName, "--ignore-not-found=true"], true);
-    kubectl(cleanupContext, ["delete", "serviceaccount", readPagesServiceAccountName, "--ignore-not-found=true"], true);
-    kubectl(cleanupContext, ["delete", "role", readPagesRoleName, "--ignore-not-found=true"], true);
-    kubectl(cleanupContext, ["delete", "networkpolicy", readPagesNetworkPolicyName, "--ignore-not-found=true"], true);
-    kubectl(cleanupContext, ["delete", "configmap", applyConfigMapOne, applyConfigMapTwo, reconnectWatchConfigMapName, "--ignore-not-found=true"], true);
-    kubectl(cleanupContext, ["delete", "backendtlspolicy.gateway.networking.k8s.io", backendTLSPolicyName, "--ignore-not-found=true"], true);
-    kubectl(cleanupContext, ["delete", "xbackendtrafficpolicy.gateway.networking.x-k8s.io", backendTrafficPolicyName, "--ignore-not-found=true"], true);
-    kubectl(cleanupContext, ["delete", `${customResourcePlural}.${customResourceGroup}`, customResourceName, "--ignore-not-found=true"], true);
-    kubectl(cleanupContext, ["delete", "crd", customResourceDefinitionName, "--ignore-not-found=true"], true);
+    kubectl(
+      cleanupContext,
+      ["delete", "deployment", deploymentName, "--ignore-not-found=true"],
+      true,
+    );
+    kubectl(
+      cleanupContext,
+      ["delete", "deployment", actionDeploymentName, "--ignore-not-found=true"],
+      true,
+    );
+    kubectl(
+      cleanupContext,
+      [
+        "delete",
+        "deployment",
+        workloadDrawerDeploymentName,
+        "--ignore-not-found=true",
+      ],
+      true,
+    );
+    kubectl(
+      cleanupContext,
+      ["delete", "poddisruptionbudget", pdbName, "--ignore-not-found=true"],
+      true,
+    );
+    kubectl(
+      cleanupContext,
+      ["delete", "deployment", pdbDeploymentName, "--ignore-not-found=true"],
+      true,
+    );
+    kubectl(
+      cleanupContext,
+      ["delete", "horizontalpodautoscaler", hpaName, "--ignore-not-found=true"],
+      true,
+    );
+    kubectl(
+      cleanupContext,
+      ["delete", "deployment", parityDeploymentName, "--ignore-not-found=true"],
+      true,
+    );
+    kubectl(
+      cleanupContext,
+      ["delete", "ingressclass", ingressClassName, "--ignore-not-found=true"],
+      true,
+    );
+    kubectl(
+      cleanupContext,
+      ["delete", "resourcequota", resourceQuotaName, "--ignore-not-found=true"],
+      true,
+    );
+    kubectl(
+      cleanupContext,
+      ["delete", "limitrange", limitRangeName, "--ignore-not-found=true"],
+      true,
+    );
+    kubectl(
+      cleanupContext,
+      ["delete", "lease", leaseName, "--ignore-not-found=true"],
+      true,
+    );
+    kubectl(
+      cleanupContext,
+      [
+        "delete",
+        "pod",
+        dashboardPodName,
+        "--ignore-not-found=true",
+        "--grace-period=0",
+        "--force",
+      ],
+      true,
+    );
+    kubectl(
+      cleanupContext,
+      [
+        "delete",
+        "pod",
+        portForwardPodName,
+        "--ignore-not-found=true",
+        "--grace-period=0",
+        "--force",
+      ],
+      true,
+    );
+    kubectl(
+      cleanupContext,
+      [
+        "delete",
+        "pod",
+        logPodName,
+        "--ignore-not-found=true",
+        "--grace-period=0",
+        "--force",
+      ],
+      true,
+    );
+    kubectl(
+      cleanupContext,
+      [
+        "delete",
+        "pod",
+        reconnectLogPodName,
+        "--ignore-not-found=true",
+        "--grace-period=0",
+        "--force",
+      ],
+      true,
+    );
+    kubectl(
+      cleanupContext,
+      [
+        "delete",
+        "pod",
+        dockStreamPodName,
+        "--ignore-not-found=true",
+        "--grace-period=0",
+        "--force",
+      ],
+      true,
+    );
+    kubectl(
+      cleanupContext,
+      [
+        "delete",
+        "pod",
+        execPodName,
+        "--ignore-not-found=true",
+        "--grace-period=0",
+        "--force",
+      ],
+      true,
+    );
+    kubectl(
+      cleanupContext,
+      [
+        "delete",
+        "pod",
+        attachPodName,
+        "--ignore-not-found=true",
+        "--grace-period=0",
+        "--force",
+      ],
+      true,
+    );
+    kubectl(
+      cleanupContext,
+      [
+        "delete",
+        "pod",
+        readPagesPodName,
+        "--ignore-not-found=true",
+        "--grace-period=0",
+        "--force",
+      ],
+      true,
+    );
+    kubectl(
+      cleanupContext,
+      ["delete", "namespace", namespaceFilterName, "--ignore-not-found=true"],
+      true,
+    );
+    kubectl(
+      cleanupContext,
+      ["delete", "service", readPagesServiceName, "--ignore-not-found=true"],
+      true,
+    );
+    kubectl(
+      cleanupContext,
+      [
+        "delete",
+        "configmap",
+        readPagesConfigMapName,
+        "--ignore-not-found=true",
+      ],
+      true,
+    );
+    kubectl(
+      cleanupContext,
+      [
+        "delete",
+        "serviceaccount",
+        readPagesServiceAccountName,
+        "--ignore-not-found=true",
+      ],
+      true,
+    );
+    kubectl(
+      cleanupContext,
+      ["delete", "role", readPagesRoleName, "--ignore-not-found=true"],
+      true,
+    );
+    kubectl(
+      cleanupContext,
+      [
+        "delete",
+        "networkpolicy",
+        readPagesNetworkPolicyName,
+        "--ignore-not-found=true",
+      ],
+      true,
+    );
+    kubectl(
+      cleanupContext,
+      [
+        "delete",
+        "configmap",
+        applyConfigMapOne,
+        applyConfigMapTwo,
+        reconnectWatchConfigMapName,
+        "--ignore-not-found=true",
+      ],
+      true,
+    );
+    kubectl(
+      cleanupContext,
+      [
+        "delete",
+        "backendtlspolicy.gateway.networking.k8s.io",
+        backendTLSPolicyName,
+        "--ignore-not-found=true",
+      ],
+      true,
+    );
+    kubectl(
+      cleanupContext,
+      [
+        "delete",
+        "xbackendtrafficpolicy.gateway.networking.x-k8s.io",
+        backendTrafficPolicyName,
+        "--ignore-not-found=true",
+      ],
+      true,
+    );
+    kubectl(
+      cleanupContext,
+      [
+        "delete",
+        `${customResourcePlural}.${customResourceGroup}`,
+        customResourceName,
+        "--ignore-not-found=true",
+      ],
+      true,
+    );
+    kubectl(
+      cleanupContext,
+      [
+        "delete",
+        "crd",
+        customResourceDefinitionName,
+        "--ignore-not-found=true",
+      ],
+      true,
+    );
     if (cleanupTLSPolicyCRD) {
-      kubectl(cleanupContext, ["delete", "crd", backendTLSPolicyCRDName, "--ignore-not-found=true"], true);
+      kubectl(
+        cleanupContext,
+        ["delete", "crd", backendTLSPolicyCRDName, "--ignore-not-found=true"],
+        true,
+      );
     }
     if (cleanupTrafficPolicyCRD) {
-      kubectl(cleanupContext, ["delete", "crd", backendTrafficPolicyCRDName, "--ignore-not-found=true"], true);
+      kubectl(
+        cleanupContext,
+        [
+          "delete",
+          "crd",
+          backendTrafficPolicyCRDName,
+          "--ignore-not-found=true",
+        ],
+        true,
+      );
     }
-    kubectl(cleanupContext, ["delete", "deployment", workloadRollbackDeploymentName, "--ignore-not-found=true"], true);
-    kubectl(cleanupContext, ["delete", "deployment", workloadRollbackUiName, "--ignore-not-found=true"], true);
+    kubectl(
+      cleanupContext,
+      [
+        "delete",
+        "deployment",
+        workloadRollbackDeploymentName,
+        "--ignore-not-found=true",
+      ],
+      true,
+    );
+    kubectl(
+      cleanupContext,
+      [
+        "delete",
+        "deployment",
+        workloadRollbackUiName,
+        "--ignore-not-found=true",
+      ],
+      true,
+    );
     if (cleanupHelmRelease) {
-      for (const releaseName of [helmReleaseName, helmReleaseUiName, helmReleaseUninstallName]) {
+      for (const releaseName of [
+        helmReleaseName,
+        helmReleaseUiName,
+        helmReleaseUninstallName,
+      ]) {
         try {
-          execFileSync("helm", ["--kube-context", cleanupContext, "uninstall", releaseName, "--namespace", "default"], { stdio: "ignore" });
+          execFileSync(
+            "helm",
+            [
+              "--kube-context",
+              cleanupContext,
+              "uninstall",
+              releaseName,
+              "--namespace",
+              "default",
+            ],
+            { stdio: "ignore" },
+          );
         } catch {
           // Already cleaned up or never installed.
         }
       }
     }
-    kubectl(cleanupContext, ["delete", "vpa", vpaSampleName, "--ignore-not-found=true"], true);
-    kubectl(cleanupContext, ["delete", "jobset", jobSetSampleName, "--ignore-not-found=true"], true);
-    kubectl(cleanupContext, ["delete", "validatingwebhookconfiguration", webhookConfigName, "--ignore-not-found=true"], true);
-    kubectl(cleanupContext, ["delete", "deployment", hoverDeploymentName, "--ignore-not-found=true"], true);
+    kubectl(
+      cleanupContext,
+      ["delete", "vpa", vpaSampleName, "--ignore-not-found=true"],
+      true,
+    );
+    kubectl(
+      cleanupContext,
+      ["delete", "jobset", jobSetSampleName, "--ignore-not-found=true"],
+      true,
+    );
+    kubectl(
+      cleanupContext,
+      [
+        "delete",
+        "validatingwebhookconfiguration",
+        webhookConfigName,
+        "--ignore-not-found=true",
+      ],
+      true,
+    );
+    kubectl(
+      cleanupContext,
+      ["delete", "deployment", hoverDeploymentName, "--ignore-not-found=true"],
+      true,
+    );
     if (cleanupVPACRD) {
-      kubectl(cleanupContext, ["delete", "crd", "verticalpodautoscalers.autoscaling.k8s.io", "--ignore-not-found=true"], true);
+      kubectl(
+        cleanupContext,
+        [
+          "delete",
+          "crd",
+          "verticalpodautoscalers.autoscaling.k8s.io",
+          "--ignore-not-found=true",
+        ],
+        true,
+      );
     }
     if (cleanupJobSetCRD) {
-      kubectl(cleanupContext, ["delete", "crd", "jobsets.jobset.x-k8s.io", "--ignore-not-found=true"], true);
+      kubectl(
+        cleanupContext,
+        ["delete", "crd", "jobsets.jobset.x-k8s.io", "--ignore-not-found=true"],
+        true,
+      );
     }
   }
   cleanupClusterId = "";
@@ -158,40 +464,65 @@ test.afterEach(async ({ request }) => {
   cleanupJobSetCRD = false;
 });
 
-test("reports reachable and unreachable kubeconfig contexts", async ({ page, request }) => {
-  const clusters = await request.get("/api/clusters").then((response) => response.json() as Promise<Cluster[]>);
+test("reports reachable and unreachable kubeconfig contexts", async ({
+  page,
+  request,
+}) => {
+  const clusters = await request
+    .get("/api/clusters")
+    .then((response) => response.json() as Promise<Cluster[]>);
   const reachable = clusters.find((item) => item.reachable);
   expect(reachable, "expected a reachable k3d kubeconfig context").toBeTruthy();
   expect(reachable).toMatchObject({
     source: "system",
     status: "reachable",
-    reachable: true
+    reachable: true,
   });
-  expect(reachable?.version, "reachable cluster should include server version").toBeTruthy();
+  expect(
+    reachable?.version,
+    "reachable cluster should include server version",
+  ).toBeTruthy();
 
   const expectedUnreachableContext = process.env.EXPECT_UNREACHABLE_CONTEXT;
   if (expectedUnreachableContext) {
-    const unreachable = clusters.find((item) => item.context === expectedUnreachableContext);
-    expect(unreachable, `expected ${expectedUnreachableContext} to be loaded from KUBECONFIG`).toBeTruthy();
+    const unreachable = clusters.find(
+      (item) => item.context === expectedUnreachableContext,
+    );
+    expect(
+      unreachable,
+      `expected ${expectedUnreachableContext} to be loaded from KUBECONFIG`,
+    ).toBeTruthy();
     expect(unreachable).toMatchObject({
       source: "system",
       status: "unreachable",
-      reachable: false
+      reachable: false,
     });
-    expect(unreachable?.error, "unreachable cluster should include the probe error").toBeTruthy();
+    expect(
+      unreachable?.error,
+      "unreachable cluster should include the probe error",
+    ).toBeTruthy();
   }
 
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Clusters" })).toBeVisible();
-  await expect(page.getByRole("main").getByRole("link", { name: reachable?.name })).toBeVisible();
+  await expect(
+    page.getByRole("main").getByRole("link", { name: reachable?.name }),
+  ).toBeVisible();
   if (expectedUnreachableContext) {
-    await expect(page.getByText(expectedUnreachableContext).first()).toBeVisible();
+    await expect(
+      page.getByText(expectedUnreachableContext).first(),
+    ).toBeVisible();
     await expect(page.getByText("Unreachable").first()).toBeVisible();
   }
 });
 
-test("discovers a kubeconfig cluster and streams deployment watch updates", async ({ page, request }) => {
-  const clusters = await request.get("/api/clusters").then((response) => response.json() as Promise<Cluster[]>);
+test("discovers a kubeconfig cluster and streams deployment watch updates", async ({
+  page,
+  request,
+}) => {
+  const clusters = await request
+    .get("/api/clusters")
+    .then((response) => response.json() as Promise<Cluster[]>);
   const cluster = clusters.find((item) => item.reachable) ?? clusters[0];
   expect(cluster, "expected at least one kubeconfig context").toBeTruthy();
   expect(cluster.reachable, `${cluster.name} should be reachable`).toBe(true);
@@ -199,7 +530,9 @@ test("discovers a kubeconfig cluster and streams deployment watch updates", asyn
 
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Clusters" })).toBeVisible();
-  await expect(page.getByRole("main").getByRole("link", { name: cluster.name })).toBeVisible();
+  await expect(
+    page.getByRole("main").getByRole("link", { name: cluster.name }),
+  ).toBeVisible();
 
   await page.goto(`/clusters/${cluster.id}`);
   await expect(page.getByRole("heading", { name: cluster.name })).toBeVisible();
@@ -212,22 +545,47 @@ test("discovers a kubeconfig cluster and streams deployment watch updates", asyn
   await expect(page.getByText(/Watch: (connected|connecting)/)).toBeVisible();
 
   await page.goto(`/clusters/${cluster.id}/deployments`);
-  await expect(page.getByRole("heading", { name: "Deployments" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Deployments" }),
+  ).toBeVisible();
   await expect(page.getByText("Watch: connected")).toBeVisible();
 
-  kubectl(cluster.context, ["create", "deployment", deploymentName, "--image=nginx:1.27-alpine"]);
+  kubectl(cluster.context, [
+    "create",
+    "deployment",
+    deploymentName,
+    "--image=nginx:1.27-alpine",
+  ]);
   await expect(page.getByText(deploymentName)).toBeVisible({ timeout: 1_000 });
 
   kubectl(cluster.context, ["delete", "deployment", deploymentName]);
-  await expect(page.getByText(deploymentName)).toHaveCount(0, { timeout: 1_000 });
+  await expect(page.getByText(deploymentName)).toHaveCount(0, {
+    timeout: 1_000,
+  });
 });
 
-test("loads dashboard metrics and the pods page for a real cluster", async ({ page, request }) => {
+test("loads dashboard metrics and the pods page for a real cluster", async ({
+  page,
+  request,
+}) => {
   const cluster = await reachableCluster(request);
   cleanupContext = cluster.context;
 
-  kubectl(cluster.context, ["run", dashboardPodName, "--image=busybox:1.36", "--restart=Never", "--", "sleep", "3600"]);
-  kubectl(cluster.context, ["wait", "--for=condition=Ready", `pod/${dashboardPodName}`, "--timeout=90s"]);
+  kubectl(cluster.context, [
+    "run",
+    dashboardPodName,
+    "--image=busybox:1.36",
+    "--restart=Never",
+    "--",
+    "sleep",
+    "3600",
+  ]);
+  kubectl(cluster.context, [
+    "wait",
+    "--for=condition=Ready",
+    `pod/${dashboardPodName}`,
+    "--timeout=90s",
+  ]);
 
   await page.goto(`/clusters/${cluster.id}`);
   await expect(page.getByRole("heading", { name: cluster.name })).toBeVisible();
@@ -235,15 +593,22 @@ test("loads dashboard metrics and the pods page for a real cluster", async ({ pa
   await expect(main.getByText("Nodes", { exact: true })).toBeVisible();
   await expect(main.getByText("Pods", { exact: true })).toBeVisible();
   await expect(main.getByText("Namespaces", { exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Node conditions" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Node conditions" }),
+  ).toBeVisible();
   await expect(page.getByText(/Ready: [1-9]/)).toBeVisible();
 
   await page.goto(`/clusters/${cluster.id}/pods`);
   await expect(page.getByRole("heading", { name: "Pods" })).toBeVisible();
-  await expect(page.getByText(dashboardPodName)).toBeVisible({ timeout: 2_000 });
+  await expect(page.getByText(dashboardPodName)).toBeVisible({
+    timeout: 2_000,
+  });
 });
 
-test("filters pods by namespace and persists the selection per cluster", async ({ page, request }) => {
+test("filters pods by namespace and persists the selection per cluster", async ({
+  page,
+  request,
+}) => {
   const cluster = await reachableCluster(request);
   cleanupContext = cluster.context;
 
@@ -257,85 +622,201 @@ test("filters pods by namespace and persists the selection per cluster", async (
     "--restart=Never",
     "--",
     "sleep",
-    "3600"
+    "3600",
   ]);
-  kubectl(cluster.context, ["wait", "--namespace", namespaceFilterName, "--for=condition=Ready", `pod/${namespaceFilterPodName}`, "--timeout=90s"]);
+  kubectl(cluster.context, [
+    "wait",
+    "--namespace",
+    namespaceFilterName,
+    "--for=condition=Ready",
+    `pod/${namespaceFilterPodName}`,
+    "--timeout=90s",
+  ]);
 
   await page.goto(`/clusters/${cluster.id}/pods`);
   await expect(page.getByRole("heading", { name: "Pods" })).toBeVisible();
-  await expect(page.getByText(namespaceFilterPodName)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(namespaceFilterPodName)).toBeVisible({
+    timeout: 30_000,
+  });
 
   await page.getByRole("button", { name: "All namespaces" }).click();
-  await expect(page.getByText("Namespaces", { exact: true }).first()).toBeVisible();
-  const namespaceOption = page.locator("label").filter({ hasText: namespaceFilterName });
+  await expect(
+    page.getByText("Namespaces", { exact: true }).first(),
+  ).toBeVisible();
+  const namespaceOption = page
+    .locator("label")
+    .filter({ hasText: namespaceFilterName });
   await namespaceOption.locator('input[name="namespace-filter"]').check();
 
-  await expect(page.getByRole("button", { name: "1 namespaces" })).toBeVisible();
-  await expect(page.getByText(`Filtered to ${namespaceFilterName}.`)).toBeVisible();
-  await expect(page.getByText(namespaceFilterPodName)).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page.getByRole("button", { name: "1 namespaces" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(`Filtered to ${namespaceFilterName}.`),
+  ).toBeVisible();
+  await expect(page.getByText(namespaceFilterPodName)).toBeVisible({
+    timeout: 30_000,
+  });
   await expect
-    .poll(() => page.evaluate((key) => localStorage.getItem(key), `namespaces:${cluster.id}`))
+    .poll(() =>
+      page.evaluate(
+        (key) => localStorage.getItem(key),
+        `namespaces:${cluster.id}`,
+      ),
+    )
     .toBe(JSON.stringify([namespaceFilterName]));
 
   await page.reload();
-  await expect(page.getByRole("button", { name: "1 namespaces" })).toBeVisible();
-  await expect(page.getByText(`Filtered to ${namespaceFilterName}.`)).toBeVisible();
-  await expect(page.getByText(namespaceFilterPodName)).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page.getByRole("button", { name: "1 namespaces" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(`Filtered to ${namespaceFilterName}.`),
+  ).toBeVisible();
+  await expect(page.getByText(namespaceFilterPodName)).toBeVisible({
+    timeout: 30_000,
+  });
 
   await page.getByRole("button", { name: "1 namespaces" }).click();
   await page.getByRole("button", { name: "Clear" }).click();
-  await expect(page.getByRole("button", { name: "All namespaces" })).toBeVisible();
-  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), `namespaces:${cluster.id}`)).toBe("[]");
+  await expect(
+    page.getByRole("button", { name: "All namespaces" }),
+  ).toBeVisible();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        (key) => localStorage.getItem(key),
+        `namespaces:${cluster.id}`,
+      ),
+    )
+    .toBe("[]");
 });
 
-test("scales and deletes a deployment from the resource drawer", async ({ page, request }) => {
+test("scales and deletes a deployment from the resource drawer", async ({
+  page,
+  request,
+}) => {
   const cluster = await reachableCluster(request);
   cleanupContext = cluster.context;
 
-  kubectl(cluster.context, ["create", "deployment", actionDeploymentName, "--image=nginx:1.27-alpine"]);
+  kubectl(cluster.context, [
+    "create",
+    "deployment",
+    actionDeploymentName,
+    "--image=nginx:1.27-alpine",
+  ]);
   await page.goto(`/clusters/${cluster.id}/deployments`);
-  await expect(page.getByRole("heading", { name: "Deployments" })).toBeVisible();
-  await expect(page.getByText(actionDeploymentName)).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page.getByRole("heading", { name: "Deployments" }),
+  ).toBeVisible();
+  await expect(page.getByText(actionDeploymentName)).toBeVisible({
+    timeout: 30_000,
+  });
 
   await page.getByText(actionDeploymentName).click();
-  await expect(page.getByRole("heading", { name: actionDeploymentName })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: actionDeploymentName }),
+  ).toBeVisible();
   await page.locator(`#replicas-${actionDeploymentName}`).fill("2");
   await page.getByRole("button", { name: "Scale" }).click();
-  await expect(page.getByText("Scaled to 2 replicas.")).toBeVisible({ timeout: 15_000 });
-  await expect.poll(() => kubectlOutput(cluster.context, ["get", "deployment", actionDeploymentName, "-o", "jsonpath={.spec.replicas}"])).toBe("2");
+  await expect(page.getByText("Scaled to 2 replicas.")).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect
+    .poll(() =>
+      kubectlOutput(cluster.context, [
+        "get",
+        "deployment",
+        actionDeploymentName,
+        "-o",
+        "jsonpath={.spec.replicas}",
+      ]),
+    )
+    .toBe("2");
 
-  await page.locator(`#delete-${actionDeploymentName}`).fill(actionDeploymentName);
+  await page
+    .locator(`#delete-${actionDeploymentName}`)
+    .fill(actionDeploymentName);
   await page.getByRole("button", { name: "Delete" }).click();
-  await expect(page.getByText(actionDeploymentName)).toHaveCount(0, { timeout: 30_000 });
-  expect(kubectlOutput(cluster.context, ["get", "deployment", actionDeploymentName, "--ignore-not-found=true"])).toBe("");
+  await expect(page.getByText(actionDeploymentName)).toHaveCount(0, {
+    timeout: 30_000,
+  });
+  expect(
+    kubectlOutput(cluster.context, [
+      "get",
+      "deployment",
+      actionDeploymentName,
+      "--ignore-not-found=true",
+    ]),
+  ).toBe("");
 });
 
-test("displays workload drawer pods, container spec, and revision history", async ({ page, request }) => {
+test("displays workload drawer pods, container spec, and revision history", async ({
+  page,
+  request,
+}) => {
   const cluster = await reachableCluster(request);
   cleanupContext = cluster.context;
 
-  kubectl(cluster.context, ["create", "deployment", workloadDrawerDeploymentName, "--image=nginx:1.27-alpine"]);
-  kubectl(cluster.context, ["rollout", "status", `deployment/${workloadDrawerDeploymentName}`, "--timeout=90s"]);
-  kubectl(cluster.context, ["set", "image", `deployment/${workloadDrawerDeploymentName}`, "*=nginx:1.26-alpine"]);
-  kubectl(cluster.context, ["rollout", "status", `deployment/${workloadDrawerDeploymentName}`, "--timeout=90s"]);
+  kubectl(cluster.context, [
+    "create",
+    "deployment",
+    workloadDrawerDeploymentName,
+    "--image=nginx:1.27-alpine",
+  ]);
+  kubectl(cluster.context, [
+    "rollout",
+    "status",
+    `deployment/${workloadDrawerDeploymentName}`,
+    "--timeout=90s",
+  ]);
+  kubectl(cluster.context, [
+    "set",
+    "image",
+    `deployment/${workloadDrawerDeploymentName}`,
+    "*=nginx:1.26-alpine",
+  ]);
+  kubectl(cluster.context, [
+    "rollout",
+    "status",
+    `deployment/${workloadDrawerDeploymentName}`,
+    "--timeout=90s",
+  ]);
 
   await page.goto(`/clusters/${cluster.id}/deployments`);
-  await expect(page.getByRole("heading", { name: "Deployments" })).toBeVisible();
-  await expect(page.getByText(workloadDrawerDeploymentName)).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page.getByRole("heading", { name: "Deployments" }),
+  ).toBeVisible();
+  await expect(page.getByText(workloadDrawerDeploymentName)).toBeVisible({
+    timeout: 30_000,
+  });
   await page.getByText(workloadDrawerDeploymentName).click();
 
-  await expect(page.getByRole("heading", { name: workloadDrawerDeploymentName })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Workload", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: workloadDrawerDeploymentName }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Workload", exact: true }),
+  ).toBeVisible();
   await expect(page.getByRole("heading", { name: "Replicas" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Owned Pods" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Container Spec" })).toBeVisible();
-  await expect(page.getByText("nginx:1.26-alpine", { exact: true }).first()).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Revision History" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Container Spec" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("nginx:1.26-alpine", { exact: true }).first(),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Revision History" }),
+  ).toBeVisible();
   await expect(page.getByText("Current").first()).toBeVisible();
   await expect(page.getByText("Previous").first()).toBeVisible();
 });
 
-test("lists active port-forwards in the topbar tray and stops them", async ({ page, request }) => {
+test("lists active port-forwards in the topbar tray and stops them", async ({
+  page,
+  request,
+}) => {
   const cluster = await reachableCluster(request);
   cleanupClusterId = cluster.id;
   cleanupContext = cluster.context;
@@ -349,18 +830,26 @@ test("lists active port-forwards in the topbar tray and stops them", async ({ pa
     "--",
     "/bin/sh",
     "-c",
-    "while true; do printf 'HTTP/1.1 200 OK\\r\\nContent-Length: 14\\r\\n\\r\\nAL_E2E_TRAY_OK' | nc -l -p 8080; done"
+    "while true; do printf 'HTTP/1.1 200 OK\\r\\nContent-Length: 14\\r\\n\\r\\nAL_E2E_TRAY_OK' | nc -l -p 8080; done",
   ]);
-  kubectl(cluster.context, ["wait", "--for=condition=Ready", `pod/${portForwardPodName}`, "--timeout=90s"]);
+  kubectl(cluster.context, [
+    "wait",
+    "--for=condition=Ready",
+    `pod/${portForwardPodName}`,
+    "--timeout=90s",
+  ]);
 
-  const startResponse = await request.post(`/api/clusters/${cluster.id}/portforwards`, {
-    data: {
-      namespace: "default",
-      pod: portForwardPodName,
-      remotePort: 8080,
-      localPort: 0
-    }
-  });
+  const startResponse = await request.post(
+    `/api/clusters/${cluster.id}/portforwards`,
+    {
+      data: {
+        namespace: "default",
+        pod: portForwardPodName,
+        remotePort: 8080,
+        localPort: 0,
+      },
+    },
+  );
   expect(startResponse.ok()).toBe(true);
   const session = (await startResponse.json()) as PortForward;
   cleanupPortForwardIds.push(session.id);
@@ -370,16 +859,28 @@ test("lists active port-forwards in the topbar tray and stops them", async ({ pa
 
   await page.goto(`/clusters/${cluster.id}`);
   await page.getByRole("button", { name: "Active port-forwards" }).click();
-  await expect(page.getByRole("heading", { name: "Port-forwards" })).toBeVisible();
-  await expect(page.getByRole("link", { name: portForwardPodName })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Port-forwards" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: portForwardPodName }),
+  ).toBeVisible();
   await expect(page.getByRole("link", { name: session.url })).toBeVisible();
   await expect(page.getByText("8080/TCP")).toBeVisible();
   await expect(page.getByText(/Expires in/)).toBeVisible();
 
-  await page.getByRole("button", { name: `Stop ${portForwardPodName} port-forward` }).click();
-  cleanupPortForwardIds = cleanupPortForwardIds.filter((id) => id !== session.id);
-  await expect(page.getByText("No active port-forwards for this cluster.")).toBeVisible();
-  const remainingResponse = await request.get(`/api/clusters/${cluster.id}/portforwards`);
+  await page
+    .getByRole("button", { name: `Stop ${portForwardPodName} port-forward` })
+    .click();
+  cleanupPortForwardIds = cleanupPortForwardIds.filter(
+    (id) => id !== session.id,
+  );
+  await expect(
+    page.getByText("No active port-forwards for this cluster."),
+  ).toBeVisible();
+  const remainingResponse = await request.get(
+    `/api/clusters/${cluster.id}/portforwards`,
+  );
   expect(await remainingResponse.json()).toEqual([]);
 });
 
@@ -388,38 +889,80 @@ test("dry-runs and applies multiple YAML documents", async ({ request }) => {
   cleanupContext = cluster.context;
   const manifest = [
     configMapManifest(applyConfigMapOne, "one"),
-    configMapManifest(applyConfigMapTwo, "two")
+    configMapManifest(applyConfigMapTwo, "two"),
   ].join("\n---\n");
 
-  const dryRunResponse = await request.post(`/api/clusters/${cluster.id}/apply?dryRun=true`, {
-    data: manifest,
-    headers: { "Content-Type": "application/yaml" }
-  });
+  const dryRunResponse = await request.post(
+    `/api/clusters/${cluster.id}/apply?dryRun=true`,
+    {
+      data: manifest,
+      headers: { "Content-Type": "application/yaml" },
+    },
+  );
   expect(dryRunResponse.ok()).toBe(true);
   const dryRun = await dryRunResponse.json();
   expect(dryRun).toMatchObject({
     dryRun: true,
     items: [
-      { kind: "ConfigMap", namespace: "default", name: applyConfigMapOne, dryRun: true },
-      { kind: "ConfigMap", namespace: "default", name: applyConfigMapTwo, dryRun: true }
-    ]
+      {
+        kind: "ConfigMap",
+        namespace: "default",
+        name: applyConfigMapOne,
+        dryRun: true,
+      },
+      {
+        kind: "ConfigMap",
+        namespace: "default",
+        name: applyConfigMapTwo,
+        dryRun: true,
+      },
+    ],
   });
-  expect(kubectlOutput(cluster.context, ["get", "configmap", applyConfigMapOne, "--ignore-not-found=true"])).toBe("");
+  expect(
+    kubectlOutput(cluster.context, [
+      "get",
+      "configmap",
+      applyConfigMapOne,
+      "--ignore-not-found=true",
+    ]),
+  ).toBe("");
 
-  const applyResponse = await request.post(`/api/clusters/${cluster.id}/apply`, {
-    data: manifest,
-    headers: { "Content-Type": "application/yaml" }
-  });
+  const applyResponse = await request.post(
+    `/api/clusters/${cluster.id}/apply`,
+    {
+      data: manifest,
+      headers: { "Content-Type": "application/yaml" },
+    },
+  );
   expect(applyResponse.ok()).toBe(true);
   const applied = await applyResponse.json();
   expect(applied).toMatchObject({
     dryRun: false,
     items: [
-      { kind: "ConfigMap", namespace: "default", name: applyConfigMapOne, dryRun: false },
-      { kind: "ConfigMap", namespace: "default", name: applyConfigMapTwo, dryRun: false }
-    ]
+      {
+        kind: "ConfigMap",
+        namespace: "default",
+        name: applyConfigMapOne,
+        dryRun: false,
+      },
+      {
+        kind: "ConfigMap",
+        namespace: "default",
+        name: applyConfigMapTwo,
+        dryRun: false,
+      },
+    ],
   });
-  expect(kubectlOutput(cluster.context, ["get", "configmap", applyConfigMapOne, applyConfigMapTwo, "-o", "name"])).toContain(`configmap/${applyConfigMapOne}`);
+  expect(
+    kubectlOutput(cluster.context, [
+      "get",
+      "configmap",
+      applyConfigMapOne,
+      applyConfigMapTwo,
+      "-o",
+      "name",
+    ]),
+  ).toContain(`configmap/${applyConfigMapOne}`);
 });
 
 test("streams pod logs in real time", async ({ page, request }) => {
@@ -435,17 +978,27 @@ test("streams pod logs in real time", async ({ page, request }) => {
     "--",
     "/bin/sh",
     "-c",
-    "i=0; while true; do echo AL_E2E_LOG_$i; i=$((i+1)); sleep 1; done"
+    "i=0; while true; do echo AL_E2E_LOG_$i; i=$((i+1)); sleep 1; done",
   ]);
-  kubectl(cluster.context, ["wait", "--for=condition=Ready", `pod/${logPodName}`, "--timeout=90s"]);
+  kubectl(cluster.context, [
+    "wait",
+    "--for=condition=Ready",
+    `pod/${logPodName}`,
+    "--timeout=90s",
+  ]);
 
   await page.goto(`/clusters/${cluster.id}/pods/default/${logPodName}/logs`);
   await expect(page.getByRole("heading", { name: logPodName })).toBeVisible();
-  await expect(page.getByText(/connected|reconnecting/i)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/connected|reconnecting/i)).toBeVisible({
+    timeout: 15_000,
+  });
   await expect(page.getByText(/AL_E2E_LOG_/)).toBeVisible({ timeout: 30_000 });
 });
 
-test("resumes pod logs after transient disconnect without replaying lines", async ({ page, request }) => {
+test("resumes pod logs after transient disconnect without replaying lines", async ({
+  page,
+  request,
+}) => {
   const cluster = await reachableCluster(request);
   cleanupContext = cluster.context;
 
@@ -458,23 +1011,49 @@ test("resumes pod logs after transient disconnect without replaying lines", asyn
     "--",
     "/bin/sh",
     "-c",
-    "i=0; while true; do echo AL_E2E_RECONNECT_LOG_$i; i=$((i+1)); sleep 1; done"
+    "i=0; while true; do echo AL_E2E_RECONNECT_LOG_$i; i=$((i+1)); sleep 1; done",
   ]);
-  kubectl(cluster.context, ["wait", "--for=condition=Ready", `pod/${reconnectLogPodName}`, "--timeout=90s"]);
+  kubectl(cluster.context, [
+    "wait",
+    "--for=condition=Ready",
+    `pod/${reconnectLogPodName}`,
+    "--timeout=90s",
+  ]);
 
   await page.goto(`/clusters/${cluster.id}`);
-  const first = await collectLogFrames(page, cluster.id, reconnectLogPodName, "", 3);
-  const latest = first.reduce((max, frame) => (frame.timestamp > max ? frame.timestamp : max), "");
+  const first = await collectLogFrames(
+    page,
+    cluster.id,
+    reconnectLogPodName,
+    "",
+    3,
+  );
+  const latest = first.reduce(
+    (max, frame) => (frame.timestamp > max ? frame.timestamp : max),
+    "",
+  );
   await page.waitForTimeout(2500);
-  const second = await collectLogFrames(page, cluster.id, reconnectLogPodName, latest, 2);
-  const seen = new Set(first.map((frame) => `${frame.timestamp}\u0000${frame.message}`));
-  const duplicates = second.filter((frame) => seen.has(`${frame.timestamp}\u0000${frame.message}`));
+  const second = await collectLogFrames(
+    page,
+    cluster.id,
+    reconnectLogPodName,
+    latest,
+    2,
+  );
+  const seen = new Set(
+    first.map((frame) => `${frame.timestamp}\u0000${frame.message}`),
+  );
+  const duplicates = second.filter((frame) =>
+    seen.has(`${frame.timestamp}\u0000${frame.message}`),
+  );
   const nonIncreasing = second.filter((frame) => frame.timestamp <= latest);
 
   expect(latest).not.toBe("");
   expect(duplicates).toEqual([]);
   expect(nonIncreasing).toEqual([]);
-  expect(second.map((frame) => frame.message).join("\n")).toContain("AL_E2E_RECONNECT_LOG_");
+  expect(second.map((frame) => frame.message).join("\n")).toContain(
+    "AL_E2E_RECONNECT_LOG_",
+  );
 });
 
 test("attaches to a running pod container", async ({ page, request }) => {
@@ -495,21 +1074,49 @@ spec:
       image: busybox:1.36
       command: ["/bin/sh", "-c", "cat"]
       stdin: true
-      tty: true`
+      tty: true`,
   );
-  kubectl(cluster.context, ["wait", "--for=condition=Ready", `pod/${attachPodName}`, "--timeout=90s"]);
+  kubectl(cluster.context, [
+    "wait",
+    "--for=condition=Ready",
+    `pod/${attachPodName}`,
+    "--timeout=90s",
+  ]);
 
   await page.goto(`/clusters/${cluster.id}`);
-  const frames = await attachAndEcho(page, cluster.id, attachPodName, "AL_E2E_ATTACH_OK");
-  expect(frames.map((frame) => frame.message ?? "").join("\n")).toContain("AL_E2E_ATTACH_OK");
+  const frames = await attachAndEcho(
+    page,
+    cluster.id,
+    attachPodName,
+    "AL_E2E_ATTACH_OK",
+  );
+  expect(frames.map((frame) => frame.message ?? "").join("\n")).toContain(
+    "AL_E2E_ATTACH_OK",
+  );
 });
 
-test("executes a command in a running pod container", async ({ page, request }) => {
+test("executes a command in a running pod container", async ({
+  page,
+  request,
+}) => {
   const cluster = await reachableCluster(request);
   cleanupContext = cluster.context;
 
-  kubectl(cluster.context, ["run", execPodName, "--image=busybox:1.36", "--restart=Never", "--", "sleep", "3600"]);
-  kubectl(cluster.context, ["wait", "--for=condition=Ready", `pod/${execPodName}`, "--timeout=90s"]);
+  kubectl(cluster.context, [
+    "run",
+    execPodName,
+    "--image=busybox:1.36",
+    "--restart=Never",
+    "--",
+    "sleep",
+    "3600",
+  ]);
+  kubectl(cluster.context, [
+    "wait",
+    "--for=condition=Ready",
+    `pod/${execPodName}`,
+    "--timeout=90s",
+  ]);
 
   await page.goto(`/clusters/${cluster.id}`);
   const frames = await execCommand(page, cluster.id, execPodName, ["ls", "/"]);
@@ -517,12 +1124,21 @@ test("executes a command in a running pod container", async ({ page, request }) 
   expect(output).toContain("bin");
   expect(output).toContain("etc");
 
-  const topFrames = await execInteractiveCommand(page, cluster.id, execPodName, ["top"], ["Mem:", "CPU:", "PID"]);
+  const topFrames = await execInteractiveCommand(
+    page,
+    cluster.id,
+    execPodName,
+    ["top"],
+    ["Mem:", "CPU:", "PID"],
+  );
   const topOutput = topFrames.map((frame) => frame.message ?? "").join("");
   expect(topOutput).toMatch(/Mem:|CPU:|PID/);
 });
 
-test("resource watch reconnects after a transient disconnect", async ({ page, request }) => {
+test("resource watch reconnects after a transient disconnect", async ({
+  page,
+  request,
+}) => {
   const cluster = await reachableCluster(request);
   cleanupContext = cluster.context;
 
@@ -530,9 +1146,19 @@ test("resource watch reconnects after a transient disconnect", async ({ page, re
   const first = await collectWatchFrames(page, cluster.id, "", 1);
   expect(first.length).toBeGreaterThan(0);
 
-  const secondPromise = collectWatchFrames(page, cluster.id, reconnectWatchConfigMapName, 1);
+  const secondPromise = collectWatchFrames(
+    page,
+    cluster.id,
+    reconnectWatchConfigMapName,
+    1,
+  );
   await page.waitForTimeout(500);
-  kubectl(cluster.context, ["create", "configmap", reconnectWatchConfigMapName, "--from-literal=message=reconnected"]);
+  kubectl(cluster.context, [
+    "create",
+    "configmap",
+    reconnectWatchConfigMapName,
+    "--from-literal=message=reconnected",
+  ]);
   const second = await secondPromise;
 
   expect(second).toEqual(
@@ -542,20 +1168,35 @@ test("resource watch reconnects after a transient disconnect", async ({ page, re
         object: expect.objectContaining({
           metadata: expect.objectContaining({
             name: reconnectWatchConfigMapName,
-            namespace: "default"
-          })
-        })
-      })
-    ])
+            namespace: "default",
+          }),
+        }),
+      }),
+    ]),
   );
 });
 
-test("displays pod disruption budget policy details", async ({ page, request }) => {
+test("displays pod disruption budget policy details", async ({
+  page,
+  request,
+}) => {
   const cluster = await reachableCluster(request);
   cleanupContext = cluster.context;
 
-  kubectl(cluster.context, ["create", "deployment", pdbDeploymentName, "--image=nginx:1.27-alpine"]);
-  kubectl(cluster.context, ["create", "poddisruptionbudget", pdbName, "--selector", `app=${pdbDeploymentName}`, "--min-available=1"]);
+  kubectl(cluster.context, [
+    "create",
+    "deployment",
+    pdbDeploymentName,
+    "--image=nginx:1.27-alpine",
+  ]);
+  kubectl(cluster.context, [
+    "create",
+    "poddisruptionbudget",
+    pdbName,
+    "--selector",
+    `app=${pdbDeploymentName}`,
+    "--min-available=1",
+  ]);
 
   await page.goto(`/clusters/${cluster.id}/poddisruptionbudgets`);
   await expect(page.getByRole("heading", { name: "PDB" })).toBeVisible();
@@ -563,51 +1204,95 @@ test("displays pod disruption budget policy details", async ({ page, request }) 
 
   await page.getByText(pdbName).click();
   await expect(page.getByRole("heading", { name: pdbName })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Pod Disruption Budget" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Pod Disruption Budget" }),
+  ).toBeVisible();
   await expect(page.getByText("Min Available")).toBeVisible();
   await expect(page.getByText("Disruptions Allowed")).toBeVisible();
   await expect(page.getByText(`app=${pdbDeploymentName}`)).toBeVisible();
 });
 
-test("displays discovered custom resource instances with summary fields", async ({ page, request }) => {
+test("displays discovered custom resource instances with summary fields", async ({
+  page,
+  request,
+}) => {
   const cluster = await reachableCluster(request);
   cleanupContext = cluster.context;
 
   kubectlApply(cluster.context, customResourceDefinitionManifest());
-  kubectl(cluster.context, ["wait", "--for=condition=Established", `crd/${customResourceDefinitionName}`, "--timeout=60s"]);
+  kubectl(cluster.context, [
+    "wait",
+    "--for=condition=Established",
+    `crd/${customResourceDefinitionName}`,
+    "--timeout=60s",
+  ]);
   kubectlApply(cluster.context, customResourceManifest(customResourceName));
 
-  await page.goto(`/clusters/${cluster.id}/resources?q=${customResourcePlural}`);
-  await expect(page.getByRole("heading", { name: "Widget" })).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText(customResourceName)).toBeVisible({ timeout: 30_000 });
+  await page.goto(
+    `/clusters/${cluster.id}/resources?q=${customResourcePlural}`,
+  );
+  await expect(page.getByRole("heading", { name: "Widget" })).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(page.getByText(customResourceName)).toBeVisible({
+    timeout: 30_000,
+  });
 
   await page.getByText(customResourceName).click();
-  await expect(page.getByRole("heading", { name: customResourceName })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Custom Resource" })).toBeVisible();
-  await expect(page.getByText(customResourceGroup, { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: customResourceName }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Custom Resource" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(customResourceGroup, { exact: true }),
+  ).toBeVisible();
   await expect(page.getByRole("heading", { name: "Spec" })).toBeVisible();
   await expect(page.getByText("tier", { exact: true })).toBeVisible();
   await expect(page.getByText("gold", { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Conditions" })).toBeVisible();
-  await expect(page.getByRole("cell", { name: "Accepted", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: "Accepted", exact: true }),
+  ).toBeVisible();
 
   await page.goto(`/clusters/${cluster.id}/crds`);
   await expect(page.getByRole("heading", { name: "CRDs" })).toBeVisible();
   await page.getByPlaceholder(/Filter/).fill(customResourcePlural);
-  await expect(page.getByText(customResourceDefinitionName)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(customResourceDefinitionName)).toBeVisible({
+    timeout: 30_000,
+  });
   await page.getByText(customResourceDefinitionName).click();
-  await expect(page.getByRole("heading", { name: customResourceDefinitionName })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Additional Printer Columns" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: customResourceDefinitionName }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Additional Printer Columns" }),
+  ).toBeVisible();
   await expect(page.getByText(".spec.tier", { exact: true })).toBeVisible();
-  await expect(page.getByText("Desired replicas", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Desired replicas", { exact: true }),
+  ).toBeVisible();
 });
 
 test("displays gateway policy resource details", async ({ page, request }) => {
   const cluster = await reachableCluster(request);
   cleanupContext = cluster.context;
 
-  const tlsCrdExists = kubectlOutput(cluster.context, ["get", "crd", backendTLSPolicyCRDName, "--ignore-not-found=true"]) !== "";
-  const trafficCrdExists = kubectlOutput(cluster.context, ["get", "crd", backendTrafficPolicyCRDName, "--ignore-not-found=true"]) !== "";
+  const tlsCrdExists =
+    kubectlOutput(cluster.context, [
+      "get",
+      "crd",
+      backendTLSPolicyCRDName,
+      "--ignore-not-found=true",
+    ]) !== "";
+  const trafficCrdExists =
+    kubectlOutput(cluster.context, [
+      "get",
+      "crd",
+      backendTrafficPolicyCRDName,
+      "--ignore-not-found=true",
+    ]) !== "";
   if (!tlsCrdExists) {
     kubectlApply(cluster.context, backendTLSPolicyCRDManifest());
     cleanupTLSPolicyCRD = true;
@@ -616,38 +1301,91 @@ test("displays gateway policy resource details", async ({ page, request }) => {
     kubectlApply(cluster.context, backendTrafficPolicyCRDManifest());
     cleanupTrafficPolicyCRD = true;
   }
-  kubectl(cluster.context, ["wait", "--for=condition=Established", `crd/${backendTLSPolicyCRDName}`, "--timeout=60s"]);
-  kubectl(cluster.context, ["wait", "--for=condition=Established", `crd/${backendTrafficPolicyCRDName}`, "--timeout=60s"]);
+  kubectl(cluster.context, [
+    "wait",
+    "--for=condition=Established",
+    `crd/${backendTLSPolicyCRDName}`,
+    "--timeout=60s",
+  ]);
+  kubectl(cluster.context, [
+    "wait",
+    "--for=condition=Established",
+    `crd/${backendTrafficPolicyCRDName}`,
+    "--timeout=60s",
+  ]);
 
-  const tlsVersions = JSON.parse(kubectlOutput(cluster.context, ["get", "crd", backendTLSPolicyCRDName, "-o", "json"])).spec.versions as { name: string; served: boolean; storage: boolean }[];
-  const tlsVersion = tlsVersions.find(version => version.served && version.storage)!.name;
-  kubectlApply(cluster.context, backendTLSPolicyManifest(backendTLSPolicyName, tlsVersion));
-  kubectlApply(cluster.context, backendTrafficPolicyManifest(backendTrafficPolicyName));
+  const tlsVersions = JSON.parse(
+    kubectlOutput(cluster.context, [
+      "get",
+      "crd",
+      backendTLSPolicyCRDName,
+      "-o",
+      "json",
+    ]),
+  ).spec.versions as { name: string; served: boolean; storage: boolean }[];
+  const tlsVersion = tlsVersions.find(
+    (version) => version.served && version.storage,
+  )!.name;
+  kubectlApply(
+    cluster.context,
+    backendTLSPolicyManifest(backendTLSPolicyName, tlsVersion),
+  );
+  kubectlApply(
+    cluster.context,
+    backendTrafficPolicyManifest(backendTrafficPolicyName),
+  );
 
   await page.goto(`/clusters/${cluster.id}/backendtlspolicies`);
-  await expect(page.getByRole("heading", { name: "BackendTLSPolicies" })).toBeVisible();
-  await expect(page.getByText(backendTLSPolicyName)).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page.getByRole("heading", { name: "BackendTLSPolicies" }),
+  ).toBeVisible();
+  await expect(page.getByText(backendTLSPolicyName)).toBeVisible({
+    timeout: 30_000,
+  });
   await page.getByText(backendTLSPolicyName).click();
-  await expect(page.getByRole("heading", { name: backendTLSPolicyName })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Backend TLS Policy" })).toBeVisible();
-  await expect(page.getByText("service.default.svc.cluster.local", { exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Target Refs" })).toBeVisible();
-  await expect(page.getByText("backend-service", { exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "CA Certificate Refs" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: backendTLSPolicyName }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Backend TLS Policy" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("service.default.svc.cluster.local", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Target Refs" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("backend-service", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "CA Certificate Refs" }),
+  ).toBeVisible();
   await expect(page.getByText("backend-ca", { exact: true })).toBeVisible();
 
   await page.goto(`/clusters/${cluster.id}/xbackendtrafficpolicies`);
-  await expect(page.getByRole("heading", { name: "XBackendTrafficPolicies" })).toBeVisible();
-  await expect(page.getByText(backendTrafficPolicyName)).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page.getByRole("heading", { name: "XBackendTrafficPolicies" }),
+  ).toBeVisible();
+  await expect(page.getByText(backendTrafficPolicyName)).toBeVisible({
+    timeout: 30_000,
+  });
   await page.getByText(backendTrafficPolicyName).click();
-  await expect(page.getByRole("heading", { name: backendTrafficPolicyName })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Backend Traffic Policy" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: backendTrafficPolicyName }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Backend Traffic Policy" }),
+  ).toBeVisible();
   await expect(page.getByText("25% / 10s")).toBeVisible();
   await expect(page.getByText("5 / 1s")).toBeVisible();
   await expect(page.getByText("sticky-service")).toBeVisible();
 });
 
-test("displays storage, networking, and security read page details", async ({ page, request }) => {
+test("displays storage, networking, and security read page details", async ({
+  page,
+  request,
+}) => {
   const cluster = await reachableCluster(request);
   cleanupContext = cluster.context;
 
@@ -659,61 +1397,129 @@ test("displays storage, networking, and security read page details", async ({ pa
     `--labels=app=${readPagesPodName}`,
     "--",
     "sleep",
-    "3600"
+    "3600",
   ]);
-  kubectl(cluster.context, ["wait", "--for=condition=Ready", `pod/${readPagesPodName}`, "--timeout=90s"]);
-  kubectl(cluster.context, ["expose", "pod", readPagesPodName, "--name", readPagesServiceName, "--port=80", "--target-port=8080"]);
-  kubectl(cluster.context, ["create", "configmap", readPagesConfigMapName, "--from-literal=mode=read-pages"]);
-  kubectl(cluster.context, ["create", "serviceaccount", readPagesServiceAccountName]);
-  kubectl(cluster.context, ["create", "role", readPagesRoleName, "--verb=get,list", "--resource=pods"]);
-  kubectlApply(cluster.context, networkPolicyManifest(readPagesNetworkPolicyName, readPagesPodName));
+  kubectl(cluster.context, [
+    "wait",
+    "--for=condition=Ready",
+    `pod/${readPagesPodName}`,
+    "--timeout=90s",
+  ]);
+  kubectl(cluster.context, [
+    "expose",
+    "pod",
+    readPagesPodName,
+    "--name",
+    readPagesServiceName,
+    "--port=80",
+    "--target-port=8080",
+  ]);
+  kubectl(cluster.context, [
+    "create",
+    "configmap",
+    readPagesConfigMapName,
+    "--from-literal=mode=read-pages",
+  ]);
+  kubectl(cluster.context, [
+    "create",
+    "serviceaccount",
+    readPagesServiceAccountName,
+  ]);
+  kubectl(cluster.context, [
+    "create",
+    "role",
+    readPagesRoleName,
+    "--verb=get,list",
+    "--resource=pods",
+  ]);
+  kubectlApply(
+    cluster.context,
+    networkPolicyManifest(readPagesNetworkPolicyName, readPagesPodName),
+  );
 
   await page.goto(`/clusters/${cluster.id}/services`);
   await expect(page.getByRole("heading", { name: "Services" })).toBeVisible();
-  await expect(page.getByText(readPagesServiceName)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(readPagesServiceName)).toBeVisible({
+    timeout: 30_000,
+  });
   await page.getByText(readPagesServiceName).click();
-  await expect(page.getByRole("heading", { name: readPagesServiceName })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Service", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: readPagesServiceName }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Service", exact: true }),
+  ).toBeVisible();
   await expect(page.getByRole("heading", { name: "Ports" })).toBeVisible();
   await expect(page.getByText("80 -> 8080")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Endpoints" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Endpoint Slices" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Endpoint Slices" }),
+  ).toBeVisible();
 
   await page.goto(`/clusters/${cluster.id}/configmaps`);
   await expect(page.getByRole("heading", { name: "ConfigMaps" })).toBeVisible();
-  await expect(page.getByText(readPagesConfigMapName)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(readPagesConfigMapName)).toBeVisible({
+    timeout: 30_000,
+  });
   await page.getByText(readPagesConfigMapName).click();
-  await expect(page.getByRole("heading", { name: readPagesConfigMapName })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: readPagesConfigMapName }),
+  ).toBeVisible();
   await expect(page.getByRole("heading", { name: "Data" })).toBeVisible();
   await expect(page.getByText("read-pages")).toBeVisible();
 
   await page.goto(`/clusters/${cluster.id}/serviceaccounts`);
-  await expect(page.getByRole("heading", { name: "ServiceAccounts" })).toBeVisible();
-  await expect(page.getByText(readPagesServiceAccountName)).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page.getByRole("heading", { name: "ServiceAccounts" }),
+  ).toBeVisible();
+  await expect(page.getByText(readPagesServiceAccountName)).toBeVisible({
+    timeout: 30_000,
+  });
   await page.getByText(readPagesServiceAccountName).click();
-  await expect(page.getByRole("heading", { name: readPagesServiceAccountName })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Service Account" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: readPagesServiceAccountName }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Service Account" }),
+  ).toBeVisible();
 
   await page.goto(`/clusters/${cluster.id}/roles`);
   await expect(page.getByRole("heading", { name: "Roles" })).toBeVisible();
-  await expect(page.getByText(readPagesRoleName)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(readPagesRoleName)).toBeVisible({
+    timeout: 30_000,
+  });
   await page.getByText(readPagesRoleName).click();
-  await expect(page.getByRole("heading", { name: readPagesRoleName })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: readPagesRoleName }),
+  ).toBeVisible();
   await expect(page.getByRole("heading", { name: "Rules" })).toBeVisible();
   await expect(page.getByText("pods")).toBeVisible();
   await expect(page.getByText("get, list")).toBeVisible();
 
   await page.goto(`/clusters/${cluster.id}/networkpolicies`);
-  await expect(page.getByRole("heading", { name: "Network Policies" })).toBeVisible();
-  await expect(page.getByText(readPagesNetworkPolicyName)).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page.getByRole("heading", { name: "Network Policies" }),
+  ).toBeVisible();
+  await expect(page.getByText(readPagesNetworkPolicyName)).toBeVisible({
+    timeout: 30_000,
+  });
   await page.getByText(readPagesNetworkPolicyName).click();
-  await expect(page.getByRole("heading", { name: readPagesNetworkPolicyName })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Network Policy" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: readPagesNetworkPolicyName }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Network Policy" }),
+  ).toBeVisible();
   await expect(page.getByText("Ingress", { exact: true })).toBeVisible();
-  await expect(page.getByText(`app=${readPagesPodName}`, { exact: true })).toBeVisible();
+  await expect(
+    page.getByText(`app=${readPagesPodName}`, { exact: true }),
+  ).toBeVisible();
 });
 
-test("renders metrics page when metrics-server is present or absent", async ({ page, request }) => {
+test("renders metrics page when metrics-server is present or absent", async ({
+  page,
+  request,
+}) => {
   const cluster = await reachableCluster(request);
   const response = await request.get(`/api/clusters/${cluster.id}/metrics`);
   expect(response.ok()).toBe(true);
@@ -722,65 +1528,123 @@ test("renders metrics page when metrics-server is present or absent", async ({ p
   await page.goto(`/clusters/${cluster.id}/metrics`);
   await expect(page.getByRole("heading", { name: "Metrics" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Node usage" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Top pods by CPU" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Top pods by CPU" }),
+  ).toBeVisible();
 
   if (metrics.available) {
     await expect(page.getByText("metrics-server").first()).toBeVisible();
     await expect(page.getByText("Cluster CPU", { exact: true })).toBeVisible();
-    await expect(page.getByText("Cluster Memory", { exact: true })).toBeVisible();
+    await expect(
+      page.getByText("Cluster Memory", { exact: true }),
+    ).toBeVisible();
   } else {
     await expect(page.getByText("optional")).toBeVisible();
-    await expect(page.getByText(/metrics-server is not available for this cluster/)).toBeVisible();
+    await expect(
+      page.getByText(/metrics-server is not available for this cluster/),
+    ).toBeVisible();
     await expect(page.getByText("No node metrics found.")).toBeVisible();
     await expect(page.getByText("No pod metrics found.")).toBeVisible();
   }
 });
 
-test("displays built-in Headlamp parity resource details", async ({ page, request }) => {
+test("displays built-in Headlamp parity resource details", async ({
+  page,
+  request,
+}) => {
   const cluster = await reachableCluster(request);
   cleanupContext = cluster.context;
 
-  kubectl(cluster.context, ["create", "deployment", parityDeploymentName, "--image=nginx:1.27-alpine"]);
-  kubectl(cluster.context, ["autoscale", "deployment", parityDeploymentName, "--name", hpaName, "--min=1", "--max=3", "--cpu-percent=50"]);
+  kubectl(cluster.context, [
+    "create",
+    "deployment",
+    parityDeploymentName,
+    "--image=nginx:1.27-alpine",
+  ]);
+  kubectl(cluster.context, [
+    "autoscale",
+    "deployment",
+    parityDeploymentName,
+    "--name",
+    hpaName,
+    "--min=1",
+    "--max=3",
+    "--cpu-percent=50",
+  ]);
   kubectlApply(cluster.context, ingressClassManifest(ingressClassName));
-  kubectl(cluster.context, ["create", "quota", resourceQuotaName, "--hard=pods=10,requests.cpu=1,requests.memory=1Gi"]);
+  kubectl(cluster.context, [
+    "create",
+    "quota",
+    resourceQuotaName,
+    "--hard=pods=10,requests.cpu=1,requests.memory=1Gi",
+  ]);
   kubectlApply(cluster.context, limitRangeManifest(limitRangeName));
   kubectlApply(cluster.context, leaseManifest(leaseName));
 
   await page.goto(`/clusters/${cluster.id}/ingressclasses`);
-  await expect(page.getByRole("heading", { name: "IngressClasses" })).toBeVisible();
-  await expect(page.getByText(ingressClassName)).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page.getByRole("heading", { name: "IngressClasses" }),
+  ).toBeVisible();
+  await expect(page.getByText(ingressClassName)).toBeVisible({
+    timeout: 30_000,
+  });
   await page.getByText(ingressClassName).click();
-  await expect(page.getByRole("heading", { name: ingressClassName })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Ingress Class" })).toBeVisible();
-  await expect(page.getByText("example.com/ingress-controller", { exact: true })).toBeVisible();
-  await expect(page.getByText("IngressParameters / default-params / Cluster")).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: ingressClassName }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Ingress Class" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("example.com/ingress-controller", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("IngressParameters / default-params / Cluster"),
+  ).toBeVisible();
 
   await page.goto(`/clusters/${cluster.id}/horizontalpodautoscalers`);
   await expect(page.getByRole("heading", { name: "HPAs" })).toBeVisible();
   await expect(page.getByText(hpaName)).toBeVisible({ timeout: 30_000 });
   await page.getByText(hpaName).click();
   await expect(page.getByRole("heading", { name: hpaName })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Horizontal Pod Autoscaler" })).toBeVisible();
-  await expect(page.getByText(`Deployment/${parityDeploymentName}`)).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Horizontal Pod Autoscaler" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(`Deployment/${parityDeploymentName}`),
+  ).toBeVisible();
   await expect(page.getByRole("heading", { name: "Metrics" })).toBeVisible();
   await expect(page.getByText("Utilization / 50%")).toBeVisible();
 
   await page.goto(`/clusters/${cluster.id}/resourcequotas`);
-  await expect(page.getByRole("heading", { name: "ResourceQuotas" })).toBeVisible();
-  await expect(page.getByText(resourceQuotaName)).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page.getByRole("heading", { name: "ResourceQuotas" }),
+  ).toBeVisible();
+  await expect(page.getByText(resourceQuotaName)).toBeVisible({
+    timeout: 30_000,
+  });
   await page.getByText(resourceQuotaName).click();
-  await expect(page.getByRole("heading", { name: resourceQuotaName })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Resource Quota" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: resourceQuotaName }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Resource Quota" }),
+  ).toBeVisible();
   await expect(page.getByRole("heading", { name: "Usage" })).toBeVisible();
   await expect(page.getByText("requests.cpu", { exact: true })).toBeVisible();
 
   await page.goto(`/clusters/${cluster.id}/limitranges`);
-  await expect(page.getByRole("heading", { name: "LimitRanges" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "LimitRanges" }),
+  ).toBeVisible();
   await expect(page.getByText(limitRangeName)).toBeVisible({ timeout: 30_000 });
   await page.getByText(limitRangeName).click();
-  await expect(page.getByRole("heading", { name: limitRangeName })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Limit Range" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: limitRangeName }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Limit Range" }),
+  ).toBeVisible();
   await expect(page.getByText("cpu: 50m, memory: 64Mi")).toBeVisible();
   await expect(page.getByText("cpu: 100m, memory: 64Mi")).toBeVisible();
 
@@ -789,16 +1653,25 @@ test("displays built-in Headlamp parity resource details", async ({ page, reques
   await expect(page.getByText(leaseName)).toBeVisible({ timeout: 30_000 });
   await page.getByText(leaseName).click();
   await expect(page.getByRole("heading", { name: leaseName })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Lease", exact: true })).toBeVisible();
-  await expect(page.getByText("astronomer-lite-e2e", { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Lease", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("astronomer-lite-e2e", { exact: true }),
+  ).toBeVisible();
   await expect(page.getByText("30s", { exact: true })).toBeVisible();
 });
 
-test("opens the command palette and navigates to pods", async ({ page, request }) => {
+test("opens the command palette and navigates to pods", async ({
+  page,
+  request,
+}) => {
   const cluster = await reachableCluster(request);
   cleanupContext = cluster.context;
   await page.goto(`/clusters/${cluster.id}`);
-  await expect(page.getByRole("button", { name: "Open command palette", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Open command palette", exact: true }),
+  ).toBeVisible();
   await page.locator("body").click();
   await page.keyboard.press("Control+k");
   const input = page.getByRole("combobox", { name: "Command palette search" });
@@ -810,35 +1683,59 @@ test("opens the command palette and navigates to pods", async ({ page, request }
   await expect(page.getByRole("heading", { name: "Pods" })).toBeVisible();
 });
 
-test("global search returns cluster resources through the palette", async ({ page, request }) => {
+test("global search returns cluster resources through the palette", async ({
+  page,
+  request,
+}) => {
   const cluster = await reachableCluster(request);
   cleanupContext = cluster.context;
   await page.goto(`/clusters/${cluster.id}`);
   // AuthGate resolves the session asynchronously after the document loads.
   // Wait for the shell's control instead of sending a shortcut before it mounts.
-  await page.getByRole("button", { name: "Open command palette", exact: true }).click();
-  await page.getByRole("combobox", { name: "Command palette search" }).fill("/coredns");
+  await page
+    .getByRole("button", { name: "Open command palette", exact: true })
+    .click();
+  await page
+    .getByRole("combobox", { name: "Command palette search" })
+    .fill("/coredns");
   // CoreDNS ships with k3d in kube-system; either the deployment or pod should match.
-  await expect(page.getByRole("option", { name: /coredns/ }).first()).toBeVisible({ timeout: 15_000 });
+  await expect(
+    page.getByRole("option", { name: /coredns/ }).first(),
+  ).toBeVisible({ timeout: 15_000 });
 });
 
 test("exposes the OpenAPI schema endpoint", async ({ request }) => {
   const cluster = await reachableCluster(request);
   const response = await request.get(`/api/clusters/${cluster.id}/openapi`);
   expect(response.ok()).toBe(true);
-  const doc = (await response.json()) as { swagger?: string; definitions?: Record<string, unknown> };
+  const doc = (await response.json()) as {
+    swagger?: string;
+    definitions?: Record<string, unknown>;
+  };
   expect(doc.swagger).toBe("2.0");
   expect(Object.keys(doc.definitions ?? {}).length).toBeGreaterThan(100);
   expect(doc.definitions?.["io.k8s.api.apps.v1.Deployment"]).toBeTruthy();
 });
 
-test("can-i endpoint returns SelfSubjectAccessReview results for mutating actions", async ({ request }) => {
+test("can-i endpoint returns SelfSubjectAccessReview results for mutating actions", async ({
+  request,
+}) => {
   const cluster = await reachableCluster(request);
   const response = await request.post(`/api/clusters/${cluster.id}/can-i`, {
-    data: { verb: "patch", group: "apps", resource: "deployments", namespace: "default" }
+    data: {
+      verb: "patch",
+      group: "apps",
+      resource: "deployments",
+      namespace: "default",
+    },
   });
   expect(response.ok()).toBe(true);
-  const body = (await response.json()) as { allowed: boolean; denied: boolean; reason?: string; evaluationError?: string };
+  const body = (await response.json()) as {
+    allowed: boolean;
+    denied: boolean;
+    reason?: string;
+    evaluationError?: string;
+  };
   expect(typeof body.allowed).toBe("boolean");
   expect(typeof body.denied).toBe("boolean");
   // k3d default credentials are cluster-admin, so a deployment patch must be allowed.
@@ -848,89 +1745,236 @@ test("can-i endpoint returns SelfSubjectAccessReview results for mutating action
 test("rolls back a Deployment to a previous revision", async ({ request }) => {
   const cluster = await reachableCluster(request);
   cleanupContext = cluster.context;
-  kubectl(cluster.context, ["create", "deployment", workloadRollbackDeploymentName, "--image=nginx:1.27-alpine"]);
-  kubectl(cluster.context, ["rollout", "status", `deployment/${workloadRollbackDeploymentName}`, "--timeout=120s"]);
-  kubectl(cluster.context, ["set", "image", `deployment/${workloadRollbackDeploymentName}`, "nginx=nginx:1.26-alpine"]);
-  kubectl(cluster.context, ["rollout", "status", `deployment/${workloadRollbackDeploymentName}`, "--timeout=120s"]);
-  const before = kubectlOutput(cluster.context, ["get", "deployment", workloadRollbackDeploymentName, "-o", "jsonpath={.spec.template.spec.containers[0].image}"]);
+  kubectl(cluster.context, [
+    "create",
+    "deployment",
+    workloadRollbackDeploymentName,
+    "--image=nginx:1.27-alpine",
+  ]);
+  kubectl(cluster.context, [
+    "rollout",
+    "status",
+    `deployment/${workloadRollbackDeploymentName}`,
+    "--timeout=120s",
+  ]);
+  kubectl(cluster.context, [
+    "set",
+    "image",
+    `deployment/${workloadRollbackDeploymentName}`,
+    "nginx=nginx:1.26-alpine",
+  ]);
+  kubectl(cluster.context, [
+    "rollout",
+    "status",
+    `deployment/${workloadRollbackDeploymentName}`,
+    "--timeout=120s",
+  ]);
+  const before = kubectlOutput(cluster.context, [
+    "get",
+    "deployment",
+    workloadRollbackDeploymentName,
+    "-o",
+    "jsonpath={.spec.template.spec.containers[0].image}",
+  ]);
   expect(before).toBe("nginx:1.26-alpine");
-  const response = await request.post(`/api/clusters/${cluster.id}/resources/deployments/default/${workloadRollbackDeploymentName}/rollback`, {
-    data: { revision: 1 }
-  });
+  const response = await request.post(
+    `/api/clusters/${cluster.id}/resources/deployments/default/${workloadRollbackDeploymentName}/rollback`,
+    {
+      data: { revision: 1 },
+    },
+  );
   expect(response.ok()).toBe(true);
   await expect
-    .poll(() => kubectlOutput(cluster.context, ["get", "deployment", workloadRollbackDeploymentName, "-o", "jsonpath={.spec.template.spec.containers[0].image}"]))
+    .poll(() =>
+      kubectlOutput(cluster.context, [
+        "get",
+        "deployment",
+        workloadRollbackDeploymentName,
+        "-o",
+        "jsonpath={.spec.template.spec.containers[0].image}",
+      ]),
+    )
     .toBe("nginx:1.27-alpine");
 });
 
-test("lists, rolls back, and renders Helm releases", async ({ page, request }) => {
+test("lists, rolls back, and renders Helm releases", async ({
+  page,
+  request,
+}) => {
   const cluster = await reachableCluster(request);
   cleanupContext = cluster.context;
   // Write a tiny self-contained chart that doesn't pull any images.
   execFileSync("mkdir", ["-p", `${helmChartDir}/templates`]);
-  execFileSync("sh", ["-c", `cat > ${helmChartDir}/Chart.yaml <<'YAML'
+  execFileSync("sh", [
+    "-c",
+    `cat > ${helmChartDir}/Chart.yaml <<'YAML'
 apiVersion: v2
 name: tiny
 version: 0.1.0
 appVersion: "v1"
-YAML`]);
-  execFileSync("sh", ["-c", `cat > ${helmChartDir}/values.yaml <<'YAML'
+YAML`,
+  ]);
+  execFileSync("sh", [
+    "-c",
+    `cat > ${helmChartDir}/values.yaml <<'YAML'
 greeting: hello
-YAML`]);
-  execFileSync("sh", ["-c", `cat > ${helmChartDir}/templates/configmap.yaml <<'YAML'
+YAML`,
+  ]);
+  execFileSync("sh", [
+    "-c",
+    `cat > ${helmChartDir}/templates/configmap.yaml <<'YAML'
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: ${helmReleaseName}-greeting
 data:
   message: {{ .Values.greeting | quote }}
-YAML`]);
-  execFileSync("helm", ["--kube-context", cluster.context, "install", helmReleaseName, helmChartDir, "--namespace", "default"], { stdio: "inherit" });
+YAML`,
+  ]);
+  execFileSync(
+    "helm",
+    [
+      "--kube-context",
+      cluster.context,
+      "install",
+      helmReleaseName,
+      helmChartDir,
+      "--namespace",
+      "default",
+    ],
+    { stdio: "inherit" },
+  );
   cleanupHelmRelease = true;
-  execFileSync("helm", ["--kube-context", cluster.context, "upgrade", helmReleaseName, helmChartDir, "--namespace", "default", "--set", "greeting=world"], { stdio: "inherit" });
+  execFileSync(
+    "helm",
+    [
+      "--kube-context",
+      cluster.context,
+      "upgrade",
+      helmReleaseName,
+      helmChartDir,
+      "--namespace",
+      "default",
+      "--set",
+      "greeting=world",
+    ],
+    { stdio: "inherit" },
+  );
 
   // Server-side list contains the release at revision 2.
-  const list = (await request.get(`/api/clusters/${cluster.id}/helm/releases`).then((r) => r.json())) as Array<{ name: string; revision: number; namespace: string }>;
+  const list = (await request
+    .get(`/api/clusters/${cluster.id}/helm/releases`)
+    .then((r) => r.json())) as Array<{
+    name: string;
+    revision: number;
+    namespace: string;
+  }>;
   const release = list.find((item) => item.name === helmReleaseName);
-  expect(release, "helm release should appear in /api/clusters/{id}/helm/releases").toBeTruthy();
+  expect(
+    release,
+    "helm release should appear in /api/clusters/{id}/helm/releases",
+  ).toBeTruthy();
   expect(release?.revision).toBe(2);
 
   // History returns two entries.
-  const history = (await request.get(`/api/clusters/${cluster.id}/helm/releases/default/${helmReleaseName}/history`).then((r) => r.json())) as Array<{ revision: number }>;
+  const history = (await request
+    .get(
+      `/api/clusters/${cluster.id}/helm/releases/default/${helmReleaseName}/history`,
+    )
+    .then((r) => r.json())) as Array<{ revision: number }>;
   expect(history.length).toBeGreaterThanOrEqual(2);
 
   // Rollback to revision 1 and verify the ConfigMap value changes back.
-  const rollback = await request.post(`/api/clusters/${cluster.id}/helm/releases/default/${helmReleaseName}/rollback`, { data: { revision: 1 } });
+  const rollback = await request.post(
+    `/api/clusters/${cluster.id}/helm/releases/default/${helmReleaseName}/rollback`,
+    { data: { revision: 1 } },
+  );
   expect(rollback.ok()).toBe(true);
   await expect
-    .poll(() => kubectlOutput(cluster.context, ["get", "cm", `${helmReleaseName}-greeting`, "-o", "jsonpath={.data.message}"]))
+    .poll(() =>
+      kubectlOutput(cluster.context, [
+        "get",
+        "cm",
+        `${helmReleaseName}-greeting`,
+        "-o",
+        "jsonpath={.data.message}",
+      ]),
+    )
     .toBe("hello");
 
   // UI smoke: page renders and shows the release row.
   await page.goto(`/clusters/${cluster.id}/helm/releases`);
-  await expect(page.getByRole("heading", { name: "Helm Releases" })).toBeVisible();
-  await expect(page.getByText(helmReleaseName).first()).toBeVisible({ timeout: 15_000 });
+  await expect(
+    page.getByRole("heading", { name: "Helm Releases" }),
+  ).toBeVisible();
+  await expect(page.getByText(helmReleaseName).first()).toBeVisible({
+    timeout: 15_000,
+  });
 });
 
-test("rolls back a Deployment from the workload drawer UI", async ({ page, request }) => {
+test("rolls back a Deployment from the workload drawer UI", async ({
+  page,
+  request,
+}) => {
   const cluster = await reachableCluster(request);
   cleanupContext = cluster.context;
-  kubectl(cluster.context, ["create", "deployment", workloadRollbackUiName, "--image=nginx:1.27-alpine"]);
-  kubectl(cluster.context, ["rollout", "status", `deployment/${workloadRollbackUiName}`, "--timeout=120s"]);
-  kubectl(cluster.context, ["set", "image", `deployment/${workloadRollbackUiName}`, "nginx=nginx:1.26-alpine"]);
-  kubectl(cluster.context, ["rollout", "status", `deployment/${workloadRollbackUiName}`, "--timeout=120s"]);
+  kubectl(cluster.context, [
+    "create",
+    "deployment",
+    workloadRollbackUiName,
+    "--image=nginx:1.27-alpine",
+  ]);
+  kubectl(cluster.context, [
+    "rollout",
+    "status",
+    `deployment/${workloadRollbackUiName}`,
+    "--timeout=120s",
+  ]);
+  kubectl(cluster.context, [
+    "set",
+    "image",
+    `deployment/${workloadRollbackUiName}`,
+    "nginx=nginx:1.26-alpine",
+  ]);
+  kubectl(cluster.context, [
+    "rollout",
+    "status",
+    `deployment/${workloadRollbackUiName}`,
+    "--timeout=120s",
+  ]);
 
   await page.goto(`/clusters/${cluster.id}/deployments`);
-  await expect(page.getByRole("heading", { name: "Deployments" })).toBeVisible();
-  await expect(page.getByText(workloadRollbackUiName)).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page.getByRole("heading", { name: "Deployments" }),
+  ).toBeVisible();
+  await expect(page.getByText(workloadRollbackUiName)).toBeVisible({
+    timeout: 30_000,
+  });
   await page.getByText(workloadRollbackUiName).click();
-  await expect(page.getByRole("heading", { name: "Revision History" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Revision History" }),
+  ).toBeVisible();
 
-  const revision1Row = page.getByRole("row").filter({ has: page.getByRole("cell", { name: "1", exact: true }) }).first();
-  await revision1Row.getByRole("button", { name: /Roll back to revision 1/i }).click();
-  await expect(page.getByText(/Rolled back to revision 1\./)).toBeVisible({ timeout: 15_000 });
+  const revision1Row = page
+    .getByRole("row")
+    .filter({ has: page.getByRole("cell", { name: "1", exact: true }) })
+    .first();
+  await revision1Row
+    .getByRole("button", { name: /Roll back to revision 1/i })
+    .click();
+  await expect(page.getByText(/Rolled back to revision 1\./)).toBeVisible({
+    timeout: 15_000,
+  });
   await expect
-    .poll(() => kubectlOutput(cluster.context, ["get", "deployment", workloadRollbackUiName, "-o", "jsonpath={.spec.template.spec.containers[0].image}"]))
+    .poll(() =>
+      kubectlOutput(cluster.context, [
+        "get",
+        "deployment",
+        workloadRollbackUiName,
+        "-o",
+        "jsonpath={.spec.template.spec.containers[0].image}",
+      ]),
+    )
     .toBe("nginx:1.27-alpine");
 });
 
@@ -938,18 +1982,58 @@ test("rolls back a Helm release from the UI", async ({ page, request }) => {
   const cluster = await reachableCluster(request);
   cleanupContext = cluster.context;
   writeTinyHelmChart(helmChartUiDir, helmReleaseUiName);
-  execFileSync("helm", ["--kube-context", cluster.context, "install", helmReleaseUiName, helmChartUiDir, "--namespace", "default"], { stdio: "inherit" });
+  execFileSync(
+    "helm",
+    [
+      "--kube-context",
+      cluster.context,
+      "install",
+      helmReleaseUiName,
+      helmChartUiDir,
+      "--namespace",
+      "default",
+    ],
+    { stdio: "inherit" },
+  );
   cleanupHelmRelease = true;
-  execFileSync("helm", ["--kube-context", cluster.context, "upgrade", helmReleaseUiName, helmChartUiDir, "--namespace", "default", "--set", "greeting=world"], { stdio: "inherit" });
+  execFileSync(
+    "helm",
+    [
+      "--kube-context",
+      cluster.context,
+      "upgrade",
+      helmReleaseUiName,
+      helmChartUiDir,
+      "--namespace",
+      "default",
+      "--set",
+      "greeting=world",
+    ],
+    { stdio: "inherit" },
+  );
 
   await page.goto(`/clusters/${cluster.id}/helm/releases`);
-  await expect(page.getByRole("heading", { name: "Helm Releases" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Helm Releases" }),
+  ).toBeVisible();
   await page.getByText(helmReleaseUiName).first().click();
-  await expect(page.getByRole("heading", { name: "Revision History" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Revision History" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Roll back" }).first().click();
-  await expect(page.getByText(/Rolled back to revision 1\./)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(/Rolled back to revision 1\./)).toBeVisible({
+    timeout: 30_000,
+  });
   await expect
-    .poll(() => kubectlOutput(cluster.context, ["get", "cm", `${helmReleaseUiName}-greeting`, "-o", "jsonpath={.data.message}"]))
+    .poll(() =>
+      kubectlOutput(cluster.context, [
+        "get",
+        "cm",
+        `${helmReleaseUiName}-greeting`,
+        "-o",
+        "jsonpath={.data.message}",
+      ]),
+    )
     .toBe("hello");
 });
 
@@ -957,61 +2041,112 @@ test("uninstalls a Helm release from the UI", async ({ page, request }) => {
   const cluster = await reachableCluster(request);
   cleanupContext = cluster.context;
   writeTinyHelmChart(helmChartUiDir, helmReleaseUninstallName);
-  execFileSync("helm", ["--kube-context", cluster.context, "install", helmReleaseUninstallName, helmChartUiDir, "--namespace", "default"], { stdio: "inherit" });
+  execFileSync(
+    "helm",
+    [
+      "--kube-context",
+      cluster.context,
+      "install",
+      helmReleaseUninstallName,
+      helmChartUiDir,
+      "--namespace",
+      "default",
+    ],
+    { stdio: "inherit" },
+  );
   cleanupHelmRelease = true;
 
   await page.goto(`/clusters/${cluster.id}/helm/releases`);
-  await expect(page.getByRole("heading", { name: "Helm Releases" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Helm Releases" }),
+  ).toBeVisible();
   await page.getByText(helmReleaseUninstallName).first().click();
   // The drawer's Uninstall trigger opens the confirm dialog.
   await page.getByRole("button", { name: "Uninstall" }).first().click();
   // Confirm dialog input is id'd uniquely; the dialog's confirm button is the second "Uninstall" in DOM order.
   await page.locator("#confirm-dialog-value").fill(helmReleaseUninstallName);
   await page.getByRole("button", { name: "Uninstall" }).last().click();
-  await expect(page.getByText(helmReleaseUninstallName)).toHaveCount(0, { timeout: 30_000 });
+  await expect(page.getByText(helmReleaseUninstallName)).toHaveCount(0, {
+    timeout: 30_000,
+  });
 });
 
-test("lists clusters with workload-overview rollup tiles", async ({ page, request }) => {
+test("lists clusters with workload-overview rollup tiles", async ({
+  page,
+  request,
+}) => {
   const cluster = await reachableCluster(request);
   cleanupContext = cluster.context;
-  const response = await request.get(`/api/clusters/${cluster.id}/workloads-overview`);
+  const response = await request.get(
+    `/api/clusters/${cluster.id}/workloads-overview`,
+  );
   expect(response.ok()).toBe(true);
-  const overview = (await response.json()) as { pods: { total: number }; failing: unknown[] };
+  const overview = (await response.json()) as {
+    pods: { total: number };
+    failing: unknown[];
+  };
   expect(overview.pods.total).toBeGreaterThan(0);
   expect(Array.isArray(overview.failing)).toBe(true);
   await page.goto(`/clusters/${cluster.id}`);
-  await expect(page.getByRole("heading", { name: "Workload health" })).toBeVisible({ timeout: 15_000 });
+  await expect(
+    page.getByRole("heading", { name: "Workload health" }),
+  ).toBeVisible({ timeout: 15_000 });
 });
 
-test("topology endpoint returns a graph and the page renders nodes", async ({ page, request }) => {
+test("topology endpoint returns a graph and the page renders nodes", async ({
+  page,
+  request,
+}) => {
   const cluster = await reachableCluster(request);
   cleanupContext = cluster.context;
-  const response = await request.get(`/api/clusters/${cluster.id}/topology?namespace=kube-system`);
+  const response = await request.get(
+    `/api/clusters/${cluster.id}/topology?namespace=kube-system`,
+  );
   expect(response.ok()).toBe(true);
-  const graph = (await response.json()) as { nodes: unknown[]; edges: unknown[] };
+  const graph = (await response.json()) as {
+    nodes: unknown[];
+    edges: unknown[];
+  };
   expect(graph.nodes.length).toBeGreaterThan(0);
   await page.goto(`/clusters/${cluster.id}/topology`);
   await expect(page.getByRole("heading", { name: "Topology" })).toBeVisible();
-  await page.getByLabel("Namespace", { exact: true }).selectOption("kube-system");
-  await expect(page.getByText(/\d+ nodes · \d+ edges/)).toBeVisible({ timeout: 15_000 });
+  await page
+    .getByLabel("Namespace", { exact: true })
+    .selectOption("kube-system");
+  await expect(page.getByText(/\d+ nodes · \d+ edges/)).toBeVisible({
+    timeout: 15_000,
+  });
 });
 
 test("prometheus detect endpoint reports a result", async ({ request }) => {
   const cluster = await reachableCluster(request);
   const response = await request.get(`/api/clusters/${cluster.id}/prom/detect`);
   expect(response.ok()).toBe(true);
-  const result = (await response.json()) as { available: boolean; reason?: string };
+  const result = (await response.json()) as {
+    available: boolean;
+    reason?: string;
+  };
   // Stock k3d doesn't have Prometheus, but the endpoint must still answer.
   expect(typeof result.available).toBe("boolean");
 });
 
-test("metrics page degrades gracefully when Prometheus is absent", async ({ page, request }) => {
+test("metrics page degrades gracefully when Prometheus is absent", async ({
+  page,
+  request,
+}) => {
   const cluster = await reachableCluster(request);
-  const detectResponse = await request.get(`/api/clusters/${cluster.id}/prom/detect`);
+  const detectResponse = await request.get(
+    `/api/clusters/${cluster.id}/prom/detect`,
+  );
   expect(detectResponse.ok()).toBe(true);
   const detection = (await detectResponse.json()) as {
     available: boolean;
-    target?: { namespace: string; service: string; port: number; source: string };
+    target?: {
+      namespace: string;
+      service: string;
+      port: number;
+      source: string;
+    };
     checkedAt: string;
     reason?: string;
   };
@@ -1025,27 +2160,41 @@ test("metrics page degrades gracefully when Prometheus is absent", async ({ page
   if (!detection.available) {
     // Stock k3d path: badge says "No Prometheus" and the Range section is not rendered.
     await expect(page.getByText("No Prometheus")).toBeVisible();
-    await expect(page.getByRole("heading", { name: /^Range \(/ })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: /^Range \(/ })).toHaveCount(
+      0,
+    );
   } else {
     // If Prometheus is installed in the test environment, just confirm the badge.
-    await expect(page.getByText(`Prometheus: ${detection.target?.source ?? ""}`)).toBeVisible();
+    await expect(
+      page.getByText(`Prometheus: ${detection.target?.source ?? ""}`),
+    ).toBeVisible();
   }
 });
 
-test("cluster links round-trip through the PATCH endpoint", async ({ request }) => {
+test("cluster links round-trip through the PATCH endpoint", async ({
+  request,
+}) => {
   const cluster = await reachableCluster(request);
   const setResponse = await request.patch(`/api/clusters/${cluster.id}/links`, {
-    data: { links: [{ label: "Grafana", url: "https://grafana.example.com" }] }
+    data: { links: [{ label: "Grafana", url: "https://grafana.example.com" }] },
   });
   expect(setResponse.ok()).toBe(true);
-  const updated = (await setResponse.json()) as { links: Array<{ label: string }> };
+  const updated = (await setResponse.json()) as {
+    links: Array<{ label: string }>;
+  };
   expect(updated.links.map((link) => link.label)).toContain("Grafana");
   // Reset to keep state clean for subsequent tests.
-  const resetResponse = await request.patch(`/api/clusters/${cluster.id}/links`, { data: { links: [] } });
+  const resetResponse = await request.patch(
+    `/api/clusters/${cluster.id}/links`,
+    { data: { links: [] } },
+  );
   expect(resetResponse.ok()).toBe(true);
 });
 
-test("favorites star toggle in the resource drawer adds a sidebar pin", async ({ page, request }) => {
+test("favorites star toggle in the resource drawer adds a sidebar pin", async ({
+  page,
+  request,
+}) => {
   const cluster = await reachableCluster(request);
   cleanupContext = cluster.context;
   await page.goto(`/clusters/${cluster.id}/pods`);
@@ -1054,25 +2203,45 @@ test("favorites star toggle in the resource drawer adds a sidebar pin", async ({
   await page.getByRole("row").nth(1).click();
   const pinButton = page.getByRole("button", { name: /Pin [^"]+/ }).first();
   await pinButton.click();
-  await expect(page.getByRole("complementary").getByText("Pinned").first()).toBeVisible({ timeout: 5_000 });
+  await page
+    .getByRole("button", { name: "Close pod detail", exact: true })
+    .click();
+  await expect(
+    page.getByRole("complementary").getByText("Pinned").first(),
+  ).toBeVisible({ timeout: 5_000 });
 });
 
-test("pod logs Pin-to-dock button adds and removes a dock entry", async ({ page, request }) => {
+test("pod logs Pin-to-dock button adds and removes a dock entry", async ({
+  page,
+  request,
+}) => {
   const cluster = await reachableCluster(request);
   cleanupContext = cluster.context;
   // Use the already-existing coredns pod from kube-system for a known target.
   const podsResponse = await request.get(`/api/clusters/${cluster.id}/pods`);
-  const pods = (await podsResponse.json()) as Array<{ name: string; namespace: string }>;
-  const coredns = pods.find((p) => p.namespace === "kube-system" && p.name.startsWith("coredns"));
+  const pods = (await podsResponse.json()) as Array<{
+    name: string;
+    namespace: string;
+  }>;
+  const coredns = pods.find(
+    (p) => p.namespace === "kube-system" && p.name.startsWith("coredns"),
+  );
   expect(coredns, "expected a coredns pod to exist on k3d").toBeTruthy();
-  await page.goto(`/clusters/${cluster.id}/pods/${encodeURIComponent(coredns!.namespace)}/${encodeURIComponent(coredns!.name)}/logs`);
-  await expect(page.getByRole("heading", { name: coredns!.name })).toBeVisible();
+  await page.goto(
+    `/clusters/${cluster.id}/pods/${encodeURIComponent(coredns!.namespace)}/${encodeURIComponent(coredns!.name)}/logs`,
+  );
+  await expect(
+    page.getByRole("heading", { name: coredns!.name }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Pin to dock" }).click();
   await expect(page.getByText("Dock")).toBeVisible({ timeout: 5_000 });
   await page.getByRole("button", { name: "Unpin" }).click();
 });
 
-test("pinned pod logs activity survives navigation and indicates a live stream", async ({ page, request }) => {
+test("pinned pod logs activity survives navigation and indicates a live stream", async ({
+  page,
+  request,
+}) => {
   // The persistent log stream lives in a global store that outlives the
   // logs page component. We assert the durable observable surface here:
   // pinning surfaces a dock entry with a "live" status, that entry
@@ -1091,23 +2260,36 @@ test("pinned pod logs activity survives navigation and indicates a live stream",
     "--",
     "/bin/sh",
     "-c",
-    "i=0; while true; do echo AL_E2E_DOCK_LOG_$i; i=$((i+1)); sleep 1; done"
+    "i=0; while true; do echo AL_E2E_DOCK_LOG_$i; i=$((i+1)); sleep 1; done",
   ]);
-  kubectl(cluster.context, ["wait", "--for=condition=Ready", `pod/${dockStreamPodName}`, "--timeout=90s"]);
+  kubectl(cluster.context, [
+    "wait",
+    "--for=condition=Ready",
+    `pod/${dockStreamPodName}`,
+    "--timeout=90s",
+  ]);
 
   const logsPath = `/clusters/${cluster.id}/pods/default/${dockStreamPodName}/logs`;
   await page.goto(logsPath);
-  await expect(page.getByRole("heading", { name: dockStreamPodName })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: dockStreamPodName }),
+  ).toBeVisible();
 
   const logViewport = page.locator("pre").first();
-  await expect(logViewport).toContainText(/AL_E2E_DOCK_LOG_\d+/, { timeout: 30_000 });
+  await expect(logViewport).toContainText(/AL_E2E_DOCK_LOG_\d+/, {
+    timeout: 30_000,
+  });
 
   // Pin to the activity dock.
   await page.getByRole("button", { name: "Pin to dock" }).click();
-  await expect(page.getByText("Dock", { exact: true })).toBeVisible({ timeout: 5_000 });
+  await expect(page.getByText("Dock", { exact: true })).toBeVisible({
+    timeout: 5_000,
+  });
   // The dock entry's green "live" dot must appear once the persistent
   // stream is open.
-  await expect(page.getByLabel("Stream is live")).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByLabel("Stream is live")).toBeVisible({
+    timeout: 10_000,
+  });
 
   // Navigate away — the dock should still show the pinned activity.
   await page.goto(`/clusters/${cluster.id}/pods`);
@@ -1118,20 +2300,37 @@ test("pinned pod logs activity survives navigation and indicates a live stream",
   // Navigate back to the logs page directly — the page must remount and
   // still show the pinned activity (with Unpin replacing Pin to dock).
   await page.goto(logsPath);
-  await expect(page.getByRole("heading", { name: dockStreamPodName })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Unpin" })).toBeVisible({ timeout: 10_000 });
+  await expect(
+    page.getByRole("heading", { name: dockStreamPodName }),
+  ).toBeVisible();
+  await expect(page.getByRole("button", { name: "Unpin" })).toBeVisible({
+    timeout: 10_000,
+  });
 
   // Cleanup: unpin so the persistent stream tears down.
   await page.getByRole("button", { name: "Unpin" }).click();
-  await expect(page.getByText("Dock", { exact: true })).toBeHidden({ timeout: 5_000 });
+  await expect(page.getByText("Dock", { exact: true })).toBeHidden({
+    timeout: 5_000,
+  });
 });
 
-test("renders a VerticalPodAutoscaler detail panel", async ({ page, request }) => {
+test("renders a VerticalPodAutoscaler detail panel", async ({
+  page,
+  request,
+}) => {
   const cluster = await reachableCluster(request);
   cleanupContext = cluster.context;
-  const tlsCrdExists = kubectlOutput(cluster.context, ["get", "crd", "verticalpodautoscalers.autoscaling.k8s.io", "--ignore-not-found=true"]) !== "";
+  const tlsCrdExists =
+    kubectlOutput(cluster.context, [
+      "get",
+      "crd",
+      "verticalpodautoscalers.autoscaling.k8s.io",
+      "--ignore-not-found=true",
+    ]) !== "";
   if (!tlsCrdExists) {
-    kubectlApply(cluster.context, `apiVersion: apiextensions.k8s.io/v1
+    kubectlApply(
+      cluster.context,
+      `apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: verticalpodautoscalers.autoscaling.k8s.io
@@ -1152,11 +2351,19 @@ spec:
       schema:
         openAPIV3Schema:
           type: object
-          x-kubernetes-preserve-unknown-fields: true`);
+          x-kubernetes-preserve-unknown-fields: true`,
+    );
     cleanupVPACRD = true;
   }
-  kubectl(cluster.context, ["wait", "--for=condition=Established", "crd/verticalpodautoscalers.autoscaling.k8s.io", "--timeout=30s"]);
-  kubectlApply(cluster.context, `apiVersion: autoscaling.k8s.io/v1
+  kubectl(cluster.context, [
+    "wait",
+    "--for=condition=Established",
+    "crd/verticalpodautoscalers.autoscaling.k8s.io",
+    "--timeout=30s",
+  ]);
+  kubectlApply(
+    cluster.context,
+    `apiVersion: autoscaling.k8s.io/v1
 kind: VerticalPodAutoscaler
 metadata:
   name: ${vpaSampleName}
@@ -1167,13 +2374,16 @@ spec:
     kind: Deployment
     name: nonexistent
   updatePolicy:
-    updateMode: "Off"`);
+    updateMode: "Off"`,
+  );
 
   await page.goto(`/clusters/${cluster.id}/verticalpodautoscalers`);
   await expect(page.getByRole("heading", { name: "VPAs" })).toBeVisible();
   await expect(page.getByText(vpaSampleName)).toBeVisible({ timeout: 30_000 });
   await page.getByText(vpaSampleName).click();
-  await expect(page.getByRole("heading", { name: "Vertical Pod Autoscaler" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Vertical Pod Autoscaler" }),
+  ).toBeVisible();
   await expect(page.getByText("Deployment/nonexistent")).toBeVisible();
   await expect(page.getByText("Off", { exact: true }).first()).toBeVisible();
 });
@@ -1181,9 +2391,17 @@ spec:
 test("renders a JobSet detail panel", async ({ page, request }) => {
   const cluster = await reachableCluster(request);
   cleanupContext = cluster.context;
-  const crdExists = kubectlOutput(cluster.context, ["get", "crd", "jobsets.jobset.x-k8s.io", "--ignore-not-found=true"]) !== "";
+  const crdExists =
+    kubectlOutput(cluster.context, [
+      "get",
+      "crd",
+      "jobsets.jobset.x-k8s.io",
+      "--ignore-not-found=true",
+    ]) !== "";
   if (!crdExists) {
-    kubectlApply(cluster.context, `apiVersion: apiextensions.k8s.io/v1
+    kubectlApply(
+      cluster.context,
+      `apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: jobsets.jobset.x-k8s.io
@@ -1201,11 +2419,19 @@ spec:
       schema:
         openAPIV3Schema:
           type: object
-          x-kubernetes-preserve-unknown-fields: true`);
+          x-kubernetes-preserve-unknown-fields: true`,
+    );
     cleanupJobSetCRD = true;
   }
-  kubectl(cluster.context, ["wait", "--for=condition=Established", "crd/jobsets.jobset.x-k8s.io", "--timeout=30s"]);
-  kubectlApply(cluster.context, `apiVersion: jobset.x-k8s.io/v1alpha2
+  kubectl(cluster.context, [
+    "wait",
+    "--for=condition=Established",
+    "crd/jobsets.jobset.x-k8s.io",
+    "--timeout=30s",
+  ]);
+  kubectlApply(
+    cluster.context,
+    `apiVersion: jobset.x-k8s.io/v1alpha2
 kind: JobSet
 metadata:
   name: ${jobSetSampleName}
@@ -1224,21 +2450,33 @@ spec:
               containers:
                 - name: hello
                   image: busybox:1.36
-                  command: ["sh","-c","sleep 5"]`);
+                  command: ["sh","-c","sleep 5"]`,
+  );
 
   await page.goto(`/clusters/${cluster.id}/jobsets`);
   await expect(page.getByRole("heading", { name: "JobSets" })).toBeVisible();
-  await expect(page.getByText(jobSetSampleName)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(jobSetSampleName)).toBeVisible({
+    timeout: 30_000,
+  });
   await page.getByText(jobSetSampleName).click();
-  await expect(page.getByRole("heading", { name: "JobSet", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Replicated Jobs" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "JobSet", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Replicated Jobs" }),
+  ).toBeVisible();
   await expect(page.getByRole("cell", { name: "leader" })).toBeVisible();
 });
 
-test("renders a ValidatingWebhookConfiguration with expanded rule rows", async ({ page, request }) => {
+test("renders a ValidatingWebhookConfiguration with expanded rule rows", async ({
+  page,
+  request,
+}) => {
   const cluster = await reachableCluster(request);
   cleanupContext = cluster.context;
-  kubectlApply(cluster.context, `apiVersion: admissionregistration.k8s.io/v1
+  kubectlApply(
+    cluster.context,
+    `apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
   name: ${webhookConfigName}
@@ -1255,20 +2493,38 @@ webhooks:
     sideEffects: None
     failurePolicy: Fail
     admissionReviewVersions: ["v1"]
-    timeoutSeconds: 5`);
+    timeoutSeconds: 5`,
+  );
 
   await page.goto(`/clusters/${cluster.id}/validatingwebhookconfigurations`);
-  await expect(page.getByRole("heading", { name: "Validating Webhooks" })).toBeVisible();
-  await expect(page.getByText(webhookConfigName)).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page.getByRole("heading", { name: "Validating Webhooks" }),
+  ).toBeVisible();
+  await expect(page.getByText(webhookConfigName)).toBeVisible({
+    timeout: 30_000,
+  });
   await page.getByText(webhookConfigName).click();
   // Webhook details show one entry with the rule operations expanded as a table.
-  await expect(page.getByRole("heading", { name: "Validating Webhooks" }).nth(1)).toBeVisible();
-  await expect(page.getByRole("heading", { name: "pods.example.com" })).toBeVisible();
-  await expect(page.getByRole("cell", { name: "CREATE, UPDATE" })).toBeVisible();
-  await expect(page.getByRole("cell", { name: "pods", exact: true })).toBeVisible();
+  await expect(
+    page
+      .getByRole("dialog")
+      .getByRole("heading", { name: "Validating Webhooks", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "pods.example.com" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: "CREATE, UPDATE" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("cell", { name: "pods", exact: true }),
+  ).toBeVisible();
 });
 
-test("Monaco YAML editor mounts with OpenAPI schema wired for hover docs", async ({ page, request }) => {
+test("Monaco YAML editor mounts with OpenAPI schema wired for hover docs", async ({
+  page,
+  request,
+}) => {
   // The visible Monaco hover-card requires a real-user mousemove sequence
   // that headless Chromium does not reliably replicate. Instead we verify
   // the infrastructure that backs the hover provider:
@@ -1280,52 +2536,86 @@ test("Monaco YAML editor mounts with OpenAPI schema wired for hover docs", async
   // for any key under that kind when a real user hovers.
   const cluster = await reachableCluster(request);
   cleanupContext = cluster.context;
-  kubectl(cluster.context, ["create", "deployment", hoverDeploymentName, "--image=nginx:1.27-alpine"]);
+  kubectl(cluster.context, [
+    "create",
+    "deployment",
+    hoverDeploymentName,
+    "--image=nginx:1.27-alpine",
+  ]);
 
-  const openapiResponse = await request.get(`/api/clusters/${cluster.id}/openapi`);
+  const openapiResponse = await request.get(
+    `/api/clusters/${cluster.id}/openapi`,
+  );
   expect(openapiResponse.ok()).toBe(true);
-  const doc = (await openapiResponse.json()) as { definitions?: Record<string, { properties?: Record<string, { description?: string }> }> };
+  const doc = (await openapiResponse.json()) as {
+    definitions?: Record<
+      string,
+      { properties?: Record<string, { description?: string }> }
+    >;
+  };
   const deploymentDef = doc.definitions?.["io.k8s.api.apps.v1.Deployment"];
   expect(deploymentDef, "OpenAPI must define Deployment").toBeTruthy();
-  expect(deploymentDef?.properties?.spec?.description?.length ?? 0, "Deployment.spec description must be non-empty").toBeGreaterThan(0);
+  expect(
+    deploymentDef?.properties?.spec?.description?.length ?? 0,
+    "Deployment.spec description must be non-empty",
+  ).toBeGreaterThan(0);
 
   await page.goto(`/clusters/${cluster.id}/deployments`);
-  await expect(page.getByRole("heading", { name: "Deployments" })).toBeVisible();
-  await expect(page.getByText(hoverDeploymentName)).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page.getByRole("heading", { name: "Deployments" }),
+  ).toBeVisible();
+  await expect(page.getByText(hoverDeploymentName)).toBeVisible({
+    timeout: 30_000,
+  });
   await page.getByText(hoverDeploymentName).click();
-  await expect(page.getByRole("heading", { name: hoverDeploymentName })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: hoverDeploymentName }),
+  ).toBeVisible();
 
-  await page.getByRole("button", { name: "yaml", exact: true }).click();
+  await page.getByRole("tab", { name: "YAML", exact: true }).click();
   await page.getByRole("button", { name: "Open YAML" }).click();
   const yamlEditor = page.locator(".monaco-editor").first();
   await expect(yamlEditor).toBeVisible({ timeout: 30_000 });
-  await expect(page.locator(".view-line", { hasText: "kind: Deployment" }).first()).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page.locator(".view-line", { hasText: "kind: Deployment" }).first(),
+  ).toBeVisible({ timeout: 30_000 });
 });
 
 function writeTinyHelmChart(dir: string, releaseName: string) {
   execFileSync("rm", ["-rf", dir]);
   execFileSync("mkdir", ["-p", `${dir}/templates`]);
-  execFileSync("sh", ["-c", `cat > ${dir}/Chart.yaml <<'YAML'
+  execFileSync("sh", [
+    "-c",
+    `cat > ${dir}/Chart.yaml <<'YAML'
 apiVersion: v2
 name: tiny
 version: 0.1.0
 appVersion: "v1"
-YAML`]);
-  execFileSync("sh", ["-c", `cat > ${dir}/values.yaml <<'YAML'
+YAML`,
+  ]);
+  execFileSync("sh", [
+    "-c",
+    `cat > ${dir}/values.yaml <<'YAML'
 greeting: hello
-YAML`]);
-  execFileSync("sh", ["-c", `cat > ${dir}/templates/configmap.yaml <<'YAML'
+YAML`,
+  ]);
+  execFileSync("sh", [
+    "-c",
+    `cat > ${dir}/templates/configmap.yaml <<'YAML'
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: ${releaseName}-greeting
 data:
   message: {{ .Values.greeting | quote }}
-YAML`]);
+YAML`,
+  ]);
 }
 
 async function reachableCluster(request: APIRequestContext) {
-  const clusters = await request.get("/api/clusters").then((response) => response.json() as Promise<Cluster[]>);
+  const clusters = await request
+    .get("/api/clusters")
+    .then((response) => response.json() as Promise<Cluster[]>);
   const cluster = clusters.find((item) => item.reachable) ?? clusters[0];
   expect(cluster, "expected at least one kubeconfig context").toBeTruthy();
   expect(cluster.reachable, `${cluster.name} should be reachable`).toBe(true);
@@ -1343,7 +2633,18 @@ type ExecFrame = {
   message?: string;
 };
 
-async function collectLogFrames(page: { evaluate: <T, A>(pageFunction: (arg: A) => Promise<T>, arg: A) => Promise<T> }, clusterId: string, podName: string, sinceTime: string, minLines: number) {
+async function collectLogFrames(
+  page: {
+    evaluate: <T, A>(
+      pageFunction: (arg: A) => Promise<T>,
+      arg: A,
+    ) => Promise<T>;
+  },
+  clusterId: string,
+  podName: string,
+  sinceTime: string,
+  minLines: number,
+) {
   return page.evaluate(
     ({ clusterId, podName, sinceTime, minLines }) =>
       new Promise<LogFrame[]>((resolve, reject) => {
@@ -1353,11 +2654,13 @@ async function collectLogFrames(page: { evaluate: <T, A>(pageFunction: (arg: A) 
           container: podName,
           tailLines: "3",
           follow: "true",
-          timestamps: "true"
+          timestamps: "true",
         });
         if (sinceTime) params.set("sinceTime", sinceTime);
         const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const ws = new WebSocket(`${protocol}//${window.location.host}/api/clusters/${clusterId}/ws/logs?${params.toString()}`);
+        const ws = new WebSocket(
+          `${protocol}//${window.location.host}/api/clusters/${clusterId}/ws/logs?${params.toString()}`,
+        );
         const frames: LogFrame[] = [];
         const timer = window.setTimeout(() => {
           ws.close();
@@ -1385,7 +2688,7 @@ async function collectLogFrames(page: { evaluate: <T, A>(pageFunction: (arg: A) 
           reject(new Error("Log WebSocket failed"));
         };
       }),
-    { clusterId, podName, sinceTime, minLines }
+    { clusterId, podName, sinceTime, minLines },
   );
 }
 
@@ -1400,7 +2703,17 @@ type WatchFrame = {
   message?: string;
 };
 
-async function collectWatchFrames(page: { evaluate: <T, A>(pageFunction: (arg: A) => Promise<T>, arg: A) => Promise<T> }, clusterId: string, name: string, minFrames: number) {
+async function collectWatchFrames(
+  page: {
+    evaluate: <T, A>(
+      pageFunction: (arg: A) => Promise<T>,
+      arg: A,
+    ) => Promise<T>;
+  },
+  clusterId: string,
+  name: string,
+  minFrames: number,
+) {
   return page.evaluate(
     ({ clusterId, name, minFrames }) =>
       new Promise<WatchFrame[]>((resolve, reject) => {
@@ -1410,10 +2723,12 @@ async function collectWatchFrames(page: { evaluate: <T, A>(pageFunction: (arg: A
           resource: "configmaps",
           kind: "ConfigMap",
           namespaced: "true",
-          namespace: "default"
+          namespace: "default",
         });
         const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const ws = new WebSocket(`${protocol}//${window.location.host}/api/clusters/${clusterId}/ws/watch?${params.toString()}`);
+        const ws = new WebSocket(
+          `${protocol}//${window.location.host}/api/clusters/${clusterId}/ws/watch?${params.toString()}`,
+        );
         const frames: WatchFrame[] = [];
         const timer = window.setTimeout(() => {
           ws.close();
@@ -1442,21 +2757,33 @@ async function collectWatchFrames(page: { evaluate: <T, A>(pageFunction: (arg: A
           reject(new Error("Watch WebSocket failed"));
         };
       }),
-    { clusterId, name, minFrames }
+    { clusterId, name, minFrames },
   );
 }
 
-async function attachAndEcho(page: { evaluate: <T, A>(pageFunction: (arg: A) => Promise<T>, arg: A) => Promise<T> }, clusterId: string, podName: string, message: string) {
+async function attachAndEcho(
+  page: {
+    evaluate: <T, A>(
+      pageFunction: (arg: A) => Promise<T>,
+      arg: A,
+    ) => Promise<T>;
+  },
+  clusterId: string,
+  podName: string,
+  message: string,
+) {
   return page.evaluate(
     ({ clusterId, podName, message }) =>
       new Promise<ExecFrame[]>((resolve, reject) => {
         const params = new URLSearchParams({
           ns: "default",
           pod: podName,
-          container: podName
+          container: podName,
         });
         const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const ws = new WebSocket(`${protocol}//${window.location.host}/api/clusters/${clusterId}/ws/attach?${params.toString()}`);
+        const ws = new WebSocket(
+          `${protocol}//${window.location.host}/api/clusters/${clusterId}/ws/attach?${params.toString()}`,
+        );
         const frames: ExecFrame[] = [];
         const timer = window.setTimeout(() => {
           ws.close();
@@ -1484,26 +2811,42 @@ async function attachAndEcho(page: { evaluate: <T, A>(pageFunction: (arg: A) => 
           reject(new Error("Attach WebSocket failed"));
         };
       }),
-    { clusterId, podName, message }
+    { clusterId, podName, message },
   );
 }
 
-async function execCommand(page: { evaluate: <T, A>(pageFunction: (arg: A) => Promise<T>, arg: A) => Promise<T> }, clusterId: string, podName: string, command: string[]) {
+async function execCommand(
+  page: {
+    evaluate: <T, A>(
+      pageFunction: (arg: A) => Promise<T>,
+      arg: A,
+    ) => Promise<T>;
+  },
+  clusterId: string,
+  podName: string,
+  command: string[],
+) {
   return page.evaluate(
     ({ clusterId, podName, command }) =>
       new Promise<ExecFrame[]>((resolve, reject) => {
         const params = new URLSearchParams({
           ns: "default",
           pod: podName,
-          container: podName
+          container: podName,
         });
         for (const part of command) params.append("command", part);
         const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const ws = new WebSocket(`${protocol}//${window.location.host}/api/clusters/${clusterId}/ws/exec?${params.toString()}`);
+        const ws = new WebSocket(
+          `${protocol}//${window.location.host}/api/clusters/${clusterId}/ws/exec?${params.toString()}`,
+        );
         const frames: ExecFrame[] = [];
         const timer = window.setTimeout(() => {
           ws.close();
-          reject(new Error(`Timed out waiting for exec command: ${command.join(" ")}`));
+          reject(
+            new Error(
+              `Timed out waiting for exec command: ${command.join(" ")}`,
+            ),
+          );
         }, 15_000);
         ws.onmessage = (event) => {
           const frame = JSON.parse(event.data) as ExecFrame;
@@ -1525,16 +2868,21 @@ async function execCommand(page: { evaluate: <T, A>(pageFunction: (arg: A) => Pr
           reject(new Error("Exec WebSocket failed"));
         };
       }),
-    { clusterId, podName, command }
+    { clusterId, podName, command },
   );
 }
 
 async function execInteractiveCommand(
-  page: { evaluate: <T, A>(pageFunction: (arg: A) => Promise<T>, arg: A) => Promise<T> },
+  page: {
+    evaluate: <T, A>(
+      pageFunction: (arg: A) => Promise<T>,
+      arg: A,
+    ) => Promise<T>;
+  },
   clusterId: string,
   podName: string,
   command: string[],
-  expectedOutput: string[]
+  expectedOutput: string[],
 ) {
   return page.evaluate(
     ({ clusterId, podName, command, expectedOutput }) =>
@@ -1542,11 +2890,13 @@ async function execInteractiveCommand(
         const params = new URLSearchParams({
           ns: "default",
           pod: podName,
-          container: podName
+          container: podName,
         });
         for (const part of command) params.append("command", part);
         const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const ws = new WebSocket(`${protocol}//${window.location.host}/api/clusters/${clusterId}/ws/exec?${params.toString()}`);
+        const ws = new WebSocket(
+          `${protocol}//${window.location.host}/api/clusters/${clusterId}/ws/exec?${params.toString()}`,
+        );
         const frames: ExecFrame[] = [];
         let settled = false;
         const finish = (callback: () => void) => {
@@ -1557,7 +2907,13 @@ async function execInteractiveCommand(
         };
         const timer = window.setTimeout(() => {
           ws.close();
-          finish(() => reject(new Error(`Timed out waiting for interactive exec command: ${command.join(" ")}`)));
+          finish(() =>
+            reject(
+              new Error(
+                `Timed out waiting for interactive exec command: ${command.join(" ")}`,
+              ),
+            ),
+          );
         }, 15_000);
         ws.onopen = () => {
           ws.send(JSON.stringify({ type: "resize", cols: 100, rows: 30 }));
@@ -1567,7 +2923,11 @@ async function execInteractiveCommand(
           frames.push(frame);
           if (frame.type === "error") {
             ws.close();
-            finish(() => reject(new Error(frame.message || "Interactive exec stream failed")));
+            finish(() =>
+              reject(
+                new Error(frame.message || "Interactive exec stream failed"),
+              ),
+            );
             return;
           }
           const output = frames.map((item) => item.message ?? "").join("");
@@ -1581,7 +2941,7 @@ async function execInteractiveCommand(
           finish(() => reject(new Error("Interactive exec WebSocket failed")));
         };
       }),
-    { clusterId, podName, command, expectedOutput }
+    { clusterId, podName, command, expectedOutput },
   );
 }
 
@@ -1819,7 +3179,7 @@ spec:
 function kubectlOutput(context: string, args: string[]) {
   return execFileSync("kubectl", ["--context", context, ...args], {
     env: process.env,
-    encoding: "utf8"
+    encoding: "utf8",
   }).trim();
 }
 
@@ -1827,7 +3187,7 @@ function kubectl(context: string, args: string[], allowFailure = false) {
   try {
     execFileSync("kubectl", ["--context", context, ...args], {
       env: process.env,
-      stdio: "inherit"
+      stdio: "inherit",
     });
   } catch (error) {
     if (!allowFailure) throw error;
@@ -1838,6 +3198,6 @@ function kubectlApply(context: string, manifest: string) {
   execFileSync("kubectl", ["--context", context, "apply", "-f", "-"], {
     env: process.env,
     input: manifest,
-    stdio: ["pipe", "inherit", "inherit"]
+    stdio: ["pipe", "inherit", "inherit"],
   });
 }

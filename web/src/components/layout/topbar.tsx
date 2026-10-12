@@ -380,7 +380,7 @@ export function Topbar({ clusters, onRefresh, selectedNamespaces, onSelectedName
         <Button variant="ghost" size="icon" onClick={onRefresh} aria-label="Refresh clusters">
           <RefreshCcw className="h-4 w-4" />
         </Button>
-        <Link to="/settings" aria-label="Settings" title="Account and plugins" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"><Settings className="h-4 w-4" /></Link>
+        <Link to="/settings" aria-label="Settings" title="Settings" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"><Settings className="h-4 w-4" /></Link>
         <Button variant="ghost" size="icon" onClick={toggleDensity} aria-label="Compact density" aria-pressed={compact} title={compact ? "Use comfortable density" : "Use compact density"} className="hidden sm:inline-flex">
           <Rows3 className="h-4 w-4" />
         </Button>

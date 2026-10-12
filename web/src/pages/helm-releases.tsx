@@ -1,3 +1,7 @@
+import { Card } from "../components/ui/card";
+import { PageHeader, PageShell } from "../components/ui/page";
+import { DataTable, type Column } from "../components/ui/data-table";
+import { Drawer } from "../components/ui/drawer";
 import { Anchor, History, Package, RefreshCcw, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -9,7 +13,7 @@ import {
   idleAccessCheck,
   isAccessBlocked,
   pendingAccessCheck,
-  type AccessCheck
+  type AccessCheck,
 } from "../lib/access";
 import { Button } from "../components/ui/button";
 import { ConfirmDialog } from "../components/ui/confirm-dialog";
@@ -32,7 +36,8 @@ function ageOf(updated: string) {
 function statusKind(status: string) {
   const s = status.toLowerCase();
   if (s === "deployed") return "success";
-  if (s === "failed" || s === "superseded" || s === "uninstalling") return "error";
+  if (s === "failed" || s === "superseded" || s === "uninstalling")
+    return "error";
   if (s.startsWith("pending") || s === "unknown") return "warning";
   return "unknown";
 }
@@ -46,12 +51,16 @@ export function HelmReleasesPage() {
   const [detail, setDetail] = useState<HelmReleaseDetail | null>(null);
   const [history, setHistory] = useState<HelmReleaseSummary[]>([]);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [actionState, setActionState] = useState<"idle" | "rolling-back" | "uninstalling">("idle");
+  const [actionState, setActionState] = useState<
+    "idle" | "rolling-back" | "uninstalling"
+  >("idle");
   const [actionMessage, setActionMessage] = useState("");
   const [confirmUninstall, setConfirmUninstall] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [rollbackAccess, setRollbackAccess] = useState<AccessCheck>(idleAccessCheck);
-  const [uninstallAccess, setUninstallAccess] = useState<AccessCheck>(idleAccessCheck);
+  const [rollbackAccess, setRollbackAccess] =
+    useState<AccessCheck>(idleAccessCheck);
+  const [uninstallAccess, setUninstallAccess] =
+    useState<AccessCheck>(idleAccessCheck);
 
   useEffect(() => {
     if (!clusterId) return;
@@ -64,7 +73,10 @@ export function HelmReleasesPage() {
         if (!cancelled) setReleases(next);
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof ApiError ? err.message : (err as Error).message);
+        if (!cancelled)
+          setError(
+            err instanceof ApiError ? err.message : (err as Error).message,
+          );
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -87,12 +99,15 @@ export function HelmReleasesPage() {
       return;
     }
     let cancelled = false;
+    setDetail(null);
+    setHistory([]);
+    setActionMessage("");
     setDetailLoading(true);
     setRollbackAccess(pendingAccessCheck);
     setUninstallAccess(pendingAccessCheck);
     Promise.all([
       api.helmRelease(clusterId, selected.namespace, selected.name),
-      api.helmReleaseHistory(clusterId, selected.namespace, selected.name)
+      api.helmReleaseHistory(clusterId, selected.namespace, selected.name),
     ])
       .then(([d, h]) => {
         if (cancelled) return;
@@ -100,14 +115,27 @@ export function HelmReleasesPage() {
         setHistory(h.sort((a, b) => b.revision - a.revision));
       })
       .catch((err) => {
-        if (!cancelled) setActionMessage(err instanceof Error ? err.message : "Failed to load release");
+        if (!cancelled)
+          setActionMessage(
+            err instanceof Error ? err.message : "Failed to load release",
+          );
       })
       .finally(() => {
         if (!cancelled) setDetailLoading(false);
       });
     void Promise.allSettled([
-      api.canI(clusterId, { verb: "patch", group: "", resource: "secrets", namespace: selected.namespace }),
-      api.canI(clusterId, { verb: "delete", group: "", resource: "secrets", namespace: selected.namespace })
+      api.canI(clusterId, {
+        verb: "patch",
+        group: "",
+        resource: "secrets",
+        namespace: selected.namespace,
+      }),
+      api.canI(clusterId, {
+        verb: "delete",
+        group: "",
+        resource: "secrets",
+        namespace: selected.namespace,
+      }),
     ]).then(([patchResult, deleteResult]) => {
       if (cancelled) return;
       setRollbackAccess(accessCheckFromSettled(patchResult));
@@ -123,13 +151,18 @@ export function HelmReleasesPage() {
     setActionState("rolling-back");
     setActionMessage("");
     try {
-      await api.helmRollback(clusterId, selected.namespace, selected.name, revision);
+      await api.helmRollback(
+        clusterId,
+        selected.namespace,
+        selected.name,
+        revision,
+      );
       setActionMessage(`Rolled back to revision ${revision}.`);
       await refresh();
       // Reload detail+history
       const [d, h] = await Promise.all([
         api.helmRelease(clusterId, selected.namespace, selected.name),
-        api.helmReleaseHistory(clusterId, selected.namespace, selected.name)
+        api.helmReleaseHistory(clusterId, selected.namespace, selected.name),
       ]);
       setDetail(d);
       setHistory(h.sort((a, b) => b.revision - a.revision));
@@ -173,81 +206,111 @@ export function HelmReleasesPage() {
   const rollbackDeniedReason = accessStatusMessage(rollbackAccess);
   const uninstallDeniedReason = accessStatusMessage(uninstallAccess);
 
+  const columns: Column<HelmReleaseSummary>[] = [
+    {
+      key: "name",
+      header: "Name",
+      textAccessor: (row) => row.name,
+      accessor: (row) => (
+        <span className="inline-flex items-center gap-2 font-medium">
+          <Package aria-hidden className="h-4 w-4 text-muted-foreground" />
+          {row.name}
+        </span>
+      ),
+    },
+    { key: "namespace", header: "Namespace", accessor: (row) => row.namespace },
+    {
+      key: "chart",
+      header: "Chart",
+      accessor: (row) => `${row.chart} ${row.version}`,
+    },
+    { key: "app", header: "App", accessor: (row) => row.appVersion || "—" },
+    { key: "revision", header: "Rev", accessor: (row) => row.revision },
+    {
+      key: "status",
+      header: "Status",
+      textAccessor: (row) => row.status,
+      accessor: (row) => (
+        <StatusBadge
+          status={statusKind(row.status)}
+          label={row.status}
+          pulse={false}
+          size="sm"
+        />
+      ),
+    },
+    {
+      key: "updated",
+      header: "Updated",
+      sortAccessor: (row) => Date.parse(row.updated) || 0,
+      accessor: (row) => ageOf(row.updated),
+    },
+  ];
+
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Helm Releases</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Releases tracked by Helm v3 in this cluster.</p>
-          <Link className="mt-2 inline-block text-sm underline" to={`/clusters/${clusterId}/helm/install`}>Install chart</Link>
+    <PageShell>
+      <PageHeader
+        title="Helm Releases"
+        description="Releases tracked by Helm v3 in this cluster."
+        actions={
+          <>
+            <Link
+              className="text-sm underline"
+              to={`/clusters/${clusterId}/helm/install`}
+            >
+              Install chart
+            </Link>
+            <Button
+              variant="secondary"
+              onClick={() => void refresh()}
+              disabled={loading}
+            >
+              <RefreshCcw className="h-4 w-4" />
+              Refresh
+            </Button>
+          </>
+        }
+      />
+      {error ? (
+        <div
+          role="alert"
+          className="rounded-md border border-destructive/35 bg-destructive/10 p-3 text-sm text-destructive"
+        >
+          {error}
         </div>
-        <Button variant="secondary" onClick={() => void refresh()} disabled={loading}>
-          <RefreshCcw className="h-4 w-4" />
-          Refresh
-        </Button>
-      </div>
-
-      {error ? <div className="rounded-md border border-destructive/35 bg-destructive/10 p-3 text-sm text-destructive">{error}</div> : null}
-
-      <div className="overflow-hidden rounded-lg border border-border">
-        <table className="w-full border-collapse text-left text-sm">
-          <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
-            <tr>
-              <th className="px-4 py-3 font-medium">Name</th>
-              <th className="px-4 py-3 font-medium">Namespace</th>
-              <th className="px-4 py-3 font-medium">Chart</th>
-              <th className="px-4 py-3 font-medium">App</th>
-              <th className="px-4 py-3 font-medium">Rev</th>
-              <th className="px-4 py-3 font-medium">Status</th>
-              <th className="px-4 py-3 font-medium">Updated</th>
-            </tr>
-          </thead>
-          <tbody>
-            {releases.length === 0 ? (
-              <tr>
-                <td className="px-4 py-10 text-center text-muted-foreground" colSpan={7}>
-                  {loading ? "Loading releases..." : "No Helm releases on this cluster."}
-                </td>
-              </tr>
-            ) : (
-              releases.map((rel) => (
-                <tr
-                  key={`${rel.namespace}/${rel.name}/${rel.revision}`}
-                  className="cursor-pointer border-t border-border transition-colors hover:bg-muted/50"
-                  onClick={() => setSelected(rel)}
-                >
-                  <td className="px-4 py-3 font-medium">
-                    <span className="inline-flex items-center gap-2">
-                      <Package className="h-4 w-4 text-muted-foreground" />
-                      {rel.name}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">{rel.namespace}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{rel.chart} {rel.version}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{rel.appVersion || "-"}</td>
-                  <td className="px-4 py-3 font-mono text-xs">{rel.revision}</td>
-                  <td className="px-4 py-3">
-                    <StatusBadge status={statusKind(rel.status)} label={rel.status} pulse={false} size="sm" />
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground">{ageOf(rel.updated)}</td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+      ) : null}
+      <DataTable
+        data={releases}
+        columns={columns}
+        keyExtractor={(row) => `${row.namespace}/${row.name}`}
+        loading={loading}
+        onRowClick={setSelected}
+        searchPlaceholder="Filter releases…"
+        emptyMessage="No Helm releases on this cluster."
+      />
 
       {selected ? (
-        <div className="fixed inset-y-0 right-0 z-40 flex w-full max-w-2xl flex-col overflow-hidden border-l border-border bg-card shadow-xl">
-          <div className="flex items-start justify-between border-b border-border px-5 py-4">
+        <Drawer
+          title={selected.name}
+          onClose={() => setSelected(null)}
+          className="max-w-2xl"
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-5 py-4">
             <div className="min-w-0">
-              <h2 className="truncate text-lg font-semibold">{selected.name}</h2>
+              <h2 className="truncate text-lg font-semibold">
+                {selected.name}
+              </h2>
               <p className="mt-1 truncate text-xs text-muted-foreground">
                 {selected.namespace} · {selected.chart} {selected.version}
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Link className="text-sm underline" to={`/clusters/${clusterId}/helm/releases/${encodeURIComponent(selected.namespace)}/${encodeURIComponent(selected.name)}/upgrade`}>Upgrade</Link>
+              <Link
+                className="text-sm underline"
+                to={`/clusters/${clusterId}/helm/releases/${encodeURIComponent(selected.namespace)}/${encodeURIComponent(selected.name)}/upgrade`}
+              >
+                Upgrade
+              </Link>
               <Button
                 variant="ghost"
                 size="sm"
@@ -258,58 +321,84 @@ export function HelmReleasesPage() {
                 <Trash2 className="h-4 w-4" />
                 Uninstall
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => setSelected(null)}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelected(null)}
+              >
                 Close
               </Button>
             </div>
           </div>
 
           <div className="flex-1 space-y-5 overflow-y-auto p-5">
-            {actionMessage ? <div className="rounded-md border border-border bg-muted p-3 text-sm">{actionMessage}</div> : null}
+            {actionMessage ? (
+              <div className="rounded-md border border-border bg-muted p-3 text-sm">
+                {actionMessage}
+              </div>
+            ) : null}
 
-            <section className="rounded-lg border border-border bg-background p-4">
+            <Card as="section" className="bg-background">
               <h3 className="mb-3 inline-flex items-center gap-2 text-sm font-semibold">
                 <History className="h-4 w-4" /> Revision History
               </h3>
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="text-muted-foreground">
+                <table className="k8s-table">
+                  <thead className="k8s-thead">
                     <tr>
-                      <th className="py-2 pr-4 font-medium">Rev</th>
-                      <th className="py-2 pr-4 font-medium">Status</th>
-                      <th className="py-2 pr-4 font-medium">Chart</th>
-                      <th className="py-2 pr-4 font-medium">Updated</th>
-                      <th className="py-2 text-right font-medium">Action</th>
+                      <th className="k8s-th">Rev</th>
+                      <th className="k8s-th">Status</th>
+                      <th className="k8s-th">Chart</th>
+                      <th className="k8s-th">Updated</th>
+                      <th className="k8s-th text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {history.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="py-4 text-center text-muted-foreground">
+                        <td
+                          colSpan={5}
+                          className="k8s-td text-center text-muted-foreground"
+                        >
                           {detailLoading ? "Loading..." : "No history."}
                         </td>
                       </tr>
                     ) : (
                       history.map((row) => (
-                        <tr key={row.revision} className="border-t border-border/50">
-                          <td className="py-2 pr-4 font-mono">{row.revision}</td>
-                          <td className="py-2 pr-4">
-                            <StatusBadge status={statusKind(row.status)} label={row.status} pulse={false} size="sm" />
+                        <tr key={row.revision} className="k8s-row">
+                          <td className="k8s-td font-mono">{row.revision}</td>
+                          <td className="k8s-td">
+                            <StatusBadge
+                              status={statusKind(row.status)}
+                              label={row.status}
+                              pulse={false}
+                              size="sm"
+                            />
                           </td>
-                          <td className="py-2 pr-4 font-mono text-muted-foreground">{row.chart} {row.version}</td>
-                          <td className="py-2 pr-4 text-muted-foreground">{ageOf(row.updated)}</td>
-                          <td className="py-2 text-right">
+                          <td className="k8s-td font-mono text-muted-foreground">
+                            {row.chart} {row.version}
+                          </td>
+                          <td className="k8s-td text-muted-foreground">
+                            {ageOf(row.updated)}
+                          </td>
+                          <td className="k8s-td text-right">
                             {row.revision === selected.revision ? (
-                              <span className="text-muted-foreground">Current</span>
+                              <span className="text-muted-foreground">
+                                Current
+                              </span>
                             ) : (
                               <Button
                                 variant="secondary"
                                 size="sm"
                                 onClick={() => void rollback(row.revision)}
-                                disabled={actionState !== "idle" || !canRollback}
+                                disabled={
+                                  actionState !== "idle" || !canRollback
+                                }
                                 title={rollbackDeniedReason || undefined}
                               >
-                                {actionState === "rolling-back" ? "Rolling back..." : "Roll back"}
+                                {actionState === "rolling-back"
+                                  ? "Rolling back..."
+                                  : "Roll back"}
                               </Button>
                             )}
                           </td>
@@ -319,32 +408,36 @@ export function HelmReleasesPage() {
                   </tbody>
                 </table>
               </div>
-            </section>
+            </Card>
 
             {detail?.notes ? (
-              <section className="rounded-lg border border-border bg-background p-4">
+              <Card as="section" className="bg-background">
                 <h3 className="mb-2 inline-flex items-center gap-2 text-sm font-semibold">
                   <Anchor className="h-4 w-4" /> Notes
                 </h3>
-                <pre className="whitespace-pre-wrap font-mono text-xs text-muted-foreground">{detail.notes}</pre>
-              </section>
+                <pre className="whitespace-pre-wrap font-mono text-xs text-muted-foreground">
+                  {detail.notes}
+                </pre>
+              </Card>
             ) : null}
 
-            <section className="rounded-lg border border-border bg-background p-4">
+            <Card as="section" className="bg-background">
               <h3 className="mb-2 text-sm font-semibold">Values</h3>
               <pre className="max-h-80 overflow-auto whitespace-pre-wrap rounded-md bg-muted/40 p-3 font-mono text-xs">
                 {valuesYaml || "No values."}
               </pre>
-            </section>
+            </Card>
 
             {detail?.manifest ? (
-              <section className="rounded-lg border border-border bg-background p-4">
+              <Card as="section" className="bg-background">
                 <h3 className="mb-2 text-sm font-semibold">Manifest</h3>
-                <pre className="max-h-96 overflow-auto whitespace-pre rounded-md bg-muted/40 p-3 font-mono text-xs">{detail.manifest}</pre>
-              </section>
+                <pre className="max-h-96 overflow-auto whitespace-pre rounded-md bg-muted/40 p-3 font-mono text-xs">
+                  {detail.manifest}
+                </pre>
+              </Card>
             ) : null}
           </div>
-        </div>
+        </Drawer>
       ) : null}
 
       <ConfirmDialog
@@ -362,6 +455,6 @@ export function HelmReleasesPage() {
         variant="destructive"
         loading={actionState === "uninstalling"}
       />
-    </div>
+    </PageShell>
   );
 }

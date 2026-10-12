@@ -1,3 +1,5 @@
+import { Card } from "../components/ui/card";
+import { Tabs } from "../components/ui/tabs";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { dump } from "js-yaml";
@@ -274,132 +276,127 @@ function ProjectDetail({
           </>
         }
       />
-      <nav aria-label="Project views" className="flex flex-wrap gap-2">
-        {["Overview", "Resources", "Map", "Access"].map((name) => (
-          <Button
-            key={name}
-            aria-current={tab === name ? "page" : undefined}
-            variant={tab === name ? "default" : "secondary"}
-            onClick={() => setTab(name)}
-          >
-            {name}
-          </Button>
-        ))}
-      </nav>
-      <QueryState
-        loading={loading}
-        error={error}
-        onRetry={() => setRefreshKey((n) => n + 1)}
+      <Tabs
+        label="Project views"
+        value={tab}
+        onChange={setTab}
+        tabs={["Overview", "Resources", "Map", "Access"].map((value) => ({
+          value,
+          label: value,
+        }))}
       >
-        {warnings.length > 0 && (
-          <div
-            role="status"
-            className="space-y-2 rounded-lg border border-status-warning/30 bg-status-warning/10 p-4 text-sm"
-          >
-            <p className="font-semibold">
-              Partial results — some resources could not be read.
-            </p>
-            {warnings.map((w, i) => (
-              <p key={i}>{w}</p>
-            ))}
-          </div>
-        )}
-        {tab === "Overview" && (
-          <PageSection title="Project overview">
-            <div className="grid gap-4 sm:grid-cols-3">
-              {[
-                [
-                  "Clusters",
-                  new Set(project?.scopes.map((s) => s.clusterId)).size,
-                ],
-                ["Namespaces", project?.scopes.length ?? 0],
-                ["Graph resources", rows.length],
-              ].map(([label, value]) => (
-                <div
-                  key={label}
-                  className="rounded-lg border border-border bg-card p-[var(--card-p)]"
-                >
-                  <p className="text-sm text-muted-foreground">{label}</p>
-                  <p className="mt-2 text-2xl font-semibold">{value}</p>
-                </div>
+        <QueryState
+          loading={loading}
+          error={error}
+          onRetry={() => setRefreshKey((n) => n + 1)}
+        >
+          {warnings.length > 0 && (
+            <div
+              role="status"
+              className="space-y-2 rounded-lg border border-status-warning/30 bg-status-warning/10 p-4 text-sm"
+            >
+              <p className="font-semibold">
+                Partial results — some resources could not be read.
+              </p>
+              {warnings.map((w, i) => (
+                <p key={i}>{w}</p>
               ))}
             </div>
-            <p className="text-sm text-muted-foreground">
-              Inventory includes workloads, services, and referenced resources
-              visible to your credentials. Project membership grants no
-              additional permissions.
-            </p>
-            <ul className="space-y-2">
-              {project?.scopes.map((s) => (
-                <li key={s.clusterId + s.namespace}>
-                  <Link
-                    className="text-sm underline"
-                    to={resourceLink(s.clusterId, {
-                      resource: "namespaces",
-                      name: s.namespace,
-                    })}
+          )}
+          {tab === "Overview" && (
+            <PageSection title="Project overview">
+              <div className="grid gap-4 sm:grid-cols-3">
+                {[
+                  [
+                    "Clusters",
+                    new Set(project?.scopes.map((s) => s.clusterId)).size,
+                  ],
+                  ["Namespaces", project?.scopes.length ?? 0],
+                  ["Graph resources", rows.length],
+                ].map(([label, value]) => (
+                  <Card key={label}>
+                    <p className="text-sm text-muted-foreground">{label}</p>
+                    <p className="mt-2 text-2xl font-semibold">{value}</p>
+                  </Card>
+                ))}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Inventory includes workloads, services, and referenced resources
+                visible to your credentials. Project membership grants no
+                additional permissions.
+              </p>
+              <ul className="space-y-2">
+                {project?.scopes.map((s) => (
+                  <li key={s.clusterId + s.namespace}>
+                    <Link
+                      className="text-sm underline"
+                      to={resourceLink(s.clusterId, {
+                        resource: "namespaces",
+                        name: s.namespace,
+                      })}
+                    >
+                      {clusters.find((c) => c.id === s.clusterId)?.name ??
+                        "Unavailable cluster"}{" "}
+                      / {s.namespace}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </PageSection>
+          )}
+          {tab === "Resources" && (
+            <DataTable
+              data={rows}
+              columns={columns}
+              keyExtractor={(r) => r.key}
+              searchPlaceholder="Search project resources"
+              emptyMessage="No graph resources are visible in these namespaces."
+            />
+          )}
+          {tab === "Map" && (
+            <>
+              <p className="text-sm text-muted-foreground">
+                Dependencies across project scopes.{" "}
+                {rows.length > 500
+                  ? "Showing the first 500 resources; use Resources to search the complete returned inventory."
+                  : "Select a resource name to open its details."}
+              </p>
+              <div className="h-[32rem] rounded-lg border border-border bg-card">
+                <ReactFlow
+                  key={refreshKey}
+                  nodes={graph.nodes}
+                  edges={graph.edges}
+                  fitView
+                  minZoom={0.05}
+                  nodesDraggable={false}
+                >
+                  <Background />
+                  <Controls />
+                </ReactFlow>
+              </div>
+            </>
+          )}
+          {tab === "Access" && (
+            <PageSection
+              title="Cluster access"
+              description="These checks use your Kubernetes credentials. Project settings do not change RBAC."
+            >
+              <ul className="space-y-2">
+                {results.map((r) => (
+                  <li
+                    className="rounded border border-border p-3 text-sm"
+                    key={r.scope.clusterId + r.scope.namespace}
                   >
-                    {clusters.find((c) => c.id === s.clusterId)?.name ??
+                    {clusters.find((c) => c.id === r.scope.clusterId)?.name ??
                       "Unavailable cluster"}{" "}
-                    / {s.namespace}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </PageSection>
-        )}
-        {tab === "Resources" && (
-          <DataTable
-            data={rows}
-            columns={columns}
-            keyExtractor={(r) => r.key}
-            searchPlaceholder="Search project resources"
-            emptyMessage="No graph resources are visible in these namespaces."
-          />
-        )}
-        {tab === "Map" && (
-          <>
-            <p className="text-sm text-muted-foreground">
-              Dependencies across project scopes.{" "}
-              {rows.length > 500
-                ? "Showing the first 500 resources; use Resources to search the complete returned inventory."
-                : "Select a resource name to open its details."}
-            </p>
-            <div className="h-[32rem] rounded-lg border border-border bg-card">
-              <ReactFlow
-                key={refreshKey}
-                nodes={graph.nodes}
-                edges={graph.edges}
-                fitView
-                minZoom={0.05}
-                nodesDraggable={false}
-              >
-                <Background />
-                <Controls />
-              </ReactFlow>
-            </div>
-          </>
-        )}
-        {tab === "Access" && (
-          <PageSection
-            title="Cluster access"
-            description="These checks use your Kubernetes credentials. Project settings do not change RBAC."
-          >
-            <ul className="space-y-2">
-              {results.map((r) => (
-                <li
-                  className="rounded border border-border p-3 text-sm"
-                  key={r.scope.clusterId + r.scope.namespace}
-                >
-                  {clusters.find((c) => c.id === r.scope.clusterId)?.name ??
-                    "Unavailable cluster"}{" "}
-                  / {r.scope.namespace}: {r.access}
-                </li>
-              ))}
-            </ul>
-          </PageSection>
-        )}
-      </QueryState>
+                    / {r.scope.namespace}: {r.access}
+                  </li>
+                ))}
+              </ul>
+            </PageSection>
+          )}
+        </QueryState>
+      </Tabs>
       <ConfirmDialog
         open={confirmDelete}
         onClose={() => setConfirmDelete(false)}

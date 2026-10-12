@@ -35,7 +35,11 @@ export function Select({
 }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select
-      className={cn("form-control h-[var(--control-h)] px-3", className)}
+      className={cn(
+        "form-control h-[var(--control-h)] px-3",
+        className,
+        "pr-9",
+      )}
       {...props}
     />
   );

@@ -2,7 +2,7 @@
 
 **Deferred from the default 0.2.0 experience.** External plugins are disabled unless `ASTRONOMER_LITE_PLUGINS_ENABLED=true`. With the default setting, no catalog is loaded, extension API requests return 404, and plugin routes, navigation and settings are hidden. Existing packages and saved settings are preserved.
 
-Astronomer-Lite retains an opt-in runtime for operator-installed external pages. External packages use the Lite SDK or the documented [Headlamp compatibility profile](headlamp-plugins.md).
+Astronomer Lite retains an opt-in runtime for operator-installed external pages. External packages use the Lite SDK or the documented [Headlamp compatibility profile](headlamp-plugins.md).
 
 ## Install and enable
 

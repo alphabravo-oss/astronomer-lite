@@ -1,3 +1,7 @@
+import { tableKeyboardNavigation } from "../lib/table-preferences";
+import { QueryState } from "../components/ui/query-state";
+import { Card } from "../components/ui/card";
+import { Select } from "../components/ui/input";
 import { RefreshCcw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
@@ -20,12 +24,7 @@ type EventsPageProps = {
 };
 
 type SortKey =
-  | "lastTimestamp"
-  | "namespace"
-  | "type"
-  | "reason"
-  | "regardingKind"
-  | "count";
+  "lastTimestamp" | "namespace" | "type" | "reason" | "regardingKind" | "count";
 
 export function EventsPage({ selectedNamespaces }: EventsPageProps) {
   const { clusterId = "" } = useParams();
@@ -155,11 +154,7 @@ export function EventsPage({ selectedNamespaces }: EventsPageProps) {
         }
       />
 
-      {error ? (
-        <div className="rounded-lg border border-destructive/35 bg-destructive/10 p-4 text-sm text-destructive">
-          {error}
-        </div>
-      ) : null}
+      {error ? <QueryState error={error} /> : null}
 
       <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3 md:flex-row md:items-center">
         <SearchInput
@@ -170,12 +165,12 @@ export function EventsPage({ selectedNamespaces }: EventsPageProps) {
           onValueChange={setQuery}
           placeholder="Search events"
         />
-        <select
+        <Select
           id="event-type-filter"
           name="event-type-filter"
           value={typeFilter}
           onChange={(event) => setTypeFilter(event.target.value)}
-          className="h-9 rounded-md border border-input bg-background px-3 text-sm outline-hidden focus:ring-2 focus:ring-ring"
+          className="w-auto max-w-full"
           aria-label="Filter by event type"
         >
           <option value="all">All types</option>
@@ -184,13 +179,13 @@ export function EventsPage({ selectedNamespaces }: EventsPageProps) {
               {type}
             </option>
           ))}
-        </select>
-        <select
+        </Select>
+        <Select
           id="event-kind-filter"
           name="event-kind-filter"
           value={kindFilter}
           onChange={(event) => setKindFilter(event.target.value)}
-          className="h-9 rounded-md border border-input bg-background px-3 text-sm outline-hidden focus:ring-2 focus:ring-ring"
+          className="w-auto max-w-full"
           aria-label="Filter by involved kind"
         >
           <option value="all">All kinds</option>
@@ -199,14 +194,17 @@ export function EventsPage({ selectedNamespaces }: EventsPageProps) {
               {kind}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
       <div className="text-xs uppercase text-muted-foreground">
         Watch: {watchStatus}
       </div>
 
-      <section className="overflow-hidden rounded-lg border border-border bg-card">
+      <section
+        onKeyDown={tableKeyboardNavigation}
+        className="overflow-x-auto rounded-lg border border-border bg-card"
+      >
         <table className="k8s-table">
           <thead className="k8s-thead">
             <tr>
@@ -259,6 +257,7 @@ export function EventsPage({ selectedNamespaces }: EventsPageProps) {
             {visibleEvents.map((event) => (
               <tr
                 key={eventKey(event)}
+                tabIndex={0}
                 className="table-row-hover k8s-row"
                 onClick={() => setSelectedEvent(event)}
               >
@@ -334,7 +333,7 @@ function EventDrawer({
     >
       <div className="h-full overflow-y-auto p-4">
         {activeTab === "message" ? (
-          <section className="rounded-lg border border-border bg-background p-4">
+          <Card as="section" className="bg-background">
             <div className="mb-3 flex items-center gap-2">
               <Badge tone={event.type === "Warning" ? "warning" : "success"}>
                 {event.type || "Normal"}
@@ -346,9 +345,12 @@ function EventDrawer({
             <p className="text-sm leading-6 text-muted-foreground">
               {event.note || event.action || "No message recorded."}
             </p>
-          </section>
+          </Card>
         ) : (
-          <section className="grid gap-3 rounded-lg border border-border bg-background p-4 text-sm sm:grid-cols-2">
+          <Card
+            as="section"
+            className="grid gap-3 bg-background text-sm sm:grid-cols-2"
+          >
             <Detail
               label="Object"
               value={`${event.regardingKind || "Object"}/${event.regardingName || "-"}`}
@@ -376,7 +378,7 @@ function EventDrawer({
               value={formatEventTime(event.lastTimestamp)}
             />
             <Detail label="Name" value={event.name} className="sm:col-span-2" />
-          </section>
+          </Card>
         )}
       </div>
     </BottomPanel>

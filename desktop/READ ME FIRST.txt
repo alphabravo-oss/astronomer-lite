@@ -1,17 +1,23 @@
-ASTRONOMER-LITE
+ASTRONOMER LITE
 Mac installation and first launch
 
 INSTALL
 
-1. Drag Astronomer-Lite.app to Applications. In the disk image, you can use
+1. Drag Astronomer Lite.app to Applications. In the disk image, you can use
    the Applications shortcut beside the app. For a ZIP download, move the
    extracted app into your Applications folder.
-2. Open Astronomer-Lite from Applications.
+2. Open Astronomer Lite from Applications.
+
+UPGRADING FROM RC.2 OR EARLIER
+
+The app is now named Astronomer Lite.app. After installing and opening it,
+you can remove the older Astronomer-Lite.app from Applications. Your
+existing clusters and preferences remain in the same profile directory.
 
 IF APPLE BLOCKS THE FIRST LAUNCH
 
 Unsigned release candidates have not been notarized by Apple. For these
-builds, macOS may say that Apple cannot check Astronomer-Lite for malicious
+builds, macOS may say that Apple cannot check Astronomer Lite for malicious
 software, or that the developer cannot be verified.
 
 For a copy you downloaded from our official GitHub release:
@@ -19,7 +25,7 @@ For a copy you downloaded from our official GitHub release:
 1. Dismiss the warning with Done or Cancel, leaving the app in Applications.
 2. Go to the Apple menu and open System Settings.
 3. Select Privacy & Security, then scroll to the Security section.
-4. Find the message about Astronomer-Lite and choose Open Anyway.
+4. Find the message about Astronomer Lite and choose Open Anyway.
 5. Authenticate if requested, then choose Open in the confirmation dialog.
 
 macOS saves an exception for this app. You can then launch it normally
@@ -39,4 +45,4 @@ https://github.com/alphabravo-oss/astronomer-lite/issues
 Apple's instructions:
 https://support.apple.com/en-us/102445
 
-Astronomer-Lite by AlphaBravo
+Astronomer Lite by AlphaBravo

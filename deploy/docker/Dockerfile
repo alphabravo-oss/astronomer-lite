@@ -29,7 +29,7 @@ RUN cd server && CGO_ENABLED=0 go build -ldflags "-s -w -X github.com/alphabravo
 FROM alpine:3.22
 ARG VERSION=dev
 ARG REVISION=unknown
-LABEL org.opencontainers.image.title="Astronomer-Lite" \
+LABEL org.opencontainers.image.title="Astronomer Lite" \
       org.opencontainers.image.version=$VERSION \
       org.opencontainers.image.revision=$REVISION \
       org.opencontainers.image.licenses="Apache-2.0" \

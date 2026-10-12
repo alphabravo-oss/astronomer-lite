@@ -1,3 +1,4 @@
+import { QueryState } from "../../components/ui/query-state";
 import { RefreshCcw } from "lucide-react";
 import { Button } from "../../components/ui/button";
 import { StatusBadge } from "../../components/ui/status-badge";
@@ -36,20 +37,16 @@ export function ObjectEventsPanel({
           Refresh
         </Button>
       </div>
-      {error ? (
-        <div className="m-4 rounded-md border border-destructive/35 bg-destructive/10 p-3 text-sm text-destructive">
-          {error}
-        </div>
-      ) : null}
+      {error ? <QueryState error={error} /> : null}
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-left text-sm">
-          <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
+        <table className="k8s-table">
+          <thead className="k8s-thead">
             <tr>
-              <th className="px-4 py-3 font-medium">Type</th>
-              <th className="px-4 py-3 font-medium">Reason</th>
-              <th className="px-4 py-3 font-medium">Message</th>
-              <th className="px-4 py-3 font-medium">Age</th>
-              <th className="px-4 py-3 font-medium">Count</th>
+              <th className="k8s-th">Type</th>
+              <th className="k8s-th">Reason</th>
+              <th className="k8s-th">Message</th>
+              <th className="k8s-th">Age</th>
+              <th className="k8s-th">Count</th>
             </tr>
           </thead>
           <tbody>

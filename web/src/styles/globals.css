@@ -3,6 +3,8 @@
 
 @layer base {
   :root {
+    --terminal-bg: 240 10% 4%;
+    --terminal-fg: 240 5% 84%;
     --font-inter: "Inter Variable", system-ui, sans-serif;
     --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
     --background: 0 0% 100%;
@@ -88,7 +90,9 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    font-feature-settings:
+      "rlig" 1,
+      "calt" 1;
   }
 
   ::-webkit-scrollbar {
@@ -115,11 +119,13 @@
 
 @layer components {
   .form-control {
-    @apply w-full rounded-md border border-input bg-background text-sm outline-hidden transition-colors placeholder:text-muted-foreground focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50;
+    @apply min-w-0 max-w-full w-full rounded-md border border-input bg-background text-sm outline-hidden transition-colors placeholder:text-muted-foreground focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .log-viewer {
-    @apply bg-[#0a0a0f] font-mono text-[13px] leading-5 text-zinc-300;
+    @apply font-mono text-[13px] leading-5;
+    background: hsl(var(--terminal-bg));
+    color: hsl(var(--terminal-fg));
   }
 
   .gauge-bar {
@@ -181,7 +187,11 @@
   }
 
   .k8s-table .k8s-td-muted {
-    color: color-mix(in srgb, hsl(var(--foreground)) 86%, hsl(var(--background)));
+    color: color-mix(
+      in srgb,
+      hsl(var(--foreground)) 86%,
+      hsl(var(--background))
+    );
   }
 
   .nav-item {
@@ -198,7 +208,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     scroll-behavior: auto !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
@@ -206,13 +218,13 @@
   }
 }
 
-@layer utilities {
-  .no-scrollbar::-webkit-scrollbar {
-    display: none;
-  }
-
-  .no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
+/* React Flow ships unlayered CSS; these scoped overrides must also be unlayered. */
+.topology-canvas .react-flow__controls-button {
+  background: hsl(var(--card));
+  color: hsl(var(--foreground));
+  border-color: hsl(var(--border));
+  fill: currentColor;
+}
+.topology-canvas .react-flow__controls-button:hover {
+  background: hsl(var(--accent));
 }

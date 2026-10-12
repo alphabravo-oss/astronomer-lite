@@ -7,9 +7,17 @@ const {
   shell,
 } = require("electron");
 const { join } = require("node:path");
+const { mkdirSync } = require("node:fs");
+const { buildMenuTemplate } = require("./menu.cjs");
 const { startServer, isLocalURL } = require("./launcher.cjs");
 
-app.setName("Astronomer-Lite");
+app.setName("Astronomer Lite");
+// Keep existing workspaces and preferences across the display-name change.
+if (!app.commandLine.hasSwitch("user-data-dir")) {
+  const profile = join(app.getPath("appData"), "Astronomer-Lite");
+  mkdirSync(profile, { recursive: true });
+  app.setPath("userData", profile);
+}
 let window;
 let server;
 let stopping = false;
@@ -50,7 +58,7 @@ if (!app.requestSingleInstanceLock()) {
       server.child.once("exit", () => {
         if (!stopping) {
           dialog.showErrorBox(
-            "Astronomer-Lite stopped",
+            "Astronomer Lite stopped",
             "The local server exited. Restart the app to reconnect.",
           );
           app.quit();
@@ -77,10 +85,11 @@ if (!app.requestSingleInstanceLock()) {
         height: 960,
         minWidth: 800,
         minHeight: 600,
-        title: "Astronomer-Lite by AlphaBravo",
+        title: "Astronomer Lite",
         icon: join(__dirname, "icon.png"),
         show: false,
         webPreferences: {
+          preload: join(__dirname, "preload.cjs"),
           nodeIntegration: false,
           contextIsolation: true,
           sandbox: true,
@@ -123,42 +132,27 @@ if (!app.requestSingleInstanceLock()) {
         return { action: "deny" };
       });
       Menu.setApplicationMenu(
-        Menu.buildFromTemplate([
-          ...(process.platform === "darwin" ? [{ role: "appMenu" }] : []),
-          { role: "fileMenu" },
-          { role: "editMenu" },
-          {
-            label: "View",
-            submenu: [
-              { role: "reload" },
-              { role: "resetZoom" },
-              { role: "zoomIn" },
-              { role: "zoomOut" },
-              { role: "togglefullscreen" },
-            ],
+        Menu.buildFromTemplate(buildMenuTemplate(process.platform, {
+          openSettings: () => {
+            if (window.isMinimized()) window.restore();
+            window.show();
+            window.focus();
+            if (isLocalURL(window.webContents.getURL(), origin)) {
+              window.webContents.send("astronomer:open-settings");
+            }
           },
-          { role: "windowMenu" },
-          {
-            label: "Help",
-            submenu: [
-              {
-                label: "About Astronomer-Lite",
-                click: () =>
-                  dialog.showMessageBox(window, {
-                    title: "Astronomer-Lite",
-                    message: `Astronomer-Lite ${app.getVersion()}`,
-                    detail: "Kubernetes workspace by AlphaBravo.",
-                  }),
-              },
-            ],
-          },
-        ]),
+          showAbout: () => dialog.showMessageBox(window, {
+            title: "Astronomer Lite",
+            message: `Astronomer Lite ${app.getVersion()}`,
+            detail: "Kubernetes workspace by AlphaBravo.",
+          }),
+        })),
       );
       await window.loadURL(origin);
       window.show();
     })
     .catch((error) => {
-      dialog.showErrorBox("Could not start Astronomer-Lite", error.message);
+      dialog.showErrorBox("Could not start Astronomer Lite", error.message);
       app.quit();
     });
 }

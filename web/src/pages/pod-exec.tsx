@@ -1,3 +1,6 @@
+import { QueryState } from "../components/ui/query-state";
+import { Card } from "../components/ui/card";
+import { Select, Input } from "../components/ui/input";
 import { FitAddon } from "@xterm/addon-fit";
 import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
@@ -8,7 +11,15 @@ import { Button } from "../components/ui/button";
 import { PageHeader, PageShell } from "../components/ui/page";
 import type { AccessReviewRequest, ExecFrame, PodDetail } from "../lib/api";
 import { api } from "../lib/api";
-import { accessCheckFromSettled, accessStatusMessage, idleAccessCheck, isAccessBlocked, isAccessDenied, pendingAccessCheck, type AccessCheck } from "../lib/access";
+import {
+  accessCheckFromSettled,
+  accessStatusMessage,
+  idleAccessCheck,
+  isAccessBlocked,
+  isAccessDenied,
+  pendingAccessCheck,
+  type AccessCheck,
+} from "../lib/access";
 import { cn } from "../lib/utils";
 
 const defaultCommand = "/bin/sh";
@@ -28,7 +39,9 @@ export function PodExecPage() {
   const [detail, setDetail] = useState<PodDetail | null>(null);
   const [container, setContainer] = useState("");
   const [command, setCommand] = useState(defaultCommand);
-  const [status, setStatus] = useState<"idle" | "connecting" | "connected" | "closed" | "error">("idle");
+  const [status, setStatus] = useState<
+    "idle" | "connecting" | "connected" | "closed" | "error"
+  >("idle");
   const [error, setError] = useState("");
   const [sessionKey, setSessionKey] = useState(0);
   const [access, setAccess] = useState<AccessCheck>(idleAccessCheck);
@@ -46,7 +59,7 @@ export function PodExecPage() {
       resource: "pods",
       subresource: attachMode ? "attach" : "exec",
       namespace: decodedNamespace,
-      name: decodedName
+      name: decodedName,
     };
     Promise.allSettled([api.canI(clusterId, review)]).then(([result]) => {
       if (!cancelled) setAccess(accessCheckFromSettled(result));
@@ -64,10 +77,15 @@ export function PodExecPage() {
       .then((nextDetail) => {
         if (cancelled) return;
         setDetail(nextDetail);
-        setContainer((current) => current || nextDetail.containers[0]?.name || "");
+        setContainer(
+          (current) => current || nextDetail.containers[0]?.name || "",
+        );
       })
       .catch((err) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load pod detail");
+        if (!cancelled)
+          setError(
+            err instanceof Error ? err.message : "Failed to load pod detail",
+          );
       });
     return () => {
       cancelled = true;
@@ -83,17 +101,18 @@ export function PodExecPage() {
     setError("");
     setStatus("connecting");
 
+    const terminalStyle = getComputedStyle(root);
     const terminal = new Terminal({
       cursorBlink: true,
       convertEol: true,
-      fontFamily: "var(--font-mono), JetBrains Mono, monospace",
+      fontFamily: terminalStyle.fontFamily,
       fontSize: 13,
       theme: {
-        background: "#0a0a0f",
-        foreground: "#d4d4d8",
-        cursor: "#fafafa",
-        selectionBackground: "#3f3f46"
-      }
+        background: terminalStyle.backgroundColor,
+        foreground: terminalStyle.color,
+        cursor: terminalStyle.color,
+        selectionBackground: "rgba(128, 128, 128, 0.35)",
+      },
     });
     const fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
@@ -110,7 +129,13 @@ export function PodExecPage() {
     const socket = new WebSocket(
       attachMode
         ? api.podAttachUrl(clusterId, decodedNamespace, decodedName, container)
-        : api.podExecUrl(clusterId, decodedNamespace, decodedName, container, commandParts(command))
+        : api.podExecUrl(
+            clusterId,
+            decodedNamespace,
+            decodedName,
+            container,
+            commandParts(command),
+          ),
     );
     socketRef.current = socket;
     terminalInstanceRef.current = terminal;
@@ -119,11 +144,18 @@ export function PodExecPage() {
     const sendResize = () => {
       fitAddon.fit();
       if (socket.readyState === WebSocket.OPEN) {
-        socket.send(JSON.stringify({ type: "resize", cols: terminal.cols, rows: terminal.rows }));
+        socket.send(
+          JSON.stringify({
+            type: "resize",
+            cols: terminal.cols,
+            rows: terminal.rows,
+          }),
+        );
       }
     };
     const disposable = terminal.onData((data) => {
-      if (socket.readyState === WebSocket.OPEN) socket.send(stdinEncoder.encode(data));
+      if (socket.readyState === WebSocket.OPEN)
+        socket.send(stdinEncoder.encode(data));
     });
     socket.onopen = () => {
       setStatus("connected");
@@ -136,7 +168,9 @@ export function PodExecPage() {
         terminal.write(frame.message ?? "");
       } else if (frame.type === "error") {
         setError(frame.message ?? `${modeLabel} session failed`);
-        terminal.writeln(`\r\n${frame.message ?? `${modeLabel} session failed`}`);
+        terminal.writeln(
+          `\r\n${frame.message ?? `${modeLabel} session failed`}`,
+        );
         setStatus("error");
       } else if (frame.type === "end") {
         terminal.writeln("\r\nSession ended.");
@@ -158,7 +192,15 @@ export function PodExecPage() {
       socket.close();
       terminal.dispose();
     };
-  }, [attachMode, clusterId, command, container, decodedName, decodedNamespace, modeLabel]);
+  }, [
+    attachMode,
+    clusterId,
+    command,
+    container,
+    decodedName,
+    decodedNamespace,
+    modeLabel,
+  ]);
 
   useEffect(() => {
     if (!container || accessBlocked) return;
@@ -166,10 +208,13 @@ export function PodExecPage() {
   }, [accessBlocked, connect, container, sessionKey]);
 
   return (
-    <PageShell className="space-y-5">
+    <PageShell>
       <PageHeader
         eyebrow={
-          <Link to={`/clusters/${clusterId}/pods`} className="inline-flex items-center gap-2 normal-case tracking-normal text-sm text-muted-foreground hover:text-foreground">
+          <Link
+            to={`/clusters/${clusterId}/pods`}
+            className="inline-flex items-center gap-2 normal-case tracking-normal text-sm text-muted-foreground hover:text-foreground"
+          >
             <ArrowLeft className="h-4 w-4" />
             Pods
           </Link>
@@ -177,8 +222,17 @@ export function PodExecPage() {
         title={decodedName}
         description={<span className="font-mono">{decodedNamespace}</span>}
         actions={
-          <Button variant="secondary" disabled={accessBlocked} onClick={() => setSessionKey((value) => value + 1)}>
-            <RefreshCcw className={cn("h-4 w-4", status === "connecting" && "animate-spin")} />
+          <Button
+            variant="secondary"
+            disabled={accessBlocked}
+            onClick={() => setSessionKey((value) => value + 1)}
+          >
+            <RefreshCcw
+              className={cn(
+                "h-4 w-4",
+                status === "connecting" && "animate-spin",
+              )}
+            />
             Reconnect
           </Button>
         }
@@ -186,45 +240,59 @@ export function PodExecPage() {
 
       {isAccessDenied(access) ? (
         <div className="rounded-lg border border-destructive/35 bg-destructive/10 p-4 text-sm text-destructive">
-          {modeLabel} is not allowed by Kubernetes RBAC: {accessStatusMessage(access)}
+          {modeLabel} is not allowed by Kubernetes RBAC:{" "}
+          {accessStatusMessage(access)}
         </div>
       ) : null}
 
-      {error ? <div className="rounded-lg border border-destructive/35 bg-destructive/10 p-4 text-sm text-destructive">{error}</div> : null}
+      {error ? <QueryState error={error} /> : null}
 
-      <section className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-4">
+      <Card as="section" className="flex flex-wrap items-end gap-3">
         <label className="space-y-1 text-sm">
-          <span className="text-xs font-medium uppercase text-muted-foreground">Container</span>
-          <select
+          <span className="text-xs font-medium uppercase text-muted-foreground">
+            Container
+          </span>
+          <Select
             value={container}
             onChange={(event) => setContainer(event.target.value)}
-            className="h-9 min-w-48 rounded-md border border-input bg-background px-3 text-sm"
+            className="w-auto max-w-full"
           >
             {(detail?.containers ?? []).map((item) => (
               <option key={item.name} value={item.name}>
                 {item.name}
               </option>
             ))}
-          </select>
+          </Select>
         </label>
         {!attachMode ? (
           <label className="min-w-56 flex-1 space-y-1 text-sm">
-            <span className="text-xs font-medium uppercase text-muted-foreground">Command</span>
-            <input
+            <span className="text-xs font-medium uppercase text-muted-foreground">
+              Command
+            </span>
+            <Input
               value={command}
               onChange={(event) => setCommand(event.target.value)}
-              className="h-9 w-full rounded-md border border-input bg-background px-3 font-mono text-sm outline-hidden focus:ring-2 focus:ring-ring"
+              className="font-mono"
             />
           </label>
         ) : null}
-        <Button variant="secondary" disabled={accessBlocked} onClick={() => setSessionKey((value) => value + 1)}>
+        <Button
+          variant="secondary"
+          disabled={accessBlocked}
+          onClick={() => setSessionKey((value) => value + 1)}
+        >
           <PlugZap className="h-4 w-4" />
           {attachMode ? "Attach" : "Connect"}
         </Button>
-        <div className="ml-auto text-xs uppercase text-muted-foreground">{status}</div>
-      </section>
+        <div className="ml-auto text-xs uppercase text-muted-foreground">
+          {status}
+        </div>
+      </Card>
 
-      <div ref={terminalRef} className="h-[calc(100vh-20rem)] min-h-96 overflow-hidden rounded-lg border border-border bg-[#0a0a0f] p-2" />
+      <div
+        ref={terminalRef}
+        className="h-[calc(100dvh-20rem)] min-h-96 overflow-hidden rounded-lg border border-border log-viewer p-2"
+      />
     </PageShell>
   );
 }
@@ -232,7 +300,7 @@ export function PodExecPage() {
 function commandParts(command: string) {
   const parts: string[] = [];
   let current = "";
-  let quote: "'" | "\"" | null = null;
+  let quote: "'" | '"' | null = null;
   let escaped = false;
 
   for (const char of command.trim()) {
@@ -250,7 +318,7 @@ function commandParts(command: string) {
       else current += char;
       continue;
     }
-    if (char === "'" || char === "\"") {
+    if (char === "'" || char === '"') {
       quote = char;
       continue;
     }

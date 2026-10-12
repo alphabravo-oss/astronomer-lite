@@ -59,3 +59,10 @@ jobs:
             ASTRONOMER_LITE_CONFIG_DIR="$RUNNER_TEMP/astronomer-lite" \
             SERVER_LOG="$RUNNER_TEMP/astronomer-lite.log" \
             ./scripts/run-k3d-e2e.sh
+      - name: Preserve browser review evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cluster-browser-${{ strategy.job-index }}
+          path: web/test-results-*
+          if-no-files-found: ignore

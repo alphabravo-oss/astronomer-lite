@@ -1,4 +1,4 @@
-# Releasing Astronomer-Lite
+# Releasing Astronomer Lite
 
 ## License and version
 
@@ -11,8 +11,8 @@ Astronomer repository itself remains under its existing license.
 `VERSION` is the canonical release version. Update it with:
 
 ```sh
-node scripts/release-version.cjs set 0.2.0-rc.2
-# Write release/notes/0.2.0-rc.2.md with the actual changes and limitations.
+node scripts/release-version.cjs set 0.2.0-rc.3
+# Write release/notes/0.2.0-rc.3.md with the actual changes and limitations.
 make release-check
 ```
 

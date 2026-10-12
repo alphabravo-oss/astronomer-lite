@@ -1,5 +1,5 @@
 import Editor, { loader } from "@monaco-editor/react";
-import { Check, Copy, Download, Loader2, Save } from "lucide-react";
+import { Check, Copy, Download, Loader2 } from "lucide-react";
 import * as monaco from "monaco-editor/esm/vs/editor/editor.api.js";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "../../lib/utils";
@@ -12,8 +12,6 @@ type YamlEditorProps = {
   value: string;
   onChange?: (value: string) => void;
   readOnly?: boolean;
-  onSave?: (value: string) => void;
-  saving?: boolean;
   height?: string;
   className?: string;
   // Optional context for OpenAPI hover descriptions. When all three are
@@ -32,7 +30,9 @@ const MAX_PATH_DEPTH = 32;
 // Extract the leading indent (in columns; tabs counted as one column) and the
 // key portion of a YAML key line. Returns null for non-key lines (comments,
 // blanks, pure list items without a `key:` after the marker).
-function parseKeyLine(line: string): { indent: number; key: string; isListMarker: boolean } | null {
+function parseKeyLine(
+  line: string,
+): { indent: number; key: string; isListMarker: boolean } | null {
   // Skip comments and blank lines.
   if (/^\s*(#|$)/.test(line)) return null;
   const match = line.match(/^(\s*)(-\s+)?([^\s:#-][^:#]*?):(?:\s|$)/);
@@ -79,13 +79,11 @@ export function YamlEditor({
   value,
   onChange,
   readOnly = false,
-  onSave,
-  saving,
   height = "calc(100vh - 21rem)",
   className,
   kind,
   apiVersion,
-  openApiDoc
+  openApiDoc,
 }: YamlEditorProps) {
   const [copied, setCopied] = useState(false);
 
@@ -125,16 +123,26 @@ export function YamlEditor({
         if (colonIdx < 0 || position.column - 1 > colonIdx) return undefined;
         const path = computeYamlPath(model.getValue(), position.lineNumber);
         if (path.length === 0) return undefined;
-        const description = lookupFieldDoc(doc, activeKind, activeApiVersion, path.join("."));
+        const description = lookupFieldDoc(
+          doc,
+          activeKind,
+          activeApiVersion,
+          path.join("."),
+        );
         if (!description) return undefined;
         return {
-          range: new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn),
+          range: new monaco.Range(
+            position.lineNumber,
+            word.startColumn,
+            position.lineNumber,
+            word.endColumn,
+          ),
           contents: [
             { value: `**${path.join(".")}**` },
-            { value: description }
-          ]
+            { value: description },
+          ],
         };
-      }
+      },
     });
   }, []);
 
@@ -154,39 +162,39 @@ export function YamlEditor({
   }, [value]);
 
   return (
-    <div className={cn("flex min-h-[calc(100vh-21rem)] flex-col overflow-hidden rounded-lg border border-border bg-[#0a0a0f]", className)}>
-      <div className="flex items-center justify-between border-b border-[#3c3c3c] bg-[#252526] px-3 py-1.5">
-        <span className="text-xs font-medium uppercase tracking-wide text-[#cccccc]/60">YAML</span>
+    <div
+      className={cn(
+        "flex min-h-[calc(100vh-21rem)] flex-col overflow-hidden rounded-lg border border-border bg-terminal",
+        className,
+      )}
+    >
+      <div className="flex items-center justify-between border-b border-border bg-terminal px-3 py-1.5">
+        <span className="text-xs font-medium uppercase tracking-wide text-terminal-foreground/60">
+          YAML
+        </span>
         <div className="flex items-center gap-1">
           <button
             type="button"
             onClick={() => void copyYaml()}
-            className="rounded p-1.5 text-[#cccccc]/80 transition-colors hover:bg-[#3c3c3c] hover:text-[#cccccc]"
+            className="rounded p-1.5 text-terminal-foreground/80 transition-colors hover:bg-white/10 hover:text-terminal-foreground"
             title={copied ? "Copied" : "Copy"}
             aria-label={copied ? "Copied YAML" : "Copy YAML"}
           >
-            {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+            {copied ? (
+              <Check className="h-3.5 w-3.5" />
+            ) : (
+              <Copy className="h-3.5 w-3.5" />
+            )}
           </button>
           <button
             type="button"
             onClick={downloadYaml}
-            className="rounded p-1.5 text-[#cccccc]/80 transition-colors hover:bg-[#3c3c3c] hover:text-[#cccccc]"
+            className="rounded p-1.5 text-terminal-foreground/80 transition-colors hover:bg-white/10 hover:text-terminal-foreground"
             title="Download"
             aria-label="Download YAML"
           >
             <Download className="h-3.5 w-3.5" />
           </button>
-          {!readOnly && onSave ? (
-            <button
-              type="button"
-              onClick={() => onSave(value)}
-              disabled={saving}
-              className="ml-1 inline-flex items-center gap-1.5 rounded bg-blue-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-blue-700 disabled:pointer-events-none disabled:opacity-50"
-            >
-              {saving ? <Loader2 className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
-              Save
-            </button>
-          ) : null}
         </div>
       </div>
       <Editor
@@ -195,7 +203,7 @@ export function YamlEditor({
         theme="vs-dark"
         value={value}
         loading={
-          <div className="flex h-full items-center justify-center bg-[#1e1e1e]">
+          <div className="flex h-full items-center justify-center bg-terminal">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
         }
@@ -213,7 +221,7 @@ export function YamlEditor({
           renderLineHighlight: "line",
           scrollBeyondLastLine: false,
           tabSize: 2,
-          wordWrap: "on"
+          wordWrap: "on",
         }}
       />
     </div>

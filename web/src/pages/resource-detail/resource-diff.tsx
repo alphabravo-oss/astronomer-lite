@@ -33,6 +33,7 @@ export function ResourceDiff({
                 <button
                   key={nextMode}
                   type="button"
+                  aria-pressed={mode === nextMode}
                   className={cn(
                     "rounded px-2.5 py-1 text-xs font-medium capitalize transition-colors",
                     mode === nextMode

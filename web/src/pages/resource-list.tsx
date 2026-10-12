@@ -424,6 +424,7 @@ export function ResourceListPage({
   return (
     <PageShell>
       <PageHeader
+        level={discoveredResource ? 2 : 1}
         title={activeResource.label}
         description={
           <>

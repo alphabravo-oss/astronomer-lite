@@ -1,3 +1,4 @@
+import { Card } from "../../components/ui/card";
 import type {
   DiscoveredResource,
   K8sResourceRow,
@@ -110,7 +111,10 @@ export function ResourceSummary({
 
   return (
     <div className="space-y-4">
-      <section className="grid gap-3 rounded-lg border border-border bg-background p-4 text-sm sm:grid-cols-2">
+      <Card
+        as="section"
+        className="grid gap-3 bg-background text-sm sm:grid-cols-2"
+      >
         <SummaryField label="Kind" value={text(detail.kind)} />
         <SummaryField label="API Version" value={text(detail.apiVersion)} />
         <SummaryField
@@ -131,10 +135,10 @@ export function ResourceSummary({
           value={text(metadata.resourceVersion)}
         />
         <SummaryField label="Generation" value={text(metadata.generation)} />
-      </section>
+      </Card>
 
       {Object.keys(status).length > 0 ? (
-        <section className="rounded-lg border border-border bg-background p-4">
+        <Card as="section" className="bg-background">
           <h3 className="mb-3 text-sm font-semibold">Status</h3>
           <dl className="grid gap-3 text-sm sm:grid-cols-2">
             {Object.entries(status)
@@ -157,7 +161,7 @@ export function ResourceSummary({
                 />
               ))}
           </dl>
-        </section>
+        </Card>
       ) : null}
 
       {showWorkloadDetails ? (
@@ -216,7 +220,7 @@ export function ResourceSummary({
       />
 
       {ownerRefs.length > 0 ? (
-        <section className="rounded-lg border border-border bg-background p-4">
+        <Card as="section" className="bg-background">
           <h3 className="mb-3 text-sm font-semibold">Owners</h3>
           <div className="space-y-2">
             {ownerRefs.map((owner, index) => {
@@ -236,7 +240,7 @@ export function ResourceSummary({
               );
             })}
           </div>
-        </section>
+        </Card>
       ) : null}
     </div>
   );
