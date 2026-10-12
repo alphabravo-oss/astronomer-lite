@@ -19,7 +19,7 @@ for (const width of [900, 1440]) {
     const env = { ...process.env, ASTRONOMER_LITE_PLUGINS_ENABLED: "false", XDG_CONFIG_HOME: profile, APPDATA: profile, KUBECONFIG: join(profile, "empty-kubeconfig") };
     const app = await electron.launch({ executablePath, args, env, timeout: 30_000 });
     let origin = "";
-    let failed = false;
+    let failure: unknown;
     try {
       expect(await realpath(await app.evaluate(({ app }) => app.getPath("userData")))).toBe(profile);
       const page = await app.firstWindow();
@@ -48,9 +48,8 @@ for (const width of [900, 1440]) {
       await expect(electron.launch({ executablePath, args, env, timeout: 10_000 })).rejects.toThrow();
       await expect(page.getByRole("heading", { name: "Settings", exact: true })).toBeVisible();
     } catch (error) {
-      failed = true;
+      failure = error;
       console.error(error);
-      throw error;
     } finally {
       let timer: ReturnType<typeof setTimeout> | undefined;
       try {
@@ -60,12 +59,13 @@ for (const width of [900, 1440]) {
         ]);
       } catch (error) {
         app.process().kill("SIGKILL");
-        if (!failed) throw error;
+        failure ??= error;
       } finally {
         clearTimeout(timer);
         await rm(profile, { recursive: true, force: true });
       }
     }
+    if (failure) throw failure;
     await expect.poll(async () => {
       try { await fetch(`${origin}/api/healthz`, { signal: AbortSignal.timeout(1000) }); return false; } catch { return true; }
     }).toBe(true);
